@@ -1,63 +1,208 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function TeacherDashboardPage() {
   const router = useRouter();
+  const fileInputRef = useRef(null);
   const [teacherData, setTeacherData] = useState(null);
   const [loading, setLoading] = useState(true);
-console.log(teacherData, "TeacherData")
+  const [uploading, setUploading] = useState(false);
+
+  const fetchDashboard = async () => {
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/teacher/dashboard', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Unauthorized');
+      const data = await res.json();
+      setTeacherData(data);
+    } catch (err) {
+      console.error(err);
+      router.push('/login');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
-
     if (!token) {
       router.push('/login');
       return;
     }
-
-    const fetchDashboard = async () => {
-      try {
-        const res = await fetch('http://localhost:5000/api/auth/teacher/dashboard', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-      
-        });
-        if (!res.ok) {
-          throw new Error('Unauthorized');
-        }
-    console.log(res)
-        const data = await res.json();
-        setTeacherData(data);
-      } catch (err) {
-        console.error(err);
-        router.push('/login'); // In case of token issues
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDashboard();
   }, [router]);
 
-  if (loading) return <p className="p-6">Loading dashboard...</p>;
+  const handleImageClick = () => {
+    fileInputRef.current.click();
+  };
 
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('profileImage', file);
+
+    try {
+      setUploading(true);
+      const res = await fetch('http://localhost:5000/api/teachers/profile-picture', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error('Upload failed');
+      const data = await res.json();
+      setTeacherData(prev => ({
+        ...prev,
+        teacher: { ...prev.teacher, profileImage: data.profileImage },
+      }));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (loading) return <p className="p-6">Loading dashboard...</p>;
   if (!teacherData) return <p className="p-6 text-red-500">Unable to load dashboard data.</p>;
 
-  return (
-    <main className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="max-w-5xl mx-auto py-10 px-6">
-        <h1 className="text-3xl font-bold mb-4 text-indigo-600">Welcome, {teacherData.teacher.name} 👋</h1>
-        <p className="mb-6">Here's a summary of your dashboard:</p>
+  const { teacher } = teacherData;
 
-        <div className="bg-white shadow p-6 rounded-lg">
-          <p><strong>Email:</strong> {teacherData.teacher.email}</p>
-          <p><strong>Role:</strong> {teacherData.teacher.role}</p>
-          <p><strong>Eligibility:</strong> {teacherData.teacher.isEligible ? '✅ Eligible' : '❌ Not Eligible'}</p>
-          
+  return (
+    <div className="max-w-5xl mx-auto mt-8 px-4">
+      {/* Profile Header */}
+      <div className="bg-white rounded-xl shadow p-6 flex flex-col md:flex-row items-center gap-6 relative">
+      <div className="relative w-32 h-32 group">
+  {/* Profile Image */}
+  <img
+    src={teacher?.profileImage || '/default-avatar.png'}
+    alt="Profile"
+    className="w-full h-full rounded-full object-cover border-4 border-blue-500"
+  />
+
+  {/* Camera Overlay (shown on hover only) */}
+  <div
+    onClick={handleImageClick}
+    className="absolute inset-0 bg-black bg-opacity-40 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+  >
+    <span className="text-white text-2xl">📷</span>
+  </div>
+
+  {/* Hidden File Input */}
+  <input
+    type="file"
+    accept="image/*"
+    className="hidden"
+    ref={fileInputRef}
+    onChange={handleFileChange}
+  />
+</div>
+
+
+        <div>
+          <h1 className="text-3xl font-bold text-gray-800">{teacher.name}</h1>
+          <p className="text-gray-600 mt-1">{teacher.email}</p>
+          <div className="flex gap-3 mt-2 flex-wrap">
+            <span className="badge badge-outline">Role: {teacher.role}</span>
+            <span className="badge badge-outline">
+              {teacher.isEligible ? '✅ Eligible' : '❌ Not Eligible'}
+            </span>
+            <span className="badge badge-outline">
+              {teacher.hasPaid ? '💰 Paid' : '🚫 Not Paid'}
+            </span>
+          </div>
+          {uploading && <p className="text-sm text-blue-500 mt-2">Uploading...</p>}
         </div>
       </div>
-    </main>
+
+      {/* Sections */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <div className="bg-white rounded-xl shadow p-6 text-center">
+          <h2 className="text-xl font-semibold mb-2 text-blue-600">📦 Post Stats</h2>
+          <p className="text-gray-500">You haven't posted any tuition yet.</p>
+        </div>
+        <div className="bg-white rounded-xl shadow p-6 text-center">
+          <h2 className="text-xl font-semibold mb-2 text-blue-600">📅 Upcoming Schedule</h2>
+          <p className="text-gray-500">No upcoming sessions scheduled.</p>
+        </div>
+      </div>
+    </div>
   );
 }
+
+
+
+
+
+// 'use client';
+// import { useEffect, useState } from 'react';
+
+// export default function TeacherDashboard() {
+//   const [teacher, setTeacher] = useState(null);
+
+//   useEffect(() => {
+//     // Mock for now – replace with API call later
+//     setTeacher({
+//       name: 'Kazi Shabbin',
+//       location: 'Bangladesh Blvd., Paterson, NJ',
+//       verified: true,
+//       profileImage: '/SHABBU.jpg', // replace with real image URL later
+//     });
+//   }, []);
+
+//   return (
+//     <div className="max-w-4xl mx-auto p-6">
+//       <div className="flex flex-col md:flex-row gap-6 items-center bg-white shadow-lg p-6 rounded-2xl">
+//         <div className="avatar">
+//           <div className="w-32 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
+//             <img src={teacher?.profileImage} alt="Profile" />
+//           </div>
+//         </div>
+
+//         <div className="flex-1 text-center md:text-left">
+//           <h2 className="text-2xl font-bold text-gray-800">{teacher?.name}</h2>
+//           <p className="text-gray-500">{teacher?.location}</p>
+
+//           <div className="mt-2 flex justify-center md:justify-start gap-2">
+//             {teacher?.verified ? (
+//               <span className="badge badge-success">Verified</span>
+//             ) : (
+//               <span className="badge badge-warning">Not Verified</span>
+//             )}
+//             <span className="badge badge-info">Tutor</span>
+//           </div>
+
+//           <button className="btn btn-primary mt-4">Post New Content</button>
+//         </div>
+//       </div>
+
+//       {/* Content Summary */}
+//       <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+//         <div className="card bg-base-100 shadow-md">
+//           <div className="card-body">
+//             <h3 className="card-title">📚 Your Content</h3>
+//             <p>0 posts published yet.</p>
+//             <div className="card-actions justify-end">
+//               <button className="btn btn-sm btn-outline btn-primary">View Posts</button>
+//             </div>
+//           </div>
+//         </div>
+
+//         <div className="card bg-base-100 shadow-md">
+//           <div className="card-body">
+//             <h3 className="card-title">🎓 Eligibility</h3>
+//             <p>You haven’t passed the eligibility test yet.</p>
+//             <div className="card-actions justify-end">
+//               <button className="btn btn-sm btn-outline btn-accent">Take Test</button>
+//             </div>
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
