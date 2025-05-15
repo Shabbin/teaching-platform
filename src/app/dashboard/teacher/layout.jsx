@@ -3,8 +3,18 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Bell, MessageCircle, LogOut, Settings, User } from 'lucide-react';
-
+import {
+  Bell,
+  MessageCircle,
+  LogOut,
+  Settings,
+  User,
+  HelpCircle,
+  Menu,
+  X,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import MessengerPopup from './components/MessengerPopup';
 const navItems = [
   { label: 'Dashboard Home', href: '/dashboard/teacher' },
   { label: 'Post Content', href: '/dashboard/teacher/post-content' },
@@ -19,6 +29,7 @@ export default function TeacherDashboardLayout({ children }) {
   const router = useRouter();
   const [profileImage, setProfileImage] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
   const dropdownRef = useRef(null);
 
   const handleLogout = () => {
@@ -55,9 +66,18 @@ export default function TeacherDashboardLayout({ children }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navbar */}
-      <header className="bg-white shadow px-6 py-4 flex items-center justify-between">
+      <header className="bg-white shadow px-6 py-4 flex items-center justify-between relative">
         <div className="text-xl font-bold text-indigo-600">Teacher Panel</div>
 
+        {/* Mobile Nav Toggle */}
+        <button
+          className="md:hidden text-gray-700"
+          onClick={() => setNavOpen(!navOpen)}
+        >
+          {navOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
+
+        {/* Desktop Nav */}
         <nav className="hidden md:flex space-x-6">
           {navItems.map((item) => (
             <Link
@@ -70,30 +90,31 @@ export default function TeacherDashboardLayout({ children }) {
           ))}
         </nav>
 
+        {/* Right Icons */}
         <div className="flex items-center space-x-4 relative" ref={dropdownRef}>
-          {/* Bell Icon */}
           <button className="text-gray-600 hover:text-indigo-600">
             <Bell className="w-5 h-5" />
           </button>
 
-          {/* Messenger Icon */}
-          <button className="text-gray-600 hover:text-indigo-600">
-            <MessageCircle className="w-5 h-5" />
-          </button>
+          <MessengerPopup />
+          <img
+            src={profileImage || '/default-profile.png'}
+            alt="Profile"
+            className="w-10 h-10 rounded-full object-cover border border-gray-300 cursor-pointer"
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+          />
 
-          {/* Profile Image Dropdown Trigger */}
-          <div className="relative">
-            <img
-              src={profileImage || '/default-profile.png'}
-              alt="Profile"
-              className="w-10 h-10 rounded-full object-cover border border-gray-300 cursor-pointer"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-            />
-
-            {/* Dropdown Menu */}
+          {/* Animated Dropdown */}
+          <AnimatePresence>
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
-                <ul className="flex flex-col text-sm text-gray-700">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -5 }}
+                transition={{ duration: 0.2 }}
+                className="absolute right-0 top-14 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden"
+              >
+                <ul className="flex flex-col text-sm text-gray-800 divide-y divide-gray-100">
                   <li>
                     <Link
                       href="/dashboard/teacher/profile"
@@ -115,7 +136,7 @@ export default function TeacherDashboardLayout({ children }) {
                       href="/help"
                       className="flex items-center px-4 py-3 hover:bg-gray-100"
                     >
-                      ❓ Help
+                      <HelpCircle className="w-4 h-4 mr-2" /> Help
                     </Link>
                   </li>
                   <li>
@@ -127,11 +148,26 @@ export default function TeacherDashboardLayout({ children }) {
                     </button>
                   </li>
                 </ul>
-              </div>
+              </motion.div>
             )}
-          </div>
+          </AnimatePresence>
         </div>
       </header>
+
+      {/* Mobile Navigation */}
+      {navOpen && (
+        <div className="md:hidden px-6 py-2 bg-white shadow space-y-2">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="block text-gray-700 hover:text-indigo-600 font-medium"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="p-6">{children}</main>
