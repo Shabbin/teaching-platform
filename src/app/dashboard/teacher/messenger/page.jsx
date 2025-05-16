@@ -1,113 +1,174 @@
-'use client';
+'use client'
+import { useEffect, useState } from 'react';
+import axios from 'axios';
 
-import { useState } from 'react';
-import { Send } from 'lucide-react';
+export default function MessengerPage() {
+  const [conversations, setConversations] = useState([]);
+  const [selectedChat, setSelectedChat] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null);
+const [text, setText] = useState('');
+  useEffect(() => {
+    // TODO: Replace with actual auth state or token decode
+    setCurrentUserId(localStorage.getItem('userId')); // or fetch from context
+console.log(selectedChat,"HSDF")
+    // Fetch all messages (preview latest message per user)
+    axios.get('http://localhost:5000/api/messages/all', {
+  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+})
+.then(res => {
+  const uniqueConversations = getUniqueConversations(res.data);
+  Promise.all(
+    uniqueConversations.map(conv =>
+      axios.get(`http://localhost:5000/api/messages/${conv.userId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      }).then(res => ({
+        ...conv,
+        name: res.data.name,
+        avatar: res.data.profileImage
+      }))
+    )
+  ).then(setConversations);
+});
+  }, []);
 
-const dummyConversations = [
-  { id: 1, name: 'Student A', lastMessage: 'Thanks for your help!', userId: 'user_1' },
-  { id: 2, name: 'Student B', lastMessage: 'Can we reschedule?', userId: 'user_2' },
-  { id: 3, name: 'Student C', lastMessage: 'I have a doubt in physics', userId: 'user_3' },
-];
+  const getUniqueConversations = (messages) => {
+  const unique = {};
 
-const dummyMessages = {
-  user_1: [
-    { from: 'me', text: 'Hi there!' },
-    { from: 'them', text: 'Thanks for your help!' },
-  ],
-  user_2: [
-    { from: 'them', text: 'Can we reschedule?' },
-    { from: 'me', text: 'Sure, let me know your time.' },
-  ],
-  user_3: [
-    { from: 'them', text: 'I have a doubt in physics' },
-    { from: 'me', text: 'Go ahead and ask.' },
-  ],
+  // ✅ First, sort messages by createdAt DESC (latest first)
+  messages.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  messages.forEach(msg => {
+    const otherUserId =
+      msg.sender === currentUserId ? msg.receiver : msg.sender;
+
+    // ✅ Only keep the first (latest) message per user
+    if (!unique[otherUserId]) {
+      unique[otherUserId] = {
+        userId: otherUserId,
+        lastMessage: msg.text,
+        lastMessageTime: msg.createdAt
+      };
+    }
+  });
+
+  return Object.values(unique);
 };
-// export default function MessagesPage() {
-//   return (
-//     <div className="p-6">
-//       <h1 className="text-2xl font-bold mb-4 text-indigo-600">📨 Messages</h1>
-//       <p>This is your messages area. Chat feature coming soon!</p>
-//     </div>
-//   );
-// }
-export default function MessagesPage() {
-  const [selectedUser, setSelectedUser] = useState(dummyConversations[0]);
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState(dummyMessages[selectedUser.userId]);
 
-  const handleSelectUser = (user) => {
-    setSelectedUser(user);
-    setMessages(dummyMessages[user.userId] || []);
-  };
+ const handleSend = async () => {
+  if (!text.trim()) return;
 
-  const handleSend = () => {
-    if (input.trim() === '') return;
-    const newMessage = { from: 'me', text: input.trim() };
-    const updatedMessages = [...messages, newMessage];
-    setMessages(updatedMessages);
-    setInput('');
+  try {
+    const res = await axios.post(
+      'http://localhost:5000/api/messages',
+      {
+        receiverId: selectedChat.userId,
+        text: text.trim()
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        }
+      }
+    );
+
+    // Add the new message to UI
+    setMessages(prev => [
+      ...prev,
+      {
+        from: 'me',
+        text: text.trim(),
+        createdAt: res.data.newMessage.createdAt,
+      }
+    ]);
+
+    setText(""); // Clear input
+  } catch (err) {
+    console.error("Failed to send message:", err);
+  }
+};
+  const handleChatSelect = async (chat) => {
+    setSelectedChat(chat);
+    const res = await axios.get(`http://localhost:5000/api/messages/${chat.userId}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    const msgList = res.data.map(m => ({
+      from: m.sender === currentUserId ? 'me' : 'them',
+      text: m.text,
+      createdAt: m.createdAt
+    }));
+    setMessages(msgList);
   };
 
   return (
-    <div className="flex h-[85vh] bg-white rounded-lg shadow-md overflow-hidden">
-      {/* Left Panel: Conversations */}
-      <aside className="w-1/3 border-r border-gray-200 bg-gray-50 p-4 overflow-y-auto">
-        <h2 className="text-lg font-semibold mb-4">Conversations</h2>
-        <ul className="space-y-3">
-          {dummyConversations.map((user) => (
+    <div className="flex h-[calc(100vh-4rem)]">
+      {/* Conversations Sidebar */}
+      <aside className="w-1/3 border-r border-gray-300 p-4 bg-white">
+        <h2 className="text-xl font-bold mb-4">Messages</h2>
+        <ul className="space-y-2">
+          {conversations.map((chat) => (
             <li
-              key={user.id}
-              className={`cursor-pointer p-3 rounded-lg hover:bg-gray-200 ${
-                selectedUser.userId === user.userId ? 'bg-gray-200' : ''
+              key={chat.userId}
+              className={`flex items-center space-x-2 cursor-pointer p-2 rounded hover:bg-gray-100 ${
+                selectedChat?.userId === chat.userId ? 'bg-gray-100' : ''
               }`}
-              onClick={() => handleSelectUser(user)}
+              onClick={() => handleChatSelect(chat)}
             >
-              <div className="font-medium">{user.name}</div>
-              <div className="text-sm text-gray-500 truncate">{user.lastMessage}</div>
+              {chat.avatar && (
+                <img src={chat.avatar} className="w-8 h-8 rounded-full" alt="" />
+              )}
+              <div>
+                <div className="font-semibold">{chat.name}</div>
+                <div className="text-sm text-gray-500 truncate">
+                  {chat.lastMessage}
+                </div>
+              </div>
             </li>
           ))}
         </ul>
       </aside>
 
-      {/* Right Panel: Messages */}
-      <section className="flex-1 flex flex-col">
-        <header className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-semibold">{selectedUser.name}</h2>
-        </header>
-
-        <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-white">
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`max-w-xs px-4 py-2 rounded-lg ${
-                msg.from === 'me'
-                  ? 'ml-auto bg-indigo-100 text-indigo-900'
-                  : 'mr-auto bg-gray-100 text-gray-900'
-              }`}
-            >
-              {msg.text}
+      {/* Chat Window */}
+      <main className="flex-1 p-4 flex flex-col justify-between bg-gray-50">
+        {selectedChat ? (
+          <>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold">{selectedChat.name}</h2>
+              <div className="space-y-2 mt-2">
+                {messages.map((msg, index) => (
+                  <div
+                    key={index}
+                    className={`max-w-xs px-3 py-2 rounded ${
+                      msg.from === 'me'
+                        ? 'bg-blue-500 text-white self-end ml-auto'
+                        : 'bg-gray-200 text-gray-800'
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-
-        <footer className="p-3 border-t border-gray-200 flex items-center gap-2">
-          <input
-            type="text"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            placeholder="Type a message..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          />
-          <button
-            onClick={handleSend}
-            className="bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700"
-          >
-            <Send className="w-4 h-4" />
-          </button>
-        </footer>
-      </section>
+            <div className="flex">
+             <input
+  type="text"
+  value={text}
+  onChange={(e) => setText(e.target.value)}
+  placeholder="Type a message"
+  className="flex-1 border rounded-l px-4 py-2 focus:outline-none"
+/>
+            <button
+        className="bg-blue-600 text-white px-3 py-1 rounded"
+        onClick={handleSend}
+      >
+        Send
+      </button>
+            </div>
+          </>
+        ) : (
+          <p className="text-gray-500">Select a conversation to start chatting.</p>
+        )}
+      </main>
     </div>
   );
 }
