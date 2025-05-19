@@ -1,103 +1,68 @@
-'use client'
+'use client';
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 
 export default function MessengerPage() {
   const [conversations, setConversations] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
-  const [currentUserId, setCurrentUserId] = useState(null);
-const [text, setText] = useState('');
+  const [text, setText] = useState('');
+
   useEffect(() => {
-    // TODO: Replace with actual auth state or token decode
-    setCurrentUserId(localStorage.getItem('userId')); // or fetch from context
-console.log(selectedChat,"HSDF")
-    // Fetch all messages (preview latest message per user)
-    axios.get('http://localhost:5000/api/messages/all', {
-  headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-})
-.then(res => {
-  const uniqueConversations = getUniqueConversations(res.data);
-  Promise.all(
-    uniqueConversations.map(conv =>
-      axios.get(`http://localhost:5000/api/messages/${conv.userId}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      }).then(res => ({
-        ...conv,
-        name: res.data.name,
-        avatar: res.data.profileImage
-      }))
-    )
-  ).then(setConversations);
-});
-  }, []);
-
-  const getUniqueConversations = (messages) => {
-  const unique = {};
-
-  // ✅ First, sort messages by createdAt DESC (latest first)
-  messages.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  messages.forEach(msg => {
-    const otherUserId =
-      msg.sender === currentUserId ? msg.receiver : msg.sender;
-
-    // ✅ Only keep the first (latest) message per user
-    if (!unique[otherUserId]) {
-      unique[otherUserId] = {
-        userId: otherUserId,
-        lastMessage: msg.text,
-        lastMessageTime: msg.createdAt
-      };
-    }
-  });
-
-  return Object.values(unique);
-};
-
- const handleSend = async () => {
-  if (!text.trim()) return;
-
-  try {
-    const res = await axios.post(
-      'http://localhost:5000/api/messages',
+    // Mock current user ID
+    const mockUserId = 'user1';
+    
+    // Mock conversations (simulate latest messages per user)
+    const mockConversations = [
       {
-        receiverId: selectedChat.userId,
-        text: text.trim()
+        userId: 'user2',
+        name: 'Alice Johnson',
+        avatar: 'https://i.pravatar.cc/100?img=1',
+        lastMessage: 'Hey, how are you?',
+        lastMessageTime: new Date().toISOString(),
       },
       {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        }
-      }
-    );
+        userId: 'user3',
+        name: 'Bob Smith',
+        avatar: 'https://i.pravatar.cc/100?img=2',
+        lastMessage: 'Let me know when you’re free!',
+        lastMessageTime: new Date().toISOString(),
+      },
+    ];
+    
+    setConversations(mockConversations);
+  }, []);
 
-    // Add the new message to UI
-    setMessages(prev => [
-      ...prev,
+  const handleChatSelect = (chat) => {
+    setSelectedChat(chat);
+    
+    // Mock message history for selected chat
+    const mockMessages = [
+      {
+        from: 'them',
+        text: 'Hey! Can you help me with algebra?',
+        createdAt: new Date().toISOString(),
+      },
       {
         from: 'me',
-        text: text.trim(),
-        createdAt: res.data.newMessage.createdAt,
-      }
-    ]);
+        text: 'Sure! When are you available?',
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    setMessages(mockMessages);
+  };
 
-    setText(""); // Clear input
-  } catch (err) {
-    console.error("Failed to send message:", err);
-  }
-};
-  const handleChatSelect = async (chat) => {
-    setSelectedChat(chat);
-    const res = await axios.get(`http://localhost:5000/api/messages/${chat.userId}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-    });
-    const msgList = res.data.map(m => ({
-      from: m.sender === currentUserId ? 'me' : 'them',
-      text: m.text,
-      createdAt: m.createdAt
-    }));
-    setMessages(msgList);
+  const handleSend = () => {
+    if (!text.trim()) return;
+
+    // Add message to the local UI
+    const newMessage = {
+      from: 'me',
+      text: text.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+    setText('');
   };
 
   return (
@@ -150,19 +115,19 @@ console.log(selectedChat,"HSDF")
               </div>
             </div>
             <div className="flex">
-             <input
-  type="text"
-  value={text}
-  onChange={(e) => setText(e.target.value)}
-  placeholder="Type a message"
-  className="flex-1 border rounded-l px-4 py-2 focus:outline-none"
-/>
-            <button
-        className="bg-blue-600 text-white px-3 py-1 rounded"
-        onClick={handleSend}
-      >
-        Send
-      </button>
+              <input
+                type="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Type a message"
+                className="flex-1 border rounded-l px-4 py-2 focus:outline-none"
+              />
+              <button
+                className="bg-blue-600 text-white px-3 py-1 rounded"
+                onClick={handleSend}
+              >
+                Send
+              </button>
             </div>
           </>
         ) : (
