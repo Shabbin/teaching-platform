@@ -5,6 +5,16 @@ import axios from 'axios'
 export default function TeacherProfilePage() {
   const [teacher, setTeacher] = useState(null)
   const [posts, setPosts] = useState([])
+  const [isEditing, setIsEditing] = useState(false)
+  const [formData, setFormData] = useState({
+    name: '',
+    bio: '',
+    hourlyRate: '',
+    skills: '',
+    location: '',
+    availability: ''
+  })
+
   const teacherId = '682532838376c0b56fe68c7d' // until Redux is ready
 
   const fetchProfile = async () => {
@@ -12,6 +22,16 @@ export default function TeacherProfilePage() {
       const res = await axios.get(`http://localhost:5000/api/teachers/${teacherId}/profile`)
       setTeacher(res.data.teacher)
       setPosts(res.data.posts)
+
+      // Prefill form
+      setFormData({
+        name: res.data.teacher.name || '',
+        bio: res.data.teacher.bio || '',
+        hourlyRate: res.data.teacher.hourlyRate || '',
+        skills: res.data.teacher.skills?.join(', ') || '',
+        location: res.data.teacher.location || '',
+        availability: res.data.teacher.availability || ''
+      })
     } catch (err) {
       console.error('Failed to fetch profile', err)
     }
@@ -29,7 +49,7 @@ export default function TeacherProfilePage() {
     formData.append(type, file)
 
     try {
-      const token = localStorage.getItem('token') // or use Redux if available
+      const token = localStorage.getItem('token')
       await axios.put(
         `http://localhost:5000/api/teachers/${type === 'profileImage' ? 'profile-picture' : 'cover-image'}`,
         formData,
@@ -40,9 +60,29 @@ export default function TeacherProfilePage() {
           },
         }
       )
-      fetchProfile() // refresh data
+      fetchProfile()
     } catch (error) {
       console.error('Upload failed:', error)
+    }
+  }
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault()
+    try {
+      const token = localStorage.getItem('token')
+      const res = await axios.put(
+        'http://localhost:5000/api/teachers/profile-info',
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      )
+      setTeacher(res.data.user)
+      setIsEditing(false)
+    } catch (err) {
+      console.error('Update failed', err)
     }
   }
 
@@ -82,13 +122,74 @@ export default function TeacherProfilePage() {
         </div>
       </div>
 
-      {/* Teacher Info */}
+      {/* Profile Info */}
       <div className="mt-8 px-4 text-left">
-        <h2 className="text-3xl font-bold">{teacher.name}</h2>
+        <div className="flex justify-between items-center">
+          <h2 className="text-3xl font-bold">{teacher.name}</h2>
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="btn btn-sm"
+          >
+            {isEditing ? 'Cancel' : 'Edit Profile'}
+          </button>
+        </div>
         <p className="text-gray-600">{teacher.email}</p>
         <p className="text-sm text-gray-500 mt-1">Age: {teacher.age || 'N/A'}</p>
 
-        {/* ...rest of the info stays the same */}
+        {!isEditing ? (
+          <div className="mt-4 space-y-2 text-gray-700">
+            <p><strong>Bio:</strong> {teacher.bio || 'Not added yet'}</p>
+            <p><strong>Hourly Rate:</strong> ${teacher.hourlyRate || 0}</p>
+            <p><strong>Skills:</strong> {teacher.skills?.join(', ') || 'Not listed'}</p>
+            <p><strong>Location:</strong> {teacher.location || 'Not specified'}</p>
+            <p><strong>Availability:</strong> {teacher.availability || 'Not specified'}</p>
+          </div>
+        ) : (
+          <form onSubmit={handleProfileUpdate} className="mt-4 space-y-3 max-w-2xl">
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              placeholder="Name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+            <textarea
+              className="textarea textarea-bordered w-full"
+              placeholder="Bio"
+              value={formData.bio}
+              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+            />
+            <input
+              type="number"
+              className="input input-bordered w-full"
+              placeholder="Hourly Rate (USD)"
+              value={formData.hourlyRate}
+              onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+            />
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              placeholder="Skills (comma separated)"
+              value={formData.skills}
+              onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
+            />
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              placeholder="Location"
+              value={formData.location}
+              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+            />
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              placeholder="Availability"
+              value={formData.availability}
+              onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
+            />
+            <button type="submit" className="btn btn-primary mt-2">Save</button>
+          </form>
+        )}
       </div>
 
       {/* Posts */}
