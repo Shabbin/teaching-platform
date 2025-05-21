@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { useDispatch } from 'react-redux';
+import { logout } from '../../redux/userSlice';
 import {
   Bell,
   MessageCircle,
@@ -15,6 +17,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MessengerPopup from './components/MessengerPopup';
+
 const navItems = [
   { label: 'Dashboard Home', href: '/dashboard/teacher' },
   { label: 'Post Content', href: '/dashboard/teacher/post-content' },
@@ -31,28 +34,45 @@ export default function TeacherDashboardLayout({ children }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const dropdownRef = useRef(null);
-
+const dispatch = useDispatch();
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+  localStorage.removeItem('token');
+  dispatch(logout()); 
     router.push('/login');
   };
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      const token = localStorage.getItem('token');
-      try {
-        const res = await fetch('http://localhost:5000/api/auth/teacher/dashboard', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        setProfileImage(data?.teacher?.profileImage || '/default-profile.png');
-      } catch (error) {
-        console.error(error);
-      }
-    };
-    fetchProfile();
-  }, []);
+  // ✅ Token check and secure fetch
+useEffect(() => {
+  const fetchProfile = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
 
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/teacher/dashboard', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      const img = data?.teacher?.profileImage;
+      if (img && typeof img === 'string' && img.trim() !== '') {
+        const fullPath = img.startsWith('http') ? img : `http://localhost:5000/${img}`;
+        setProfileImage(fullPath);
+      } else {
+        setProfileImage('/default-profile.png');
+      }
+
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      setProfileImage('/default-profile.png');
+    }
+  };
+
+  fetchProfile();
+}, []);
+
+
+  // 👇 Detect clicks outside dropdown
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {

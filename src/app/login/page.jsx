@@ -1,54 +1,44 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser } from '../redux/userSlice';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 export default function LoginPage() {
+  const dispatch = useDispatch();
   const router = useRouter();
+
   const [form, setForm] = useState({ email: '', password: '' });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { userInfo, loading, error } = useSelector((state) => state.user);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  const result = await dispatch(loginUser(form));
 
-    try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      });
+  // Optional: check for errors directly
+  if (result.meta.requestStatus === 'rejected') {
+    console.log('Login failed');
+    return;
+  }
+};
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      // ✅ Store token in localStorage
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // ✅ Redirect based on role
-      if (data.user.role === 'teacher') {
-        router.push('/dashboard/teacher');
-      } else {
-        router.push('/');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+useEffect(() => {
+  console.log('User Info from Redux:', userInfo);
+  if (userInfo) {
+    if (userInfo.role === 'teacher') {
+      router.push('/dashboard/teacher');
+    } else {
+      router.push('/');
     }
-  };
-
+  }
+}, [userInfo, router]);
+ 
   return (
     <main className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="max-w-md w-full border rounded-xl p-8 shadow-md">

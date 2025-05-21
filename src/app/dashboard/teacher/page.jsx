@@ -30,9 +30,9 @@ export default function TeacherDashboardPage() {
     const token = localStorage.getItem('token');
     if (!token) {
       router.push('/login');
-      return;
+    } else {
+      fetchDashboard();
     }
-    fetchDashboard();
   }, [router]);
 
   const handleImageClick = () => {
@@ -77,32 +77,31 @@ export default function TeacherDashboardPage() {
     <div className="max-w-5xl mx-auto mt-8 px-4">
       {/* Profile Header */}
       <div className="bg-white rounded-xl shadow p-6 flex flex-col md:flex-row items-center gap-6 relative">
-      <div className="relative w-32 h-32 group">
-  {/* Profile Image */}
-  <img
-    src={teacher?.profileImage || '/default-avatar.png'}
-    alt="Profile"
-    className="w-full h-full rounded-full object-cover border-4 border-blue-500"
-  />
+        <div className="relative w-32 h-32 group">
+          {/* Profile Image */}
+          <img
+            src={teacher?.profileImage || '/SHABBU.jpg'}
+            alt="Profile"
+            className="w-full h-full rounded-full object-cover border-4 border-blue-500"
+          />
 
-  {/* Camera Overlay (shown on hover only) */}
-  <div
-    onClick={handleImageClick}
-    className="absolute inset-0 bg-black bg-opacity-40 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-  >
-    <span className="text-white text-2xl">📷</span>
-  </div>
+          {/* Camera Overlay */}
+          <div
+            onClick={handleImageClick}
+            className="absolute inset-0 bg-black bg-opacity-40 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          >
+            <span className="text-white text-2xl">📷</span>
+          </div>
 
-  {/* Hidden File Input */}
-  <input
-    type="file"
-    accept="image/*"
-    className="hidden"
-    ref={fileInputRef}
-    onChange={handleFileChange}
-  />
-</div>
-
+          {/* Hidden File Input */}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+          />
+        </div>
 
         <div>
           <h1 className="text-3xl font-bold text-gray-800">{teacher.name}</h1>
@@ -134,75 +133,3 @@ export default function TeacherDashboardPage() {
     </div>
   );
 }
-
-
-
-
-
-// 'use client';
-// import { useEffect, useState } from 'react';
-
-// export default function TeacherDashboard() {
-//   const [teacher, setTeacher] = useState(null);
-
-//   useEffect(() => {
-//     // Mock for now – replace with API call later
-//     setTeacher({
-//       name: 'Kazi Shabbin',
-//       location: 'Bangladesh Blvd., Paterson, NJ',
-//       verified: true,
-//       profileImage: '/SHABBU.jpg', // replace with real image URL later
-//     });
-//   }, []);
-
-//   return (
-//     <div className="max-w-4xl mx-auto p-6">
-//       <div className="flex flex-col md:flex-row gap-6 items-center bg-white shadow-lg p-6 rounded-2xl">
-//         <div className="avatar">
-//           <div className="w-32 rounded-full ring ring-primary ring-offset-base-100 ring-offset-2">
-//             <img src={teacher?.profileImage} alt="Profile" />
-//           </div>
-//         </div>
-
-//         <div className="flex-1 text-center md:text-left">
-//           <h2 className="text-2xl font-bold text-gray-800">{teacher?.name}</h2>
-//           <p className="text-gray-500">{teacher?.location}</p>
-
-//           <div className="mt-2 flex justify-center md:justify-start gap-2">
-//             {teacher?.verified ? (
-//               <span className="badge badge-success">Verified</span>
-//             ) : (
-//               <span className="badge badge-warning">Not Verified</span>
-//             )}
-//             <span className="badge badge-info">Tutor</span>
-//           </div>
-
-//           <button className="btn btn-primary mt-4">Post New Content</button>
-//         </div>
-//       </div>
-
-//       {/* Content Summary */}
-//       <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-//         <div className="card bg-base-100 shadow-md">
-//           <div className="card-body">
-//             <h3 className="card-title">📚 Your Content</h3>
-//             <p>0 posts published yet.</p>
-//             <div className="card-actions justify-end">
-//               <button className="btn btn-sm btn-outline btn-primary">View Posts</button>
-//             </div>
-//           </div>
-//         </div>
-
-//         <div className="card bg-base-100 shadow-md">
-//           <div className="card-body">
-//             <h3 className="card-title">🎓 Eligibility</h3>
-//             <p>You haven’t passed the eligibility test yet.</p>
-//             <div className="card-actions justify-end">
-//               <button className="btn btn-sm btn-outline btn-accent">Take Test</button>
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
