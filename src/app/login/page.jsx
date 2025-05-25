@@ -33,7 +33,10 @@ useEffect(() => {
   if (userInfo) {
     if (userInfo.role === 'teacher') {
       router.push('/dashboard/teacher');
-    } else {
+    } else if (userInfo.role === 'student'){
+      router.push('/dashboard/student')
+    }
+     else {
       router.push('/');
     }
   }

@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
-// Async thunk for login
+// 🔐 Login Thunk (already in your code)
 export const loginUser = createAsyncThunk(
   'user/loginUser',
   async (formData, { rejectWithValue }) => {
@@ -27,23 +27,55 @@ export const loginUser = createAsyncThunk(
   }
 );
 
+// 🧠 New: Student Dashboard Thunk
+export const getStudentDashboard = createAsyncThunk(
+  'user/getStudentDashboard',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/students/dashboard', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to fetch student dashboard');
+      }
+
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// 🧾 Initial State
 const initialUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user')) : null;
 const initialState = {
-  userInfo: null,
+  userInfo: initialUser,
   loading: false,
   error: null,
+  studentDashboard: null,
 };
+
+// 🔧 Slice
 const userSlice = createSlice({
   name: 'user',
   initialState,
-  
+
   reducers: {
     logout: (state) => {
-    Object.assign(state, initialState);  // Clears all keys, useful if you don’t store other data
-},
+      Object.assign(state, initialState);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    },
   },
+
   extraReducers: (builder) => {
     builder
+      // Login
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -55,10 +87,24 @@ const userSlice = createSlice({
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      // Student Dashboard
+      .addCase(getStudentDashboard.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getStudentDashboard.fulfilled, (state, action) => {
+        state.loading = false;
+        state.studentDashboard = action.payload;
+      })
+      .addCase(getStudentDashboard.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   },
 });
 
-
+// ✅ Exports
 export const { logout } = userSlice.actions;
 export default userSlice.reducer;

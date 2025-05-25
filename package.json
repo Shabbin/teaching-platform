@@ -32,5 +32,18 @@
     "eslint-config-next": "15.3.1",
     "postcss": "^8.5.3",
     "typescript": "^5"
-  }
+  },
+  "description": "This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shabbin/teaching-platform.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Shabbin/teaching-platform/issues"
+  },
+  "homepage": "https://github.com/Shabbin/teaching-platform#readme"
 }

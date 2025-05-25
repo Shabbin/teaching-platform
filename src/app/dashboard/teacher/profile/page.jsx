@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
 import axios from 'axios'
 
 export default function TeacherProfilePage() {
@@ -15,7 +16,8 @@ export default function TeacherProfilePage() {
     availability: ''
   })
 
-  const teacherId = '682532838376c0b56fe68c7d' // until Redux is ready
+  // ✅ Dynamically get teacherId from Redux userSlice
+const teacherId = useSelector((state) => state.user.userInfo?.id);
 
   const fetchProfile = async () => {
     try {
@@ -38,8 +40,11 @@ export default function TeacherProfilePage() {
   }
 
   useEffect(() => {
-    fetchProfile()
-  }, [])
+    console.log("Redux teacherId:", teacherId); // ✅ debug
+    if (teacherId) {
+      fetchProfile()
+    }
+  }, [teacherId])
 
   const handleUpload = async (e, type) => {
     const file = e.target.files[0]
