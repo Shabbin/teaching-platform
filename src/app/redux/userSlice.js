@@ -59,7 +59,7 @@ const initialProfileImage =
 
 const initialState = {
   userInfo: initialUser,
-  profileImage: initialProfileImage || '/default-profile.png', // 👈 ADDED
+  profileImage: initialProfileImage || '/default-profile.png',
   loading: false,
   error: null,
   studentDashboard: null,
@@ -90,13 +90,15 @@ const userSlice = createSlice({
         state.teacherProfile.profileImage = newImg;
       }
 
-      // ⬇️ Update user in localStorage if already there
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         const user = JSON.parse(storedUser);
         user.profileImage = newImg;
         localStorage.setItem('user', JSON.stringify(user));
       }
+    },
+    setUserInfo: (state, action) => {
+      state.userInfo = action.payload;
     },
   },
 
@@ -137,5 +139,5 @@ const userSlice = createSlice({
 });
 
 // ✅ Export actions
-export const { logout, setTeacherData, updateProfileImage } = userSlice.actions;
+export const { logout, setTeacherData, updateProfileImage, setUserInfo } = userSlice.actions;
 export default userSlice.reducer;

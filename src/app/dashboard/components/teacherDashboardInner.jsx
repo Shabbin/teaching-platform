@@ -76,7 +76,36 @@ console.log(teacherData,"data")
     }
   };
 
-  if (loading) return <p className="p-6">Loading dashboard...</p>;
+  if (loading) {
+  return (
+    <div className="max-w-5xl mx-auto mt-8 px-4 animate-pulse">
+      <div className="bg-white rounded-xl shadow p-6 flex flex-col md:flex-row items-center gap-6">
+        <div className="w-32 h-32 rounded-full bg-gray-300" />
+        <div className="flex-1 space-y-4">
+          <div className="h-6 bg-gray-300 rounded w-3/4" />
+          <div className="h-4 bg-gray-300 rounded w-1/2" />
+          <div className="flex gap-2 mt-2">
+            <div className="h-6 bg-gray-200 rounded-full w-24" />
+            <div className="h-6 bg-gray-200 rounded-full w-24" />
+            <div className="h-6 bg-gray-200 rounded-full w-24" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+        <div className="bg-white rounded-xl shadow p-6">
+          <div className="h-6 bg-gray-300 rounded w-1/3 mb-4" />
+          <div className="h-4 bg-gray-200 rounded w-3/4" />
+        </div>
+        <div className="bg-white rounded-xl shadow p-6">
+          <div className="h-6 bg-gray-300 rounded w-1/3 mb-4" />
+          <div className="h-4 bg-gray-200 rounded w-3/4" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
   if (!teacherData) return <p className="p-6 text-red-500">Unable to load dashboard data.</p>;
 
   const { teacher } = teacherData;

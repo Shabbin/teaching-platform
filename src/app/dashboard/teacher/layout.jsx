@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '../../redux/userSlice';
 import {
   Bell,
@@ -23,45 +23,37 @@ export default function DashboardLayout({ children }) {
   const dispatch = useDispatch();
   const dropdownRef = useRef(null);
 
-  const [profileImage, setProfileImage] = useState(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const userInfo = useSelector((state) => state.user.userInfo);
+  const profileImage = userInfo?.profileImage;
+  const role = userInfo?.role;
+
   const [navOpen, setNavOpen] = useState(false);
-  const [role, setRole] = useState(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [navItems, setNavItems] = useState([]);
 
+  // Update nav items based on role
   useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (!userData) return;
-
-    try {
-      const user = JSON.parse(userData);
-      setRole(user.role);
-      setProfileImage(user.profileImage);
-
-      if (user.role === 'teacher') {
-        setNavItems([
-          { label: 'Dashboard Home', href: '/dashboard/teacher' },
-          { label: 'Post Content', href: '/dashboard/teacher/post-content' },
-          { label: 'Requests', href: '/dashboard/teacher/requests' },
-          { label: 'Schedule', href: '/dashboard/teacher/schedule' },
-          { label: 'Students', href: '/dashboard/teacher/students' },
-          { label: 'Media Tuitions', href: '/dashboard/teacher/media-tuitions' },
-          { label: 'Profile', href: '/dashboard/teacher/profile' },
-        ]);
-      } else if (user.role === 'student') {
-        setNavItems([
-          { label: 'Dashboard Home', href: '/dashboard/student' },
-          { label: 'My Requests', href: '/dashboard/student/requests' },
-          { label: 'Find Teachers', href: '/dashboard/student/teachers' },
-          { label: 'My Schedule', href: '/dashboard/student/schedule' },
-          { label: 'My Bookings', href: '/dashboard/student/bookings' },
-          { label: 'Profile', href: '/dashboard/student/profile' },
-        ]);
-      }
-    } catch (err) {
-      console.error('Invalid user in localStorage');
+    if (role === 'teacher') {
+      setNavItems([
+        { label: 'Dashboard Home', href: '/dashboard/teacher' },
+        { label: 'Post Content', href: '/dashboard/teacher/post-content' },
+        { label: 'Requests', href: '/dashboard/teacher/requests' },
+        { label: 'Schedule', href: '/dashboard/teacher/schedule' },
+        { label: 'Students', href: '/dashboard/teacher/students' },
+        { label: 'Media Tuitions', href: '/dashboard/teacher/media-tuitions' },
+        { label: 'Profile', href: '/dashboard/teacher/profile' },
+      ]);
+    } else if (role === 'student') {
+      setNavItems([
+        { label: 'Dashboard Home', href: '/dashboard/student' },
+        { label: 'My Requests', href: '/dashboard/student/requests' },
+        { label: 'Find Teachers', href: '/dashboard/student/teachers' },
+        { label: 'My Schedule', href: '/dashboard/student/schedule' },
+        { label: 'My Bookings', href: '/dashboard/student/bookings' },
+        { label: 'Profile', href: '/dashboard/student/profile' },
+      ]);
     }
-  }, []);
+  }, [role]);
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -118,8 +110,8 @@ export default function DashboardLayout({ children }) {
               profileImage?.startsWith('http')
                 ? profileImage
                 : profileImage
-                  ? `http://localhost:5000/${profileImage}`
-                  : '/default-profile.png'
+                ? `http://localhost:5000/${profileImage}`
+                : '/default-profile.png'
             }
             alt="Profile"
             className="w-10 h-10 rounded-full object-cover border border-gray-300 cursor-pointer"

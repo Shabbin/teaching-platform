@@ -1,13 +1,20 @@
 'use client'
+
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import axios from 'axios'
-import { updateProfileImage } from './../../../redux/userSlice' // adjust path if different
+import toast, { Toaster } from 'react-hot-toast'
+import { updateProfileImage } from '../../../redux/userSlice'
 
 export default function TeacherProfilePage() {
+  const dispatch = useDispatch()
+  const teacherId = useSelector((state) => state.user.userInfo?._id)
+console.log(teacherId, "redux TeacherId")
   const [teacher, setTeacher] = useState(null)
   const [posts, setPosts] = useState([])
+  const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
+
   const [formData, setFormData] = useState({
     name: '',
     bio: '',
@@ -17,34 +24,40 @@ export default function TeacherProfilePage() {
     availability: ''
   })
 
-  const dispatch = useDispatch()
-  const teacherId = useSelector((state) => state.user.userInfo?.id)
-
+  // Fetch teacher profile and posts
   const fetchProfile = async () => {
+    setLoading(true)
+    if (!teacherId) {
+      setLoading(false)
+      return
+    }
+
     try {
       const res = await axios.get(`http://localhost:5000/api/teachers/${teacherId}/profile`)
-      setTeacher(res.data.teacher)
-      setPosts(res.data.posts)
+      const { teacher, posts } = res.data
+      setTeacher(teacher)
+      setPosts(posts)
 
       setFormData({
-        name: res.data.teacher.name || '',
-        bio: res.data.teacher.bio || '',
-        hourlyRate: res.data.teacher.hourlyRate || '',
-        skills: res.data.teacher.skills?.join(', ') || '',
-        location: res.data.teacher.location || '',
-        availability: res.data.teacher.availability || ''
+        name: teacher.name || '',
+        bio: teacher.bio || '',
+        hourlyRate: teacher.hourlyRate || '',
+        skills: teacher.skills?.join(', ') || '',
+        location: teacher.location || '',
+        availability: teacher.availability || ''
       })
     } catch (err) {
-      console.error('Failed to fetch profile', err)
+      toast.error('Failed to fetch profile')
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (teacherId) {
-      fetchProfile()
-    }
+    if (teacherId) fetchProfile()
   }, [teacherId])
 
+  // Upload image handler
   const handleUpload = async (e, type) => {
     const file = e.target.files[0]
     if (!file) return
@@ -66,40 +79,63 @@ export default function TeacherProfilePage() {
       )
 
       if (type === 'profileImage') {
-        dispatch(updateProfileImage(res.data.profileImage)) // <-- 🔥 update Redux
+        dispatch(updateProfileImage(res.data.profileImage))
       }
 
-      fetchProfile() // refresh local state
+      toast.success('Image uploaded successfully')
+      fetchProfile()
     } catch (error) {
-      console.error('Upload failed:', error)
+      toast.error('Image upload failed')
     }
   }
 
+  // Handle profile form submission
   const handleProfileUpdate = async (e) => {
     e.preventDefault()
+
+    if (!formData.name || !formData.bio || !formData.hourlyRate) {
+      return toast.error('Name, bio, and hourly rate are required')
+    }
+
     try {
       const token = localStorage.getItem('token')
       const res = await axios.put(
         'http://localhost:5000/api/teachers/profile-info',
         formData,
         {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         }
       )
       setTeacher(res.data.user)
+      toast.success('Profile updated')
       setIsEditing(false)
     } catch (err) {
-      console.error('Update failed', err)
+      toast.error('Profile update failed')
     }
   }
 
-  if (!teacher) return <div className="text-center mt-10">Loading...</div>
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto p-4">
+        <div className="h-72 bg-gray-200 animate-pulse rounded-md mb-8"></div>
+        <div className="flex gap-4 mb-4">
+          <div className="w-48 h-64 bg-gray-200 rounded-full animate-pulse"></div>
+          <div className="flex-1 space-y-4">
+            <div className="h-6 w-1/3 bg-gray-200 animate-pulse rounded"></div>
+            <div className="h-4 w-1/2 bg-gray-200 animate-pulse rounded"></div>
+            <div className="h-4 w-full bg-gray-200 animate-pulse rounded"></div>
+            <div className="h-4 w-3/4 bg-gray-200 animate-pulse rounded"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-4">
-      {/* Cover Photo */}
+      <Toaster />
+
+      {/* Cover Image */}
       <div className="relative w-full h-60 sm:h-72 md:h-[30rem] rounded-lg overflow-hidden bg-gray-200">
         <img
           src={teacher.coverImage || '/default-cover.jpg'}
@@ -113,9 +149,9 @@ export default function TeacherProfilePage() {
         />
       </div>
 
-      {/* Profile Photo */}
+      {/* Profile Image */}
       <div className="relative z-20 mt-[-5rem] sm:mt-[-7rem] md:mt-[-9rem] pl-4">
-        <div className="w-48 h-64 shadow-lg border-4 border-white overflow-hidden">
+        <div className="w-48 h-64 shadow-lg border-4 border-white overflow-hidden rounded-full">
           <img
             src={
               teacher?.profileImage?.startsWith('http')
@@ -123,7 +159,7 @@ export default function TeacherProfilePage() {
                 : `http://localhost:5000/${teacher.profileImage}`
             }
             alt="Profile"
-            className="w-full h-full rounded-full object-cover border-4 border-blue-500"
+            className="w-full h-full object-cover border-4 border-blue-500"
           />
         </div>
         <div className="mt-2">
@@ -139,10 +175,7 @@ export default function TeacherProfilePage() {
       <div className="mt-8 px-4 text-left">
         <div className="flex justify-between items-center">
           <h2 className="text-3xl font-bold">{teacher.name}</h2>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="btn btn-sm"
-          >
+          <button onClick={() => setIsEditing(!isEditing)} className="btn btn-sm">
             {isEditing ? 'Cancel' : 'Edit Profile'}
           </button>
         </div>
@@ -165,12 +198,14 @@ export default function TeacherProfilePage() {
               placeholder="Name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
             />
             <textarea
               className="textarea textarea-bordered w-full"
               placeholder="Bio"
               value={formData.bio}
               onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              required
             />
             <input
               type="number"
@@ -178,6 +213,7 @@ export default function TeacherProfilePage() {
               placeholder="Hourly Rate (USD)"
               value={formData.hourlyRate}
               onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+              required
             />
             <input
               type="text"
