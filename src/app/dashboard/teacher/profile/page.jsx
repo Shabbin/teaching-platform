@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import axios from 'axios'
+import { updateProfileImage } from './../../../redux/userSlice' // adjust path if different
 
 export default function TeacherProfilePage() {
   const [teacher, setTeacher] = useState(null)
@@ -16,8 +17,8 @@ export default function TeacherProfilePage() {
     availability: ''
   })
 
-  // ✅ Dynamically get teacherId from Redux userSlice
-const teacherId = useSelector((state) => state.user.userInfo?.id);
+  const dispatch = useDispatch()
+  const teacherId = useSelector((state) => state.user.userInfo?.id)
 
   const fetchProfile = async () => {
     try {
@@ -25,7 +26,6 @@ const teacherId = useSelector((state) => state.user.userInfo?.id);
       setTeacher(res.data.teacher)
       setPosts(res.data.posts)
 
-      // Prefill form
       setFormData({
         name: res.data.teacher.name || '',
         bio: res.data.teacher.bio || '',
@@ -40,7 +40,6 @@ const teacherId = useSelector((state) => state.user.userInfo?.id);
   }
 
   useEffect(() => {
-    console.log("Redux teacherId:", teacherId); // ✅ debug
     if (teacherId) {
       fetchProfile()
     }
@@ -50,14 +49,14 @@ const teacherId = useSelector((state) => state.user.userInfo?.id);
     const file = e.target.files[0]
     if (!file) return
 
-    const formData = new FormData()
-    formData.append(type, file)
+    const uploadData = new FormData()
+    uploadData.append(type, file)
 
     try {
       const token = localStorage.getItem('token')
-      await axios.put(
+      const res = await axios.put(
         `http://localhost:5000/api/teachers/${type === 'profileImage' ? 'profile-picture' : 'cover-image'}`,
-        formData,
+        uploadData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
@@ -65,7 +64,12 @@ const teacherId = useSelector((state) => state.user.userInfo?.id);
           },
         }
       )
-      fetchProfile()
+
+      if (type === 'profileImage') {
+        dispatch(updateProfileImage(res.data.profileImage)) // <-- 🔥 update Redux
+      }
+
+      fetchProfile() // refresh local state
     } catch (error) {
       console.error('Upload failed:', error)
     }
@@ -113,9 +117,13 @@ const teacherId = useSelector((state) => state.user.userInfo?.id);
       <div className="relative z-20 mt-[-5rem] sm:mt-[-7rem] md:mt-[-9rem] pl-4">
         <div className="w-48 h-64 shadow-lg border-4 border-white overflow-hidden">
           <img
-            src={teacher.profileImage || '/default-avatar.png'}
+            src={
+              teacher?.profileImage?.startsWith('http')
+                ? teacher.profileImage
+                : `http://localhost:5000/${teacher.profileImage}`
+            }
             alt="Profile"
-            className="object-cover w-full h-full"
+            className="w-full h-full rounded-full object-cover border-4 border-blue-500"
           />
         </div>
         <div className="mt-2">

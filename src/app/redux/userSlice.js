@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
-// 🔐 Login Thunk (already in your code)
+// 🔐 Login Thunk
 export const loginUser = createAsyncThunk(
   'user/loginUser',
   async (formData, { rejectWithValue }) => {
@@ -16,7 +16,6 @@ export const loginUser = createAsyncThunk(
         throw new Error(data.message || 'Login failed');
       }
 
-      // Save to localStorage
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
 
@@ -27,7 +26,7 @@ export const loginUser = createAsyncThunk(
   }
 );
 
-// 🧠 New: Student Dashboard Thunk
+// 🧠 Student Dashboard Thunk
 export const getStudentDashboard = createAsyncThunk(
   'user/getStudentDashboard',
   async (_, { rejectWithValue }) => {
@@ -53,11 +52,18 @@ export const getStudentDashboard = createAsyncThunk(
 
 // 🧾 Initial State
 const initialUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user')) : null;
+const initialProfileImage =
+  initialUser?.profileImage?.startsWith('http') || !initialUser?.profileImage
+    ? initialUser?.profileImage
+    : `http://localhost:5000/${initialUser?.profileImage}`;
+
 const initialState = {
   userInfo: initialUser,
+  profileImage: initialProfileImage || '/default-profile.png', // 👈 ADDED
   loading: false,
   error: null,
   studentDashboard: null,
+  teacherProfile: null,
 };
 
 // 🔧 Slice
@@ -71,11 +77,31 @@ const userSlice = createSlice({
       localStorage.removeItem('token');
       localStorage.removeItem('user');
     },
+    setTeacherData: (state, action) => {
+      state.teacherProfile = action.payload;
+    },
+    updateProfileImage: (state, action) => {
+      const newImg = action.payload;
+      state.profileImage = newImg;
+      if (state.userInfo) {
+        state.userInfo.profileImage = newImg;
+      }
+      if (state.teacherProfile) {
+        state.teacherProfile.profileImage = newImg;
+      }
+
+      // ⬇️ Update user in localStorage if already there
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        user.profileImage = newImg;
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+    },
   },
 
   extraReducers: (builder) => {
     builder
-      // Login
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -83,13 +109,18 @@ const userSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         state.userInfo = action.payload;
+
+        const img = action.payload?.profileImage;
+        state.profileImage =
+          img?.startsWith('http') || !img
+            ? img || '/default-profile.png'
+            : `http://localhost:5000/${img}`;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
 
-      // Student Dashboard
       .addCase(getStudentDashboard.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -105,6 +136,6 @@ const userSlice = createSlice({
   },
 });
 
-// ✅ Exports
-export const { logout } = userSlice.actions;
+// ✅ Export actions
+export const { logout, setTeacherData, updateProfileImage } = userSlice.actions;
 export default userSlice.reducer;

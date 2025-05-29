@@ -18,61 +18,58 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import MessengerPopup from './components/MessengerPopup';
 
-const navItems = [
-  { label: 'Dashboard Home', href: '/dashboard/teacher' },
-  { label: 'Post Content', href: '/dashboard/teacher/post-content' },
-  { label: 'Requests', href: '/dashboard/teacher/requests' },
-  { label: 'Schedule', href: '/dashboard/teacher/schedule' },
-  { label: 'Students', href: '/dashboard/teacher/students' },
-  { label: 'Media Tuitions', href: '/dashboard/teacher/media-tuitions' },
-  { label: 'Profile', href: '/dashboard/teacher/profile' },
-];
-
-export default function TeacherDashboardLayout({ children }) {
+export default function DashboardLayout({ children }) {
   const router = useRouter();
+  const dispatch = useDispatch();
+  const dropdownRef = useRef(null);
+
   const [profileImage, setProfileImage] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  const dropdownRef = useRef(null);
-const dispatch = useDispatch();
+  const [role, setRole] = useState(null);
+  const [navItems, setNavItems] = useState([]);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (!userData) return;
+
+    try {
+      const user = JSON.parse(userData);
+      setRole(user.role);
+      setProfileImage(user.profileImage);
+
+      if (user.role === 'teacher') {
+        setNavItems([
+          { label: 'Dashboard Home', href: '/dashboard/teacher' },
+          { label: 'Post Content', href: '/dashboard/teacher/post-content' },
+          { label: 'Requests', href: '/dashboard/teacher/requests' },
+          { label: 'Schedule', href: '/dashboard/teacher/schedule' },
+          { label: 'Students', href: '/dashboard/teacher/students' },
+          { label: 'Media Tuitions', href: '/dashboard/teacher/media-tuitions' },
+          { label: 'Profile', href: '/dashboard/teacher/profile' },
+        ]);
+      } else if (user.role === 'student') {
+        setNavItems([
+          { label: 'Dashboard Home', href: '/dashboard/student' },
+          { label: 'My Requests', href: '/dashboard/student/requests' },
+          { label: 'Find Teachers', href: '/dashboard/student/teachers' },
+          { label: 'My Schedule', href: '/dashboard/student/schedule' },
+          { label: 'My Bookings', href: '/dashboard/student/bookings' },
+          { label: 'Profile', href: '/dashboard/student/profile' },
+        ]);
+      }
+    } catch (err) {
+      console.error('Invalid user in localStorage');
+    }
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('user');
-  localStorage.removeItem('token');
-  dispatch(logout()); 
+    localStorage.removeItem('token');
+    dispatch(logout());
     router.push('/login');
   };
 
-  // ✅ Token check and secure fetch
-useEffect(() => {
-  const fetchProfile = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    try {
-      const res = await fetch('http://localhost:5000/api/auth/teacher/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-
-      const img = data?.teacher?.profileImage;
-      if (img && typeof img === 'string' && img.trim() !== '') {
-        const fullPath = img.startsWith('http') ? img : `http://localhost:5000/${img}`;
-        setProfileImage(fullPath);
-      } else {
-        setProfileImage('/default-profile.png');
-      }
-
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      setProfileImage('/default-profile.png');
-    }
-  };
-
-  fetchProfile();
-}, []);
-
-
-  // 👇 Detect clicks outside dropdown
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -85,11 +82,11 @@ useEffect(() => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Navbar */}
       <header className="bg-white shadow px-6 py-4 flex items-center justify-between relative">
-        <div className="text-xl font-bold text-indigo-600">Teacher Panel</div>
+        <div className="text-xl font-bold text-indigo-600 capitalize">
+          {role} Panel
+        </div>
 
-        {/* Mobile Nav Toggle */}
         <button
           className="md:hidden text-gray-700"
           onClick={() => setNavOpen(!navOpen)}
@@ -97,7 +94,6 @@ useEffect(() => {
           {navOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
 
-        {/* Desktop Nav */}
         <nav className="hidden md:flex space-x-6">
           {navItems.map((item) => (
             <Link
@@ -110,21 +106,26 @@ useEffect(() => {
           ))}
         </nav>
 
-        {/* Right Icons */}
         <div className="flex items-center space-x-4 relative" ref={dropdownRef}>
           <button className="text-gray-600 hover:text-indigo-600">
             <Bell className="w-5 h-5" />
           </button>
 
           <MessengerPopup />
+
           <img
-            src={profileImage || '/default-profile.png'}
+            src={
+              profileImage?.startsWith('http')
+                ? profileImage
+                : profileImage
+                  ? `http://localhost:5000/${profileImage}`
+                  : '/default-profile.png'
+            }
             alt="Profile"
             className="w-10 h-10 rounded-full object-cover border border-gray-300 cursor-pointer"
             onClick={() => setDropdownOpen(!dropdownOpen)}
           />
 
-          {/* Animated Dropdown */}
           <AnimatePresence>
             {dropdownOpen && (
               <motion.div
@@ -137,7 +138,7 @@ useEffect(() => {
                 <ul className="flex flex-col text-sm text-gray-800 divide-y divide-gray-100">
                   <li>
                     <Link
-                      href="/dashboard/teacher/profile"
+                      href={`/dashboard/${role}/profile`}
                       className="flex items-center px-4 py-3 hover:bg-gray-100"
                     >
                       <User className="w-4 h-4 mr-2" /> View Profile
@@ -145,7 +146,7 @@ useEffect(() => {
                   </li>
                   <li>
                     <Link
-                      href="/dashboard/teacher/settings"
+                      href={`/dashboard/${role}/settings`}
                       className="flex items-center px-4 py-3 hover:bg-gray-100"
                     >
                       <Settings className="w-4 h-4 mr-2" /> Settings & Privacy
@@ -174,7 +175,6 @@ useEffect(() => {
         </div>
       </header>
 
-      {/* Mobile Navigation */}
       {navOpen && (
         <div className="md:hidden px-6 py-2 bg-white shadow space-y-2">
           {navItems.map((item) => (
@@ -189,7 +189,6 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Main Content */}
       <main className="p-6">{children}</main>
     </div>
   );

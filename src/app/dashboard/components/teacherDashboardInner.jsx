@@ -11,7 +11,7 @@ export default function TeacherDashboardInner() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const dispatch = useDispatch();
-
+console.log(teacherData,"data")
   const fetchDashboard = async () => {
     const token = localStorage.getItem('token'); //ssss
     try {
@@ -80,16 +80,20 @@ export default function TeacherDashboardInner() {
   if (!teacherData) return <p className="p-6 text-red-500">Unable to load dashboard data.</p>;
 
   const { teacher } = teacherData;
-
+console.log(teacher.profileImage, " Teachers")
   return (
     <div className="max-w-5xl mx-auto mt-8 px-4">
       <div className="bg-white rounded-xl shadow p-6 flex flex-col md:flex-row items-center gap-6 relative">
         <div className="relative w-32 h-32 group">
-          <img
-            src={teacher?.profileImage || '/SHABBU.jpg'}
-            alt="Profile"
-            className="w-full h-full rounded-full object-cover border-4 border-blue-500"
-          />
+         <img
+  src={
+    teacher?.profileImage?.startsWith('http')
+      ? teacher.profileImage
+      : `http://localhost:5000/${teacher.profileImage}`
+  }
+  alt="Profile"
+  className="w-full h-full rounded-full object-cover border-4 border-blue-500"
+/>
           <div
             onClick={handleImageClick}
             className="absolute inset-0 bg-black bg-opacity-40 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity duration-200"

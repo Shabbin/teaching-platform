@@ -1,6 +1,6 @@
 'use client';
 import ProtectedRoute from '././../../components/auth/protectedRoute';
-import TeacherDashboardInner from './components/TeacherDashboardInner';
+import TeacherDashboardInner from '../components/teacherDashboardInner';
 
 export default function TeacherDashboardPage() {
   return (
