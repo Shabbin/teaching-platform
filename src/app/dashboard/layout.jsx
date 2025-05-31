@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { logout } from '../../redux/userSlice';
+import { logout } from '../redux/userSlice';
 import {
   Bell,
   MessageCircle,
@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import MessengerPopup from './components/MessengerPopup';
+import MessengerPopup from './teacher/components/MessengerPopup';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
