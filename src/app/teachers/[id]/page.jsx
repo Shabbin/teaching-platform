@@ -80,7 +80,8 @@ const TeacherProfilePage = () => {
                 <div key={post._id} className="border p-4 rounded shadow-sm bg-gray-50">
                   <h3 className="text-lg font-semibold">{post.title}</h3>
                   <p className="text-sm text-gray-600 mt-1 line-clamp-3">{post.description}</p>
-                  <p className="text-sm mt-2"><strong>Subjects:</strong> {JSON.parse(post.subjects[0]).join(', ')}</p>
+                  <p className="text-sm mt-2"><strong>Subjects:</strong> {post.subjects.join(', ')}</p>
+
                   <p className="text-sm"><strong>Rate:</strong> ৳{post.hourlyRate}/hr</p>
                   <p className="text-sm"><strong>Language:</strong> {post.language}</p>
                   <p className="text-sm"><strong>Mode:</strong> {post.location}</p>
