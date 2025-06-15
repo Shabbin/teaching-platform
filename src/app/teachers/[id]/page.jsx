@@ -12,6 +12,7 @@ const TeacherProfilePage = () => {
 
   useEffect(() => {
     if (!id) return;
+
     axios.get(`http://localhost:5000/api/teachers/${id}/profile`)
       .then((res) => {
         setTeacherData(res.data);
@@ -24,27 +25,26 @@ const TeacherProfilePage = () => {
   }, [id]);
 
   if (loading) return <p className="p-6">Loading profile...</p>;
-
-  if (!teacherData) return <p className="p-6 text-red-600">Teacher not found</p>;
+  if (!teacherData || !teacherData.teacher) return <p className="p-6 text-red-600">Teacher not found</p>;
 
   const { teacher, posts } = teacherData;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto bg-white rounded-lg shadow p-6 space-y-6">
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg p-8 space-y-8">
 
         {/* Profile Header */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           <Image
             src={teacher.profileImage || '/default-profile.png'}
-            alt={teacher.name}
-            width={80}
-            height={80}
-            className="rounded-full object-cover"
+            alt={teacher.name || 'Teacher Profile'}
+            width={90}
+            height={90}
+            className="rounded-full object-cover border"
           />
           <div>
-            <h1 className="text-2xl font-bold">{teacher.name}</h1>
-            <p className="text-gray-600 text-sm">{teacher.email}</p>
+            <h1 className="text-3xl font-bold text-gray-800">{teacher.name}</h1>
+            <p className="text-gray-600">{teacher.email}</p>
             <p className="text-sm text-gray-500">📍 {teacher.location || 'Location not provided'}</p>
           </div>
         </div>
@@ -52,39 +52,59 @@ const TeacherProfilePage = () => {
         {/* Bio */}
         {teacher.bio && (
           <div>
-            <h2 className="text-lg font-semibold">🧾 Bio</h2>
-            <p className="text-gray-700 mt-1">{teacher.bio}</p>
+            <h2 className="text-xl font-semibold text-gray-800 mb-1">🧾 Bio</h2>
+            <p className="text-gray-700 leading-relaxed">{teacher.bio}</p>
           </div>
         )}
 
         {/* Skills */}
-        {teacher.skills && teacher.skills.length > 0 && (
+        {teacher.skills?.length > 0 && (
           <div>
-            <h2 className="text-lg font-semibold">🧠 Skills</h2>
-            <div className="flex flex-wrap gap-2 mt-1">
+            <h2 className="text-xl font-semibold text-gray-800 mb-1">🧠 Skills</h2>
+            <div className="flex flex-wrap gap-2 mt-2">
               {teacher.skills.map((skill, index) => (
-                <span key={index} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm">{skill}</span>
+                <span
+                  key={index}
+                  className="bg-blue-100 text-blue-800 text-sm px-3 py-1 rounded-full"
+                >
+                  {skill}
+                </span>
               ))}
             </div>
           </div>
         )}
 
-        {/* Posts */}
+        {/* Tuition Posts */}
         <div>
-          <h2 className="text-lg font-semibold">📚 Tuition Posts</h2>
-          {posts.length === 0 ? (
-            <p className="text-sm text-gray-500 mt-1">No posts available.</p>
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">📚 Tuition Posts</h2>
+          {posts?.length === 0 ? (
+            <p className="text-gray-500">No posts available.</p>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {posts.map((post) => (
-                <div key={post._id} className="border p-4 rounded shadow-sm bg-gray-50">
-                  <h3 className="text-lg font-semibold">{post.title}</h3>
+                <div
+                  key={post._id}
+                  className="border border-gray-200 bg-gray-50 p-5 rounded-lg shadow-sm hover:shadow-md transition"
+                >
+                  <h3 className="text-lg font-semibold text-gray-900">{post.title}</h3>
                   <p className="text-sm text-gray-600 mt-1 line-clamp-3">{post.description}</p>
-                  <p className="text-sm mt-2"><strong>Subjects:</strong> {post.subjects.join(', ')}</p>
 
-                  <p className="text-sm"><strong>Rate:</strong> ৳{post.hourlyRate}/hr</p>
-                  <p className="text-sm"><strong>Language:</strong> {post.language}</p>
-                  <p className="text-sm"><strong>Mode:</strong> {post.location}</p>
+                  <div className="flex flex-wrap gap-1 mt-3">
+                    {post.subjects.map((subj, idx) => (
+                      <span
+                        key={idx}
+                        className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded-full"
+                      >
+                        {subj}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 text-sm space-y-1 text-gray-700">
+                    <p><strong>Rate:</strong> ৳{post.hourlyRate}/hr</p>
+                    <p><strong>Language:</strong> {post.language}</p>
+                    <p><strong>Mode:</strong> {post.mode}</p>
+                  </div>
                 </div>
               ))}
             </div>

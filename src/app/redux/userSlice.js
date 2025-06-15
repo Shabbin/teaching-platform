@@ -64,8 +64,17 @@ const initialState = {
   error: null,
   studentDashboard: null,
   teacherProfile: null,
+  isRehydrated: false,
 };
-
+const emptyState = {
+  userInfo: null,
+  profileImage: '/default-profile.png',
+  loading: false,
+  error: null,
+  studentDashboard: null,
+  teacherProfile: null,
+  isRehydrated: false,
+};
 // 🔧 Slice
 const userSlice = createSlice({
   name: 'user',
@@ -73,7 +82,7 @@ const userSlice = createSlice({
 
   reducers: {
     logout: (state) => {
-      Object.assign(state, initialState);
+      Object.assign(state, emptyState);
       localStorage.removeItem('token');
       localStorage.removeItem('user');
     },
@@ -99,6 +108,8 @@ const userSlice = createSlice({
     },
     setUserInfo: (state, action) => {
       state.userInfo = action.payload;
+      state.isRehydrated = true;
+      localStorage.setItem('user', JSON.stringify(action.payload));
     },
   },
 
