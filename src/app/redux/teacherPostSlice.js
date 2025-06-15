@@ -101,7 +101,11 @@ const teacherPostSlice = createSlice({
 .addCase(updateTeacherPost.rejected, (state, action) => {
   state.loading = false;
   state.error = action.payload;
-});
+}).addCase(deleteTeacherPost.fulfilled, (state, action) => {
+  state.loading = false;
+  state.items = state.items.filter(post => post._id !== action.payload.id);
+})
+
 
   },
 });

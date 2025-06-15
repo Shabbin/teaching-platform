@@ -1,34 +1,43 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useDispatch } from 'react-redux';
+import { deleteTeacherPost } from '../../../redux/teacherPostSlice'; // Adjust path as needed
 
 const PostDetails = ({ post }) => {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const dispatch = useDispatch();
+  const router = useRouter();
+
   const handleDelete = async () => {
-  if (!confirm('Are you sure you want to delete this post? This action cannot be undone.')) return;
+    if (!confirm('Are you sure you want to delete this post? This action cannot be undone.')) return;
 
-  setSaving(true);
-  try {
-    const result = await dispatch(deleteTeacherPost(id));
+    setSaving(true);
+    setError(null);
 
-    if (deleteTeacherPost.fulfilled.match(result)) {
-      router.push('/dashboard/teacher/post-content'); // ✅ Adjust as needed
-    } else {
-      setError(result.payload || 'Failed to delete post');
+    try {
+      const result = await dispatch(deleteTeacherPost(post._id));
+
+      if (deleteTeacherPost.fulfilled.match(result)) {
+        router.push('/dashboard/teacher/post-content'); // Adjust path if needed
+      } else {
+        setError(result.payload || 'Failed to delete post');
+      }
+    } catch (err) {
+      setError(err.message || 'Something went wrong');
+    } finally {
+      setSaving(false);
     }
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setSaving(false);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 overflow-x-hidden overflow-y-auto">
-      
-      {/* Full-width flex container */}
       <div className="flex flex-col lg:flex-row w-full h-full">
-        {/* Left: Image + Reviews */}
         <div className="w-full lg:w-1/3 bg-gray-100 flex flex-col items-center justify-center p-8">
           <Image
             src={post.teacherImage || '/default-teacher.png'}
@@ -44,7 +53,6 @@ const PostDetails = ({ post }) => {
           </div>
         </div>
 
-        {/* Right: Course Details */}
         <div className="w-full lg:w-2/3 p-8 space-y-6 overflow-y-auto">
           <h1 className="text-4xl font-bold text-gray-800">{post.title}</h1>
           <p className="text-lg text-gray-700 leading-relaxed">{post.description}</p>
@@ -76,21 +84,23 @@ const PostDetails = ({ post }) => {
             </div>
           )}
 
-          <div className="flex justify-end pt-6">
-          <Link href={`/dashboard/posts/${post._id}/edit`}>
-  <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-base">
-    Edit Post
-  </button>
-  
-</Link>
-<Link href={`/dashboard/teacher/post-content`}>
-<button
-  type="button"
-  onClick={handleDelete}
-  className="px-6 py-3 bg-red-600 text-white rounded hover:bg-red-700"
->
-  Delete Post
-</button></Link>
+          {error && <p className="text-red-600 mb-4">{error}</p>}
+
+          <div className="flex justify-end pt-6 space-x-4">
+            <Link href={`/dashboard/posts/${post._id}/edit`}>
+              <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-base">
+                Edit Post
+              </button>
+            </Link>
+
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={saving}
+              className="px-6 py-3 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            >
+              {saving ? 'Deleting...' : 'Delete Post'}
+            </button>
           </div>
         </div>
       </div>
