@@ -1,12 +1,12 @@
+
+
 'use client';
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import CreatePostForm from '../components/postForm';
-
 const PostContentPage = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deletingPostId, setDeletingPostId] = useState(null);
   const [deletingMultiple, setDeletingMultiple] = useState(false);
   const [error, setError] = useState(null);
   const [selectedPosts, setSelectedPosts] = useState(new Set());
@@ -32,41 +32,9 @@ const PostContentPage = () => {
     fetchPosts();
   }, []);
 
-  const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this post? This action cannot be undone.')) return;
-
-    setDeletingPostId(id);
-    setError(null);
-
-    try {
-      const res = await fetch(`http://localhost:5000/api/posts/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'Failed to delete post');
-      }
-
-      setPosts((prev) => prev.filter((post) => post._id !== id));
-      setSelectedPosts((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setDeletingPostId(null);
-    }
-  };
-
   const handleDeleteSelected = async () => {
     if (selectedPosts.size === 0) return alert('No posts selected.');
-    if (!confirm(`Are you sure you want to delete ${selectedPosts.size} selected post(s)? This action cannot be undone.`)) return;
+    if (!confirm(`Are you sure you want to delete ${selectedPosts.size} post(s)?`)) return;
 
     setDeletingMultiple(true);
     setError(null);
@@ -100,11 +68,7 @@ const PostContentPage = () => {
   const toggleSelectPost = (id) => {
     setSelectedPosts((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(id)) {
-        newSet.delete(id);
-      } else {
-        newSet.add(id);
-      }
+      newSet.has(id) ? newSet.delete(id) : newSet.add(id);
       setSelectAll(newSet.size === posts.length);
       return newSet;
     });
@@ -135,18 +99,13 @@ const PostContentPage = () => {
             {posts.length > 0 && (
               <div className="flex justify-between mb-3">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={selectAll}
-                    onChange={toggleSelectAll}
-                    className="cursor-pointer"
-                  />
+                  <input type="checkbox" checked={selectAll} onChange={toggleSelectAll} />
                   Select All
                 </label>
-                {selectAll && (
+                {selectedPosts.size > 0 && (
                   <button
                     onClick={handleDeleteSelected}
-                    disabled={deletingMultiple || selectedPosts.size === 0}
+                    disabled={deletingMultiple}
                     className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                   >
                     {deletingMultiple ? 'Deleting...' : `Delete Selected (${selectedPosts.size})`}
@@ -160,33 +119,23 @@ const PostContentPage = () => {
             ) : posts.length === 0 ? (
               <p className="text-sm text-gray-500">No posts found.</p>
             ) : (
-              <div className="space-y-2">
-                {posts.map((post) => (
-                  <div key={post._id} className="bg-white border border-gray-200 rounded-md px-3 py-2 text-sm flex justify-between items-center">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={selectedPosts.has(post._id)}
-                        onChange={() => toggleSelectPost(post._id)}
-                      />
-                      <div>
-                        <p className="font-semibold truncate">{post.title}</p>
-                        <Link href={`/dashboard/posts/${post._id}`} className="text-blue-600 text-xs hover:underline">
-                          ➜ View
-                        </Link>
-                      </div>
-                    </label>
-
-                    <button
-                      onClick={() => handleDelete(post._id)}
-                      disabled={deletingPostId === post._id || deletingMultiple}
-                      className="ml-2 px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                    >
-                      {deletingPostId === post._id ? 'Deleting...' : 'Delete'}
-                    </button>
-                  </div>
-                ))}
-              </div>
+              posts.map((post) => (
+                <div key={post._id} className="bg-white border border-gray-200 rounded-md px-3 py-2 text-sm flex justify-between items-center">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={selectedPosts.has(post._id)}
+                      onChange={() => toggleSelectPost(post._id)}
+                    />
+                    <div>
+                      <p className="font-semibold truncate">{post.title}</p>
+                      <Link href={`/dashboard/posts/${post._id}`} className="text-blue-600 text-xs hover:underline">
+                        ➜ View
+                      </Link>
+                    </div>
+                  </label>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -214,14 +163,13 @@ const PostContentPage = () => {
                   type="checkbox"
                   checked={selectAll}
                   onChange={toggleSelectAll}
-                  className="cursor-pointer"
                 />
                 Select All
               </label>
-              {selectAll && (
+              {selectedPosts.size > 0 && (
                 <button
                   onClick={handleDeleteSelected}
-                  disabled={deletingMultiple || selectedPosts.size === 0}
+                  disabled={deletingMultiple}
                   className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                 >
                   {deletingMultiple
@@ -265,13 +213,6 @@ const PostContentPage = () => {
                     <Link href={`/dashboard/posts/${post._id}`} className="text-blue-600 hover:underline">
                       ➜ View Full Post
                     </Link>
-                    <button
-                      onClick={() => handleDelete(post._id)}
-                      disabled={deletingPostId === post._id || deletingMultiple}
-                      className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                    >
-                      {deletingPostId === post._id ? 'Deleting...' : 'Delete'}
-                    </button>
                   </div>
                 </div>
               </div>
