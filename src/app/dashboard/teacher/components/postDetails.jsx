@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useDispatch } from 'react-redux';
-import { deleteTeacherPost } from '../../../redux/teacherPostSlice'; // Adjust path as needed
+import { deleteTeacherPost } from '../../../redux/teacherPostSlice';
 
 const PostDetails = ({ post }) => {
   const [saving, setSaving] = useState(false);
@@ -15,16 +15,15 @@ const PostDetails = ({ post }) => {
   const router = useRouter();
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this post? This action cannot be undone.')) return;
+    if (!confirm('Are you sure you want to delete this post?')) return;
 
     setSaving(true);
     setError(null);
 
     try {
       const result = await dispatch(deleteTeacherPost(post._id));
-
       if (deleteTeacherPost.fulfilled.match(result)) {
-        router.push('/dashboard/teacher/post-content'); // Adjust path if needed
+        router.push('/dashboard/teacher/post-content');
       } else {
         setError(result.payload || 'Failed to delete post');
       }
@@ -36,38 +35,51 @@ const PostDetails = ({ post }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden overflow-y-auto">
-      <div className="flex flex-col lg:flex-row w-full h-full">
-        <div className="w-full lg:w-1/3 bg-gray-100 flex flex-col items-center justify-center p-8">
-          <Image
-            src={post.teacherImage || '/default-teacher.png'}
-            alt="Teacher"
-            width={280}
-            height={280}
-            className="rounded-lg border object-cover"
-          />
-          <div className="mt-6 text-center text-gray-700 space-y-1">
-            <div className="text-base font-semibold text-gray-800">Rating</div>
-            <div className="text-yellow-500 text-xl">★★★★☆</div>
-            <div className="text-sm text-gray-600">12 reviews</div>
+    <div className="min-h-screen bg-gray-50 relative">
+      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-start gap-8 p-6">
+        
+        {/* Floating Badge Style Image */}
+        <div className="hidden lg:block absolute left-8 top-8 z-10">
+          <div className="bg-white rounded-xl p-6 shadow-lg flex flex-col items-center w-64">
+            <Image
+              src={post.teacherImage || '/SHABBU.jpg'}
+              alt="Teacher"
+              width={160}
+              height={160}
+              className="rounded-full object-cover"
+            />
+            <div className="mt-4 text-center text-gray-700 text-base space-y-1">
+              <div className="font-semibold text-gray-800">Rating</div>
+              <div className="text-yellow-500 text-xl">★★★★☆</div>
+              <div className="text-sm text-gray-500">12 reviews</div>
+            </div>
           </div>
         </div>
 
-        <div className="w-full lg:w-2/3 p-8 space-y-6 overflow-y-auto">
+        {/* Details Section - Full Width */}
+        <div className="w-full lg:pl-64 space-y-6"> {/* Pl-64 gives room for the badge */}
           <h1 className="text-4xl font-bold text-gray-800">{post.title}</h1>
-          <p className="text-lg text-gray-700 leading-relaxed">{post.description}</p>
+
+          <div className="text-gray-700 text-lg leading-relaxed">
+            {post.description}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-700 text-base">
-            <div>
-              <span className="font-semibold">Subjects:</span> {post.subjects?.join(', ')}
+            <div className="bg-gray-100 rounded-lg p-3">
+              <span className="font-semibold">Subjects:</span><br />
+              <span className="text-gray-600">{post.subjects?.join(', ')}</span>
             </div>
-            <div>
-              <span className="font-semibold">Location:</span> {post.location}
+            <div className="bg-gray-100 rounded-lg p-3">
+              <span className="font-semibold">Location:</span><br />
+              <span className="text-gray-600">{post.location}</span>
             </div>
-            <div>
-              <span className="font-semibold">Language:</span> {post.language}
+            <div className="bg-gray-100 rounded-lg p-3">
+              <span className="font-semibold">Language:</span><br />
+              <span className="text-gray-600">{post.language}</span>
             </div>
-            <div>
-              <span className="font-semibold">Hourly Rate:</span> {post.hourlyRate} BDT/hr
+            <div className="bg-gray-100 rounded-lg p-3">
+              <span className="font-semibold">Hourly Rate:</span><br />
+              <span className="text-gray-600">{post.hourlyRate} BDT/hr</span>
             </div>
           </div>
 
@@ -76,7 +88,7 @@ const PostDetails = ({ post }) => {
               <h3 className="text-lg font-semibold text-gray-800 mb-2">Intro Video</h3>
               <iframe
                 className="w-full aspect-video rounded-md border"
-                src={`https://www.youtube.com/embed/${post.youtubeLink.split('v=')[1]}`}
+                src={`https://www.youtube.com/embed/${post.youtubeLink}`}
                 title="YouTube video"
                 frameBorder="0"
                 allowFullScreen
@@ -86,7 +98,7 @@ const PostDetails = ({ post }) => {
 
           {error && <p className="text-red-600 mb-4">{error}</p>}
 
-          <div className="flex justify-end pt-6 space-x-4">
+          <div className="flex justify-end gap-4 pt-4">
             <Link href={`/dashboard/posts/${post._id}/edit`}>
               <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-base">
                 Edit Post
@@ -97,7 +109,7 @@ const PostDetails = ({ post }) => {
               type="button"
               onClick={handleDelete}
               disabled={saving}
-              className="px-6 py-3 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
             >
               {saving ? 'Deleting...' : 'Delete Post'}
             </button>

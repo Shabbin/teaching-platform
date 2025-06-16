@@ -59,7 +59,7 @@ const EditPostPage = () => {
     const updatedData = {
       title,
       description,
-      subjects,
+      subjects, // subjects stay unchanged
       location,
       language,
       hourlyRate: Number(hourlyRate),
@@ -80,11 +80,6 @@ const EditPostPage = () => {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleSubjectsChange = (e) => {
-    const val = e.target.value;
-    setSubjects(val.split(',').map(s => s.trim()).filter(Boolean));
   };
 
   const handleTagsChange = (e) => {
@@ -128,14 +123,13 @@ const EditPostPage = () => {
         </div>
 
         <div>
-          <label className="block font-medium mb-1" htmlFor="subjects">Subjects (comma separated, max 5)</label>
+          <label className="block font-medium mb-1" htmlFor="subjects">Subjects (read-only)</label>
           <input
             id="subjects"
             type="text"
             value={subjects.join(', ')}
-            onChange={handleSubjectsChange}
-            className="w-full border border-gray-300 rounded px-3 py-2"
-            required
+            readOnly
+            className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100 text-gray-700 cursor-not-allowed"
           />
         </div>
 
@@ -205,7 +199,6 @@ const EditPostPage = () => {
         >
           {saving ? 'Saving...' : 'Save Changes'}
         </button>
-
       </form>
     </div>
   );
