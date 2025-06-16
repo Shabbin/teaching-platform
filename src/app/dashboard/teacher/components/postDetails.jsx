@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { deleteTeacherPost } from '../../../redux/teacherPostSlice';
 
 const PostDetails = ({ post }) => {
@@ -13,6 +13,14 @@ const PostDetails = ({ post }) => {
 
   const dispatch = useDispatch();
   const router = useRouter();
+
+  // ✅ Get profile image from Redux userSlice
+  const profileImage = useSelector((state) => state.user.profileImage);
+
+  const getTeacherImageUrl = (image) => {
+    if (!image || image.trim() === '') return '/SHABBU.jpg';
+    return image.startsWith('http') ? image : `http://localhost:5000/${image}`;
+  };
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this post?')) return;
@@ -41,13 +49,16 @@ const PostDetails = ({ post }) => {
         {/* Floating Badge Style Image */}
         <div className="hidden lg:block absolute left-8 top-8 z-10">
           <div className="bg-white rounded-xl p-6 shadow-lg flex flex-col items-center w-64">
-            <Image
-              src={post.teacherImage || '/SHABBU.jpg'}
-              alt="Teacher"
-              width={160}
-              height={160}
-              className="rounded-full object-cover"
-            />
+          <div className="w-40 h-40 rounded-full overflow-hidden">
+  <Image
+    src={getTeacherImageUrl(profileImage)}
+    alt="Teacher"
+    width={160}
+    height={160}
+    className="object-cover w-full h-full"
+  />
+</div>
+
             <div className="mt-4 text-center text-gray-700 text-base space-y-1">
               <div className="font-semibold text-gray-800">Rating</div>
               <div className="text-yellow-500 text-xl">★★★★☆</div>
@@ -57,10 +68,10 @@ const PostDetails = ({ post }) => {
         </div>
 
         {/* Details Section - Full Width */}
-        <div className="w-full lg:pl-64 space-y-6"> {/* Pl-64 gives room for the badge */}
+        <div className="w-full lg:pl-64 space-y-6">
           <h1 className="text-4xl font-bold text-gray-800">{post.title}</h1>
 
-          <div className="text-gray-700 text-lg leading-relaxed">
+          <div className="text-gray-700 text-lg leading-relaxed whitespace-pre-line">
             {post.description}
           </div>
 
@@ -90,7 +101,7 @@ const PostDetails = ({ post }) => {
                 className="w-full aspect-video rounded-md border"
                 src={`https://www.youtube.com/embed/${post.youtubeLink}`}
                 title="YouTube video"
-                frameBorder="0"
+               
                 allowFullScreen
               />
             </div>
