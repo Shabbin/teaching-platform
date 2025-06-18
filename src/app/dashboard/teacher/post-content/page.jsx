@@ -12,23 +12,31 @@ const PostContentPage = () => {
   const [selectAll, setSelectAll] = useState(false);
   const [expandedPost, setExpandedPost] = useState(null);
 
- useEffect(() => {
-  const fetchPosts = async () => {
-    try {
-      const res = await fetch('http://localhost:5000/api/posts/mine', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-      const data = await res.json();
-      setPosts(Array.isArray(data) ? data : data.posts || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchPosts();
-}, []);
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/posts/mine', {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        const data = await res.json();
+        setPosts(Array.isArray(data) ? data : data.posts || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPosts();
+  }, []);
 
+  // NEW: add a post to the list immediately after creation
+const addNewPost = (newPost) => {
+  if (!newPost || !newPost._id || !newPost.title) {
+    console.warn('New post incomplete:', newPost);
+    return;
+  }
+  setPosts((prev) => [newPost, ...prev]);
+};
 
   const toggleSelectPost = (id) => {
     setSelectedPosts((prev) => {
@@ -116,12 +124,23 @@ const PostContentPage = () => {
 
       <div className="flex flex-col md:flex-row gap-4">
         {/* Post List */}
-        <div className="md:w-1/3 max-h-[80vh] overflow-y-auto pr-2 space-y-3">
+        <div
+          className={`md:w-1/3 max-h-[80vh] pr-2 space-y-3
+            ${
+              posts.length > 10
+                ? 'overflow-y-hidden hover:overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200'
+                : 'overflow-y-auto'
+            }
+          `}
+        >
           <div className="flex justify-between items-center mb-2 px-2">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={selectAll} onChange={toggleSelectAll} />
-              Select All
-            </label>
+            {posts.length > 10 && (
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={selectAll} onChange={toggleSelectAll} />
+                Select All
+              </label>
+            )}
+
             {selectedPosts.size > 0 && (
               <button
                 onClick={handleDeleteSelected}
@@ -142,9 +161,10 @@ const PostContentPage = () => {
           )}
         </div>
 
-        {/* Create Post Form Without Wrapper */}
+        {/* Create Post Form WITHOUT wrapper */}
         <div className="md:w-2/3">
-          <CreatePostForm />
+          {/* Pass the callback here */}
+          <CreatePostForm onPostCreated={addNewPost} />
         </div>
       </div>
     </div>

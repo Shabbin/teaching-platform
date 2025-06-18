@@ -1,7 +1,33 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
-// ✅ Async thunk
-export const fetchTeacherPosts = createAsyncThunk(
+// ✅ Create post
+ const createTeacherPost = createAsyncThunk(
+  'teacherPosts/createTeacherPost',
+  async (postData, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:5000/api/posts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(postData),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to create post');
+console.log(data, "Data")
+      return data.post || data; // ✅ Return only the post
+    } catch (err) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+
+// ✅ Fetch posts
+ const fetchTeacherPosts = createAsyncThunk(
   'teacherPosts/fetchTeacherPosts',
   async (teacherId, { rejectWithValue }) => {
     try {
@@ -23,7 +49,9 @@ export const fetchTeacherPosts = createAsyncThunk(
     }
   }
 );
-export const updateTeacherPost = createAsyncThunk(
+
+// ✅ Update post
+ const updateTeacherPost = createAsyncThunk(
   'teacherPosts/updateTeacherPost',
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
@@ -45,7 +73,9 @@ export const updateTeacherPost = createAsyncThunk(
     }
   }
 );
-export const deleteTeacherPost = createAsyncThunk(
+
+// ✅ Delete post
+ const deleteTeacherPost = createAsyncThunk(
   'teacherPosts/deleteTeacherPost',
   async (id, { rejectWithValue }) => {
     try {
@@ -65,6 +95,7 @@ export const deleteTeacherPost = createAsyncThunk(
     }
   }
 );
+
 // ✅ Initial state
 const initialState = {
   items: [],
@@ -79,6 +110,7 @@ const teacherPostSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
+      // Fetch
       .addCase(fetchTeacherPosts.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -90,25 +122,50 @@ const teacherPostSlice = createSlice({
       .addCase(fetchTeacherPosts.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-      }).addCase(updateTeacherPost.pending, (state) => {
-  state.loading = true;
-  state.error = null;
-})
-.addCase(updateTeacherPost.fulfilled, (state, action) => {
-  state.loading = false;
-  // Optional: update specific post in state.items if needed
-})
-.addCase(updateTeacherPost.rejected, (state, action) => {
-  state.loading = false;
-  state.error = action.payload;
-}).addCase(deleteTeacherPost.fulfilled, (state, action) => {
-  state.loading = false;
-  state.items = state.items.filter(post => post._id !== action.payload.id);
-})
+      })
 
+      // Create
+      .addCase(createTeacherPost.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createTeacherPost.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items.push(action.payload);
+      })
+      .addCase(createTeacherPost.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
+      // Update
+      .addCase(updateTeacherPost.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateTeacherPost.fulfilled, (state, action) => {
+        state.loading = false;
+        // Optional: update post in items if needed
+      })
+      .addCase(updateTeacherPost.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // Delete
+      .addCase(deleteTeacherPost.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = state.items.filter(post => post._id !== action.payload.id);
+      });
   },
 });
 
-// ✅ Only export ONCE each
+// ✅ Export reducer + thunks
 export default teacherPostSlice.reducer;
+
+export {
+  createTeacherPost,
+  fetchTeacherPosts,
+  updateTeacherPost,
+  deleteTeacherPost,
+};
