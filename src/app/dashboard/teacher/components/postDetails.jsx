@@ -1,30 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useDispatch, useSelector } from 'react-redux';
+import { useState } from 'react';
 import { deleteTeacherPost } from '../../../redux/teacherPostSlice';
 
 const PostDetails = ({ post }) => {
+  const dispatch = useDispatch();
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const dispatch = useDispatch();
-  const router = useRouter();
+  const user = useSelector((state) => state.user);
+  const userInfo = user?.userInfo || {};
+  const userId = userInfo?.id || userInfo?._id;
+  const userRole = userInfo?.role;
 
-  // ✅ Get profile image from Redux userSlice
-  const profileImage = useSelector((state) => state.user.profileImage);
+  console.log('userRole:', userRole);
+  console.log('userId:', userId);
+  console.log('teacher:', post.teacher);
+
+  if (!post) {
+    return <p className="p-6 text-center text-gray-500">Loading post...</p>;
+  }
+
+  // Fallback teacher info for teacher dashboard (post.teacher may be undefined)
+  const fallbackTeacher = post.teacher || {
+    _id: userId,
+    name: userInfo?.name || 'Unnamed',
+    profileImage: userInfo?.profileImage || '',
+    location: userInfo?.location || '',
+  };
+
+  // Ownership check
+  const teacherId = post.teacher?._id || userId;
+  const isOwner = userRole === 'teacher' && userId && String(userId) === String(teacherId);
 
   const getTeacherImageUrl = (image) => {
-    if (!image || image.trim() === '') return '/SHABBU.jpg';
+    if (!image || image.trim() === '') return '/default-profile.png';
     return image.startsWith('http') ? image : `http://localhost:5000/${image}`;
   };
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this post?')) return;
-
     setSaving(true);
     setError(null);
 
@@ -44,30 +64,32 @@ const PostDetails = ({ post }) => {
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-start gap-8 p-6">
-        
-        {/* Floating Badge Style Image */}
+      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 p-6">
+        {/* Sidebar Teacher Info */}
         <div className="hidden lg:block absolute left-8 top-8 z-10">
           <div className="bg-white rounded-xl p-6 shadow-lg flex flex-col items-center w-64">
-          <div className="w-40 h-40 rounded-full overflow-hidden">
-  <Image
-    src={getTeacherImageUrl(profileImage)}
-    alt="Teacher"
-    width={160}
-    height={160}
-    className="object-cover w-full h-full"
-  />
-</div>
-
+            <div className="w-40 h-40 rounded-full overflow-hidden">
+              <Image
+                src={getTeacherImageUrl(fallbackTeacher?.profileImage)}
+                alt={fallbackTeacher?.name || 'Teacher'}
+                width={160}
+                height={160}
+                className="object-cover w-full h-full"
+              />
+            </div>
             <div className="mt-4 text-center text-gray-700 text-base space-y-1">
-              <div className="font-semibold text-gray-800">Rating</div>
-              <div className="text-yellow-500 text-xl">★★★★☆</div>
-              <div className="text-sm text-gray-500">12 reviews</div>
+              <div className="font-semibold text-gray-800">
+                {fallbackTeacher?.name || 'Unnamed Teacher'}
+              </div>
+              <div className="text-sm text-gray-500">
+                📍 {post?.location || fallbackTeacher?.location || 'Unknown'}
+              </div>
+              <div className="text-sm text-yellow-500">★★★★☆ (12 reviews)</div>
             </div>
           </div>
         </div>
 
-        {/* Details Section - Full Width */}
+        {/* Post Content */}
         <div className="w-full lg:pl-64 space-y-6">
           <h1 className="text-4xl font-bold text-gray-800">{post.title}</h1>
 
@@ -94,36 +116,44 @@ const PostDetails = ({ post }) => {
             </div>
           </div>
 
+          {/* YouTube Video (if any) */}
           {post.youtubeLink && (
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-2">Intro Video</h3>
               <iframe
                 className="w-full aspect-video rounded-md border"
                 src={`https://www.youtube.com/embed/${post.youtubeLink}`}
-                title="YouTube video"
-               
+                title="Intro Video"
                 allowFullScreen
               />
             </div>
           )}
 
-          {error && <p className="text-red-600 mb-4">{error}</p>}
+          {/* Error Display */}
+          {error && <p className="text-red-600">{error}</p>}
 
+          {/* Footer Actions */}
           <div className="flex justify-end gap-4 pt-4">
-            <Link href={`/dashboard/posts/${post._id}/edit`}>
-              <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-base">
-                Edit Post
+            {isOwner ? (
+              <>
+                <Link href={`/dashboard/posts/${post._id}/edit`}>
+                  <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    ✏️ Edit Post
+                  </button>
+                </Link>
+                <button
+                  onClick={handleDelete}
+                  disabled={saving}
+                  className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                >
+                  {saving ? 'Deleting...' : '🗑 Delete Post'}
+                </button>
+              </>
+            ) : (
+              <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                📩 Request Tuition
               </button>
-            </Link>
-
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={saving}
-              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-            >
-              {saving ? 'Deleting...' : 'Delete Post'}
-            </button>
+            )}
           </div>
         </div>
       </div>

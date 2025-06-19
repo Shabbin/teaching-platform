@@ -17,8 +17,6 @@ const ViewTeachers = () => {
   const [maxPay, setMaxPay] = useState('');
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const postsPerPage = 20;
 
   const fetchAllTags = async () => {
     try {
@@ -31,7 +29,7 @@ const ViewTeachers = () => {
       });
       setAllTags([...tagSet]);
     } catch (err) {
-      console.error('Failed to fetch all tags:', err);
+      console.error('Failed to fetch tags:', err);
     }
   };
 
@@ -51,7 +49,6 @@ const ViewTeachers = () => {
       const query = queryParams.length ? `?${queryParams.join('&')}` : '';
       const res = await axios.get(`http://localhost:5000/api/posts${query}`);
       setPosts(res.data);
-      setCurrentPage(1);
     } catch (err) {
       console.error('Error fetching posts:', err);
     } finally {
@@ -70,29 +67,37 @@ const ViewTeachers = () => {
 
   const tagOptions = allTags.map(tag => ({ value: tag, label: tag }));
 
-  const indexOfLast = currentPage * postsPerPage;
-  const indexOfFirst = indexOfLast - postsPerPage;
-  const currentPosts = posts.slice(indexOfFirst, indexOfLast);
-  const totalPages = Math.ceil(posts.length / postsPerPage);
+  // Group posts by teacher and only show filtered subjects
+  const teacherMap = {};
+  posts.forEach(post => {
+    const tid = post.teacher._id;
+    const subjectFilter = selectedTags.length > 0
+      ? post.subjects.filter(s => selectedTags.some(tag => tag.value === s))
+      : post.subjects;
 
-  const teachersMap = {};
-  currentPosts.forEach(post => {
-    const id = post.teacher._id;
-    if (!teachersMap[id]) {
-      teachersMap[id] = {
-        ...post.teacher,
-        samplePost: post
+    if (subjectFilter.length === 0) return; // Skip teacher if no matching subjects
+
+    if (!teacherMap[tid]) {
+      teacherMap[tid] = {
+        teacher: post.teacher,
+        subjects: new Set(),
+        hourlyRate: post.hourlyRate,
+        location: post.location,
+        language: post.language,
       };
     }
+
+    subjectFilter.forEach(s => teacherMap[tid].subjects.add(s));
   });
-  const teachers = Object.values(teachersMap);
+
+  const teachers = Object.values(teacherMap);
 
   return (
     <div className="min-h-screen p-4 sm:p-6 bg-gray-50">
       <h1 className="text-2xl font-bold mb-6 text-gray-800">🎓 Browse Available Teachers</h1>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Filter Sidebar */}
+        {/* Filters */}
         <div className="w-full lg:w-1/4 lg:sticky top-6 h-fit">
           <div className="bg-white rounded-xl shadow-md p-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-800">🔍 Filter Teachers</h2>
@@ -153,12 +158,12 @@ const ViewTeachers = () => {
           </div>
         </div>
 
-        {/* Teachers Display */}
+        {/* Teachers List */}
         <div className="w-full lg:w-3/4">
           {loading ? (
             <div className="space-y-6">
-              {Array.from({ length: 20 }).map((_, idx) => (
-                <div key={idx} className="bg-white rounded-2xl shadow p-6 w-full flex items-start gap-6">
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <div key={idx} className="bg-white rounded-2xl shadow p-6 flex gap-6">
                   <Skeleton variant="circular" width={80} height={80} />
                   <div className="flex-1 space-y-3">
                     <Skeleton variant="text" width="60%" />
@@ -170,74 +175,50 @@ const ViewTeachers = () => {
               ))}
             </div>
           ) : teachers.length === 0 ? (
-            <p className="text-red-500">No teachers found with selected filters.</p>
+            <p className="text-red-500">No matching teachers found.</p>
           ) : (
-            <>
-              <div className="flex flex-col gap-6 mb-6">
-                {teachers.map(teacher => (
-                  <div key={teacher._id} className="bg-white rounded-2xl shadow p-6 w-full hover:shadow-lg">
-                    <div className="flex flex-col sm:flex-row gap-6 sm:items-start">
-                      <Avatar
-                        alt={teacher.name}
-                        src={teacher.profileImage}
-                        sx={{ width: 80, height: 80 }}
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-xl font-semibold text-gray-800">{teacher.name}</h3>
-                          <div className="text-sm text-blue-600 font-semibold">
-                            ৳{teacher.samplePost.hourlyRate} / hour
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-500 mb-1">{teacher.samplePost.location}</p>
-                        <p className="text-gray-600 mb-2 line-clamp-3">{teacher.samplePost.description}</p>
-                        <div className="flex flex-wrap gap-2 mb-3">
-                          {teacher.samplePost.subjects.map((subj, i) => (
-                            <span key={i} className="bg-blue-100 text-blue-700 text-sm px-2 py-0.5 rounded-full">
-                              #{subj}
-                            </span>
-                          ))}
-                        </div>
-                        <Link href={`/teachers/${teacher._id}`}>
-                          <button className="mt-2 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
-                            View Profile
-                          </button>
-                        </Link>
+            <div className="space-y-6">
+              {teachers.map(({ teacher, subjects, hourlyRate, location, language }) => (
+                <div
+                  key={teacher._id}
+                  className="bg-white rounded-2xl shadow p-6 hover:shadow-lg transition"
+                >
+                  <div className="flex flex-col sm:flex-row gap-6 sm:items-start">
+                    <Avatar
+                      alt={teacher.name}
+                      src={teacher.profileImage}
+                      sx={{ width: 80, height: 80 }}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <h3 className="text-xl font-semibold text-gray-800">{teacher.name}</h3>
+                        <div className="text-sm text-blue-600 font-semibold">৳{hourlyRate} / hr</div>
                       </div>
+                      <p className="text-sm text-gray-500 mb-1">📍 {location}</p>
+                      <p className="text-sm text-gray-500 mb-2">💬 {language || 'Language not specified'}</p>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {[...subjects].map((subj, i) => (
+                          <span key={i} className="bg-blue-100 text-blue-700 text-sm px-2 py-0.5 rounded-full">
+                            #{subj}
+                          </span>
+                        ))}
+                      </div>
+                    <Link
+  href={`/teachers/${teacher._id}/posts${
+    selectedTags.length > 0 ? `?subject=${selectedTags[0].value}` : ''
+  }`}
+>
+  <button className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+    View Posts
+  </button>
+</Link>
+
+
                     </div>
                   </div>
-                ))}
-              </div>
-
-              {/* Pagination Controls */}
-              <div className="flex justify-center items-center gap-4 flex-wrap">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-                  disabled={currentPage === 1}
-                  className={`px-4 py-2 rounded-md ${
-                    currentPage === 1
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
-                  }`}
-                >
-                  Previous
-                </button>
-                <span className="text-gray-700 font-semibold">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className={`px-4 py-2 rounded-md ${
-                    currentPage === totalPages
-                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
-                  }`}
-                >
-                  Next
-                </button>
-              </div>
-            </>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>
