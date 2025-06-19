@@ -18,6 +18,7 @@ const ViewTeachers = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch all tags from all posts
   const fetchAllTags = async () => {
     try {
       const res = await axios.get('http://localhost:5000/api/posts');
@@ -33,6 +34,7 @@ const ViewTeachers = () => {
     }
   };
 
+  // Fetch all posts based on filters
   const fetchFilteredPosts = async () => {
     try {
       setLoading(true);
@@ -67,30 +69,34 @@ const ViewTeachers = () => {
 
   const tagOptions = allTags.map(tag => ({ value: tag, label: tag }));
 
-  // Group posts by teacher and only show filtered subjects
-  const teacherMap = {};
+  // Group unique teachers from posts
+  const teacherMap = new Map();
+
   posts.forEach(post => {
-    const tid = post.teacher._id;
-    const subjectFilter = selectedTags.length > 0
+    const tId = post.teacher._id;
+    const currentSubjects = teacherMap.get(tId)?.subjects || new Set();
+
+    const filteredSubjects = selectedTags.length > 0
       ? post.subjects.filter(s => selectedTags.some(tag => tag.value === s))
       : post.subjects;
 
-    if (subjectFilter.length === 0) return; // Skip teacher if no matching subjects
+    if (filteredSubjects.length === 0) return;
 
-    if (!teacherMap[tid]) {
-      teacherMap[tid] = {
+    if (!teacherMap.has(tId)) {
+      teacherMap.set(tId, {
         teacher: post.teacher,
-        subjects: new Set(),
+        subjects: new Set(filteredSubjects),
         hourlyRate: post.hourlyRate,
         location: post.location,
         language: post.language,
-      };
+      });
+    } else {
+      filteredSubjects.forEach(subj => currentSubjects.add(subj));
+      teacherMap.get(tId).subjects = currentSubjects;
     }
-
-    subjectFilter.forEach(s => teacherMap[tid].subjects.add(s));
   });
 
-  const teachers = Object.values(teacherMap);
+  const teachers = Array.from(teacherMap.values());
 
   return (
     <div className="min-h-screen p-4 sm:p-6 bg-gray-50">
@@ -158,7 +164,7 @@ const ViewTeachers = () => {
           </div>
         </div>
 
-        {/* Teachers List */}
+        {/* Teacher Cards */}
         <div className="w-full lg:w-3/4">
           {loading ? (
             <div className="space-y-6">
@@ -203,17 +209,17 @@ const ViewTeachers = () => {
                           </span>
                         ))}
                       </div>
-                    <Link
-  href={`/teachers/${teacher._id}/posts${
-    selectedTags.length > 0 ? `?subject=${selectedTags[0].value}` : ''
-  }`}
->
-  <button className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
-    View Posts
-  </button>
-</Link>
-
-
+                      <Link
+                        href={
+                          selectedTags.length > 0
+  ? `/teachers/${teacher._id}/posts?${selectedTags.map(tag => `subject=${encodeURIComponent(tag.value)}`).join('&')}`
+  : `/teachers/${teacher._id}/posts`
+                        }
+                      >
+                        <button className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                          View Posts
+                        </button>
+                      </Link>
                     </div>
                   </div>
                 </div>

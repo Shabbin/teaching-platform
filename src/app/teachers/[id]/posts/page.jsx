@@ -7,7 +7,8 @@ import Link from 'next/link';
 const TeacherPostsPage = () => {
   const { id } = useParams();
   const searchParams = useSearchParams();
-  const subject = searchParams.get('subject');
+
+  const subjectParams = searchParams.getAll('subject'); // ✅ supports multiple subjects
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,17 +16,15 @@ const TeacherPostsPage = () => {
   useEffect(() => {
     if (!id) return;
 
+    const queryParams = new URLSearchParams();
+    queryParams.append('teacher', id);
+    subjectParams.forEach(s => queryParams.append('subject', s)); // ✅ add all subjects
+
     const fetchPosts = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/posts?teacher=${id}`);
+        const res = await fetch(`http://localhost:5000/api/posts?${queryParams.toString()}`);
         const data = await res.json();
-
-        // ✅ filter if subject is passed in URL
-        const filtered = subject
-          ? data.filter(post => post.subjects.includes(subject))
-          : data;
-
-        setPosts(filtered);
+        setPosts(data);
       } catch (err) {
         console.error('Error fetching teacher posts:', err);
       } finally {
@@ -34,7 +33,7 @@ const TeacherPostsPage = () => {
     };
 
     fetchPosts();
-  }, [id, subject]);
+  }, [id, subjectParams.join(',')]);
 
   if (loading) return <p className="p-6 text-center text-gray-500">Loading posts...</p>;
   if (posts.length === 0) return <p className="p-6 text-center text-red-500">No posts found for this teacher.</p>;
@@ -44,7 +43,8 @@ const TeacherPostsPage = () => {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6 text-gray-800">
-        📚 Posts by {teacher.name} {subject && `(Filtered by ${subject})`}
+        📚 Posts by {teacher.name}{' '}
+        {subjectParams.length > 0 && `(Filtered by ${subjectParams.join(', ')})`}
       </h1>
 
       <div className="space-y-6">
