@@ -14,39 +14,26 @@ const SUBJECT_OPTIONS = [
 const CreatePostForm = ({ onPostCreated }) => {
   const dispatch = useDispatch();
   const { loading } = useSelector(state => state.teacherPosts);
-
   const [postType, setPostType] = useState('general');
 
-  // Shared fields
   const [subjects, setSubjects] = useState([]);
   const [location, setLocation] = useState('');
   const [language, setLanguage] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
   const [youtubeLink, setYoutubeLink] = useState('');
   const [errors, setErrors] = useState({});
-
-  // General post fields
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-
-  // Topic post fields
   const [topicTitle, setTopicTitle] = useState('');
   const [syllabusTag, setSyllabusTag] = useState('');
   const [targetStudents, setTargetStudents] = useState([]);
   const [weeklyPlan, setWeeklyPlan] = useState([{ week: 1, title: '', description: '' }]);
 
   const resetAllFields = () => {
-    setSubjects([]);
-    setLocation('');
-    setLanguage('');
-    setHourlyRate('');
-    setYoutubeLink('');
-    setErrors({});
-    setTitle('');
-    setDescription('');
-    setTopicTitle('');
-    setSyllabusTag('');
-    setTargetStudents([]);
+    setSubjects([]); setLocation(''); setLanguage('');
+    setHourlyRate(''); setYoutubeLink('');
+    setErrors({}); setTitle(''); setDescription('');
+    setTopicTitle(''); setSyllabusTag(''); setTargetStudents([]);
     setWeeklyPlan([{ week: 1, title: '', description: '' }]);
   };
 
@@ -56,54 +43,11 @@ const CreatePostForm = ({ onPostCreated }) => {
       case 'syllabusTag': setSyllabusTag(value); break;
       case 'targetStudents': setTargetStudents(value); break;
       case 'weeklyPlan': setWeeklyPlan(value); break;
-      default: break;
     }
   };
 
-  const sharedFields = (
-    <>
-      <TagInput
-        label="Subjects (max 5)"
-        options={SUBJECT_OPTIONS}
-        selected={subjects}
-        setSelected={setSubjects}
-        maxTags={5}
-      />
-      {errors.subjects && <p className="text-red-500 text-sm">{errors.subjects}</p>}
-
-      <input
-        className="input input-bordered w-full mb-2"
-        placeholder="Location"
-        value={location}
-        onChange={(e) => setLocation(e.target.value)}
-      />
-      <input
-        className="input input-bordered w-full mb-2"
-        placeholder="Language"
-        value={language}
-        onChange={(e) => setLanguage(e.target.value)}
-      />
-      <input
-        type="number"
-        className="input input-bordered w-full mb-2"
-        placeholder="Hourly Rate"
-        value={hourlyRate}
-        onChange={(e) => setHourlyRate(e.target.value)}
-      />
-      {errors.hourlyRate && <p className="text-red-500 text-sm">{errors.hourlyRate}</p>}
-
-      <input
-        className="input input-bordered w-full mb-2"
-        placeholder="YouTube Link"
-        value={youtubeLink}
-        onChange={(e) => setYoutubeLink(e.target.value)}
-      />
-    </>
-  );
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const newErrors = {};
 
     if (subjects.length === 0) newErrors.subjects = 'Select at least one subject';
@@ -162,41 +106,77 @@ const CreatePostForm = ({ onPostCreated }) => {
   };
 
   return (
-    <form className="card bg-base-100 shadow-lg p-6 w-full max-w-3xl mx-auto" onSubmit={handleSubmit}>
-      <h2 className="text-xl font-semibold mb-4">Create New Post</h2>
+    <form onSubmit={handleSubmit} className="max-w-3xl mx-auto bg-white rounded-xl shadow-xl p-8 space-y-6 border border-gray-200">
+      <h2 className="text-3xl font-bold text-center text-gray-800">📣 Create a New Tuition Post</h2>
 
-      {/* Post Type Toggle */}
-      <div className="mb-4 flex gap-6">
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name="postType"
-            value="general"
-            checked={postType === 'general'}
-            onChange={() => {
-              setPostType('general');
-              resetAllFields();
-            }}
-          />
-          General Post
-        </label>
-        <label className="flex items-center gap-2">
-          <input
-            type="radio"
-            name="postType"
-            value="topic"
-            checked={postType === 'topic'}
-            onChange={() => {
-              setPostType('topic');
-              resetAllFields();
-            }}
-          />
-          Topic Post
-        </label>
+      {/* Post Type Selector */}
+      <div className="flex justify-center gap-6">
+        {['general', 'topic'].map((type) => (
+          <label key={type} className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="radio"
+              name="postType"
+              value={type}
+              checked={postType === type}
+              onChange={() => {
+                setPostType(type);
+                resetAllFields();
+              }}
+              className="radio radio-primary"
+            />
+            <span className="font-medium capitalize">{type} Post</span>
+          </label>
+        ))}
       </div>
 
-      {sharedFields}
+      {/* Shared Inputs */}
+      <div className="grid gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">📚 Subjects (max 5)</label>
+          <div className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 shadow-sm">
+            <TagInput
+              options={SUBJECT_OPTIONS}
+              selected={subjects}
+              setSelected={setSubjects}
+              maxTags={5}
+            />
+          </div>
+          {errors.subjects && (
+            <p className="text-red-500 text-sm mt-1">{errors.subjects}</p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">Click to select from predefined subjects.</p>
+        </div>
 
+        <input
+          className="input input-bordered w-full"
+          placeholder="📍 Location (e.g., Dhaka, Online)"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
+        <input
+          className="input input-bordered w-full"
+          placeholder="🌐 Language"
+          value={language}
+          onChange={(e) => setLanguage(e.target.value)}
+        />
+        <input
+          type="number"
+          className="input input-bordered w-full"
+          placeholder="💸 Hourly Rate (in BDT)"
+          value={hourlyRate}
+          onChange={(e) => setHourlyRate(e.target.value)}
+        />
+        {errors.hourlyRate && <p className="text-red-500 text-sm">{errors.hourlyRate}</p>}
+
+        <input
+          className="input input-bordered w-full"
+          placeholder="🎥 YouTube Link (optional)"
+          value={youtubeLink}
+          onChange={(e) => setYoutubeLink(e.target.value)}
+        />
+      </div>
+
+      {/* Post Type-Specific Fields */}
       {postType === 'general' ? (
         <GeneralPostForm
           title={title}
@@ -229,18 +209,20 @@ const CreatePostForm = ({ onPostCreated }) => {
         />
       )}
 
-      {/* Submit button */}
+      {/* Submit Button */}
       <button
         type="submit"
         disabled={loading}
-        className={`btn btn-primary w-full mt-6 ${loading ? 'loading' : ''}`}
+        className={`btn btn-primary w-full py-3 text-lg font-semibold ${loading ? 'loading' : ''}`}
       >
-        {loading ? 'Creating...' : 'Create Post'}
+        {loading ? 'Posting...' : '🚀 Submit Post'}
       </button>
 
-      {/* Submission error */}
+      {/* Error Message */}
       {errors.submit && (
-        <p className="text-red-600 mt-4 text-center font-semibold">{errors.submit}</p>
+        <div className="bg-red-100 text-red-600 px-4 py-2 rounded-md text-center mt-4 font-semibold">
+          {errors.submit}
+        </div>
       )}
     </form>
   );

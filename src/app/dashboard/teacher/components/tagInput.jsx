@@ -1,104 +1,103 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
-const TagInput = ({ label, selected, setSelected, options = [], maxTags = 5 }) => {
-  const [input, setInput] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
+const TagInput = ({ label, options, selected = [], setSelected, maxTags = 5 }) => {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const wrapperRef = useRef(null);
-  const inputRef = useRef(null);
 
-  // Click outside to close
+  const handleSelect = (option) => {
+    if (selected.includes(option) || selected.length >= maxTags) return;
+    setSelected([...selected, option]);
+    setDropdownOpen(false);
+  };
+
+  const handleRemove = (tag) => {
+    setSelected(selected.filter((s) => s !== tag));
+  };
+
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setShowDropdown(false);
+    const handleClickOutside = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
+        setDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    setInput('');
-  }, [selected]);
-
-  const handleAdd = (value) => {
-    if (!value || selected.includes(value) || selected.length >= maxTags) return;
-    setSelected([...selected, value]);
-    setInput('');
-    setShowDropdown(false);
-  };
-
-  const handleRemove = (tag) => {
-    setSelected(selected.filter((t) => t !== tag));
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleAdd(input.trim());
-    }
-  };
-
-  const handleFocus = () => {
-    if (selected.length < maxTags) {
-      setShowDropdown(true);
-    }
-  };
-
-  const filteredOptions = options.filter(
-    (option) =>
-      option.toLowerCase().includes(input.toLowerCase()) &&
-      !selected.includes(option)
-  );
-
   return (
-    <div ref={wrapperRef} className="mb-4 relative z-20">
-      <label className="block text-sm font-medium mb-1">{label}</label>
+    <div ref={wrapperRef} className="relative mb-4">
+      {label && <label className="block font-semibold mb-1">{label}</label>}
 
-      {/* Selected tags */}
-      <div className="flex flex-wrap gap-2 mb-2">
+      {/* Tag input area */}
+      <div
+        onClick={() => {
+          if (selected.length < maxTags) setDropdownOpen(!dropdownOpen);
+        }}
+        className={`w-full border rounded-md px-3 py-2 bg-white min-h-[44px] flex flex-wrap items-center gap-2 cursor-pointer transition-all ${
+          selected.length >= maxTags ? 'border-red-300 bg-red-50' : 'border-gray-300'
+        }`}
+      >
+        {selected.length === 0 && (
+          <span className="text-gray-400">Click to select subjects</span>
+        )}
         {selected.map((tag) => (
-          <span key={tag} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm">
+          <span
+            key={tag}
+            className="bg-blue-100 text-blue-800 rounded-full px-3 py-1 text-sm flex items-center gap-1"
+          >
             {tag}
             <button
               type="button"
-              className="ml-1 text-red-600"
-              onClick={() => handleRemove(tag)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemove(tag);
+              }}
+              className="text-sm font-bold hover:text-red-600"
             >
               ×
             </button>
           </span>
         ))}
+        {selected.length >= maxTags && (
+          <span className="text-sm text-red-500 ml-2">Max {maxTags} subjects</span>
+        )}
       </div>
 
-      {/* Input box */}
-      <input
-        ref={inputRef}
-        type="text"
-        value={input}
-        onFocus={handleFocus}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={`Type and press enter (max ${maxTags})`}
-        className="input input-bordered w-full"
-        disabled={selected.length >= maxTags}
-      />
-
       {/* Dropdown */}
-      {showDropdown && filteredOptions.length > 0 && selected.length < maxTags && (
-        <ul className="absolute bg-white border border-gray-300 rounded shadow mt-1 w-full max-h-40 overflow-auto">
-          {filteredOptions.map((option) => (
+      {dropdownOpen && selected.length < maxTags && (
+        <ul className="absolute z-20 w-full bg-white border border-gray-300 rounded-md shadow-md mt-1 max-h-60 overflow-y-auto animate-fade-in">
+          {options.filter((opt) => !selected.includes(opt)).map((opt) => (
             <li
-              key={option}
-              className="px-3 py-1 cursor-pointer hover:bg-blue-100"
-              onClick={() => handleAdd(option)}
+              key={opt}
+              className="px-4 py-2 hover:bg-blue-100 cursor-pointer transition-all"
+              onClick={() => handleSelect(opt)}
             >
-              {option}
+              {opt}
             </li>
           ))}
+          {options.filter((opt) => !selected.includes(opt)).length === 0 && (
+            <li className="px-4 py-2 text-gray-400">No more options</li>
+          )}
         </ul>
       )}
+
+      {/* Animation class */}
+      <style jsx>{`
+        .animate-fade-in {
+          animation: fadeIn 0.15s ease-in-out;
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-5px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 };
