@@ -47,63 +47,75 @@ const CreatePostForm = ({ onPostCreated }) => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    const newErrors = {};
+  e.preventDefault();
+  const newErrors = {};
 
-    if (subjects.length === 0) newErrors.subjects = 'Select at least one subject';
-    if (!hourlyRate || hourlyRate <= 0) newErrors.hourlyRate = 'Hourly rate must be positive';
+  if (subjects.length === 0) newErrors.subjects = 'Select at least one subject';
+  if (!hourlyRate || hourlyRate <= 0) newErrors.hourlyRate = 'Hourly rate must be positive';
 
-    if (postType === 'general') {
-      if (!title.trim()) newErrors.title = 'Title is required';
-      if (!description.trim()) newErrors.description = 'Description is required';
-    } else {
-      if (!topicTitle.trim()) newErrors.topicTitle = 'Topic title is required';
-      weeklyPlan.forEach((week, i) => {
-        if (!week.title.trim()) newErrors[`weekTitle${i}`] = 'Week title is required';
-        if (!week.description.trim()) newErrors[`weekDesc${i}`] = 'Week description is required';
-      });
-    }
+  if (postType === 'general') {
+    if (!title.trim()) newErrors.title = 'Title is required';
+    if (!description.trim()) newErrors.description = 'Description is required';
+  } else {
+    if (!topicTitle.trim()) newErrors.topicTitle = 'Topic title is required';
+    weeklyPlan.forEach((week, i) => {
+      if (!week.title.trim()) newErrors[`weekTitle${i}`] = 'Week title is required';
+      if (!week.description.trim()) newErrors[`weekDesc${i}`] = 'Week description is required';
+    });
+  }
 
-    setErrors(newErrors);
-    if (Object.keys(newErrors).length > 0) return;
+  setErrors(newErrors);
+  if (Object.keys(newErrors).length > 0) return;
 
-    let postData = {
-      postType,
-      subjects,
-      location,
-      language,
-      hourlyRate: Number(hourlyRate),
-      youtubeLink,
-    };
-
-    if (postType === 'general') {
-      postData = { ...postData, title, description };
-    } else {
-      postData = {
-        ...postData,
-        title: topicTitle,
-        description: '',
-        topicDetails: {
-          topicTitle,
-          syllabusTag,
-          studentTypes: targetStudents,
-          weeklyPlan,
-        },
-      };
-    }
-
-    try {
-      const result = await dispatch(createTeacherPost(postData));
-      if (createTeacherPost.fulfilled.match(result)) {
-        onPostCreated(result.payload);
-        resetAllFields();
-      } else {
-        setErrors({ submit: result.payload || 'Failed to create post' });
-      }
-    } catch {
-      setErrors({ submit: 'Something went wrong. Try again later.' });
-    }
+  // --- NEW: create a meaningful description from weekly plan ---
+  const createDescriptionFromWeeklyPlan = (plan) => {
+    if (!Array.isArray(plan) || plan.length === 0) return '';
+    return plan
+      .map(
+        (week) =>
+          `Week ${week.week}: ${week.title.trim()}. ${week.description.trim()}`
+      )
+      .join(' ');
   };
+
+  let postData = {
+    postType,
+    subjects,
+    location,
+    language,
+    hourlyRate: Number(hourlyRate),
+    youtubeLink,
+  };
+
+  if (postType === 'general') {
+    postData = { ...postData, title, description };
+  } else {
+    postData = {
+      ...postData,
+      title: topicTitle,
+      description: createDescriptionFromWeeklyPlan(weeklyPlan), // assign meaningful description here
+      topicDetails: {
+        topicTitle,
+        syllabusTag,
+        studentTypes: targetStudents,
+        weeklyPlan,
+      },
+    };
+  }
+
+  try {
+    const result = await dispatch(createTeacherPost(postData));
+    if (createTeacherPost.fulfilled.match(result)) {
+      onPostCreated(result.payload);
+      resetAllFields();
+    } else {
+      setErrors({ submit: result.payload || 'Failed to create post' });
+    }
+  } catch {
+    setErrors({ submit: 'Something went wrong. Try again later.' });
+  }
+};
+
 
   return (
     <form onSubmit={handleSubmit} className="max-w-3xl mx-auto bg-white rounded-xl shadow-xl p-8 space-y-6 border border-gray-200">

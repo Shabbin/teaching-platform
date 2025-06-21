@@ -24,14 +24,15 @@ const GeneralPostForm = ({
       <div className="mb-4">
         <label className="block font-semibold mb-1" htmlFor="title">Title</label>
         <input
-          id="title"
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="input input-bordered w-full"
-          placeholder="Post title"
-        />
-        {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
+  type="text"
+  className="input input-bordered w-full"
+  placeholder="Post title (e.g., 'Crash Course on Physics')"
+  value={title}
+  onChange={(e) => setTitle(e.target.value)}
+/>
+<p className="text-xs text-gray-400 mt-1">
+  Tip: Include your subject tag (like "Physics") in the title for better matching.
+</p>
       </div>
 
       {/* Description */}
