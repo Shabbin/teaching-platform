@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 
-export default function Step2_BoardGroup({ educationTree, onNext, onBack }) {
+export default function Step2_BoardGroup({ educationTree, onNext, onBack, editMode }) {
   const {
     register,
     watch,
@@ -21,12 +21,10 @@ export default function Step2_BoardGroup({ educationTree, onNext, onBack }) {
   if (educationSystem === 'English-Medium') {
     boardsOptions = Object.keys(educationTree['English-Medium'] || {});
   } else if (educationSystem === 'Bangla-Medium') {
-    // Bangla Medium only has groups, no boards
     groupsOptions = ['Science', 'Commerce', 'Arts'];
   } else if (educationSystem === 'University-Admission') {
     boardsOptions = Object.keys(educationTree['University-Admission'] || {});
   } else if (educationSystem === 'GED') {
-    // GED has neither boards nor groups
     boardsOptions = [];
     groupsOptions = [];
   } else if (educationSystem === 'Entrance-Exams') {
@@ -36,14 +34,14 @@ export default function Step2_BoardGroup({ educationTree, onNext, onBack }) {
     groupsOptions = ['General', 'Technical', 'Both'];
   }
 
-  // Clear group if educationSystem changes to a system that does NOT need it
+  // Clear group if educationSystem changes to one that doesn't need it
   useEffect(() => {
     if (!['Bangla-Medium', 'BCS'].includes(educationSystem)) {
       setValue('group', '');
     }
   }, [educationSystem, setValue]);
 
-  // Clear board if educationSystem changes to a system that does NOT need it
+  // Clear board if educationSystem changes to one that doesn't need it
   useEffect(() => {
     if (
       ![
@@ -57,7 +55,7 @@ export default function Step2_BoardGroup({ educationTree, onNext, onBack }) {
     }
   }, [educationSystem, setValue]);
 
-  // You may also want to clear board when educationSystem changes at all to avoid stale board
+  // Always reset board on educationSystem change
   useEffect(() => {
     setValue('board', '');
   }, [educationSystem, setValue]);
@@ -70,6 +68,7 @@ export default function Step2_BoardGroup({ educationTree, onNext, onBack }) {
           <select
             {...register('board', { required: 'Board is required' })}
             className="border p-2 rounded w-full mb-2"
+            disabled={editMode && educationSystem !== 'Bangla-Medium'} // disable except for Bangla-Medium
           >
             <option value="">-- Select Board --</option>
             {boardsOptions.map((board) => (
@@ -78,9 +77,7 @@ export default function Step2_BoardGroup({ educationTree, onNext, onBack }) {
               </option>
             ))}
           </select>
-          {errors.board && (
-            <p className="text-red-600">{errors.board.message}</p>
-          )}
+          {errors.board && <p className="text-red-600">{errors.board.message}</p>}
         </>
       )}
 
@@ -90,6 +87,7 @@ export default function Step2_BoardGroup({ educationTree, onNext, onBack }) {
           <select
             {...register('group', { required: 'Group is required' })}
             className="border p-2 rounded w-full mb-2"
+            disabled={editMode && educationSystem !== 'Bangla-Medium'} // only enable editing group for Bangla-Medium
           >
             <option value="">-- Select Group --</option>
             {groupsOptions.map((group) => (
@@ -98,16 +96,11 @@ export default function Step2_BoardGroup({ educationTree, onNext, onBack }) {
               </option>
             ))}
           </select>
-          {errors.group && (
-            <p className="text-red-600">{errors.group.message}</p>
-          )}
+          {errors.group && <p className="text-red-600">{errors.group.message}</p>}
         </>
       )}
 
-      {/* For GED no board/group so show Next always */}
-      {educationSystem === 'GED' && (
-        <p className="mb-2">No board or group needed for GED</p>
-      )}
+      {educationSystem === 'GED' && <p className="mb-2">No board or group needed for GED</p>}
 
       <div className="flex justify-between mt-4">
         <button
@@ -120,7 +113,6 @@ export default function Step2_BoardGroup({ educationTree, onNext, onBack }) {
         <button
           type="button"
           onClick={() => {
-            // Validate presence of board or group based on educationSystem
             if (
               ['English-Medium', 'University-Admission', 'Entrance-Exams', 'BCS'].includes(
                 educationSystem

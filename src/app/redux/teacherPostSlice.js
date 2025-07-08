@@ -46,8 +46,6 @@ export const updateTeacherPost = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
 
-      // We assume updatedData is a plain object, not FormData
-      // Adjust headers and body accordingly if you want to send multipart/form-data instead
       const response = await axios.put(
         `http://localhost:5000/api/posts/${id}`,
         updatedData,
@@ -59,6 +57,25 @@ export const updateTeacherPost = createAsyncThunk(
       );
 
       return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
+
+// ✅ Async thunk to delete a teacher post
+export const deleteTeacherPost = createAsyncThunk(
+  'teacherPosts/deleteTeacherPost',
+  async (postId, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(`http://localhost:5000/api/posts/${postId}`, {
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      return { postId }; // return just the ID for local removal
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }
@@ -79,7 +96,7 @@ const teacherPostSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // createTeacherPost cases
+      // CREATE
       .addCase(createTeacherPost.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -93,14 +110,13 @@ const teacherPostSlice = createSlice({
         state.error = action.payload || 'Failed to create post';
       })
 
-      // updateTeacherPost cases
+      // UPDATE
       .addCase(updateTeacherPost.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(updateTeacherPost.fulfilled, (state, action) => {
         state.loading = false;
-        // Find and update post in posts array
         const index = state.posts.findIndex((p) => p._id === action.payload._id);
         if (index !== -1) {
           state.posts[index] = action.payload;
@@ -109,10 +125,24 @@ const teacherPostSlice = createSlice({
       .addCase(updateTeacherPost.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Failed to update post';
+      })
+
+      // ✅ DELETE
+      .addCase(deleteTeacherPost.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteTeacherPost.fulfilled, (state, action) => {
+        state.loading = false;
+        state.posts = state.posts.filter((post) => post._id !== action.payload.postId);
+      })
+      .addCase(deleteTeacherPost.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Failed to delete post';
       });
   },
 });
 
 export const { resetError } = teacherPostSlice.actions;
 
-export default teacherPostSlice.reducer;
+export default teacherPostSlice.reducer; 

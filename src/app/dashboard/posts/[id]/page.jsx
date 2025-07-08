@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import PostDetails from '../../teacher/components/postDetails'; // adjust path as needed
+import ViewPostDetails from '../../../dashboard/teacher/components/viewPostDetails';
 
 const PostDetailPage = () => {
   const { id } = useParams();
@@ -29,10 +29,10 @@ const PostDetailPage = () => {
     fetchPost();
   }, [id]);
 
-  if (loading) return <p>Loading post...</p>;
-  if (!post) return <p>Post not found.</p>;
+  if (loading) return <p className="p-6 text-center text-gray-500">Loading post...</p>;
+  if (!post) return <p className="p-6 text-center text-red-500">Post not found.</p>;
 
-  return <PostDetails post={post} />;
+  return <ViewPostDetails post={post} />;
 };
 
 export default PostDetailPage;

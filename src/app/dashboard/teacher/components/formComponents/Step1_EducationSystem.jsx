@@ -10,7 +10,7 @@ const educationSystems = [
   'BCS',
 ];
 
-export default function Step1_EducationSystem({ onNext }) {
+export default function Step1_EducationSystem({ onNext, editMode }) {
   const {
     register,
     watch,
@@ -22,7 +22,11 @@ export default function Step1_EducationSystem({ onNext }) {
   return (
     <div>
       <label className="block font-medium mb-1">Select Education System</label>
-      <select {...register('educationSystem', { required: 'Education System is required' })} className="border p-2 rounded w-full mb-2">
+      <select
+        {...register('educationSystem', { required: 'Education System is required' })}
+        className="border p-2 rounded w-full mb-2"
+        disabled={editMode} // disable in edit mode
+      >
         <option value="">-- Select --</option>
         {educationSystems.map((sys) => (
           <option key={sys} value={sys}>
@@ -36,7 +40,9 @@ export default function Step1_EducationSystem({ onNext }) {
         type="button"
         onClick={onNext}
         disabled={!selected}
-        className={`mt-4 px-4 py-2 rounded text-white ${selected ? 'bg-blue-600' : 'bg-gray-400 cursor-not-allowed'}`}
+        className={`mt-4 px-4 py-2 rounded text-white ${
+          selected ? 'bg-blue-600' : 'bg-gray-400 cursor-not-allowed'
+        }`}
       >
         Next →
       </button>
