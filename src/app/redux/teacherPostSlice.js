@@ -11,7 +11,10 @@ export const createTeacherPost = createAsyncThunk(
       Object.entries(postData).forEach(([key, value]) => {
         if (Array.isArray(value)) {
           value
-            .filter(v => v !== undefined && v !== null && v !== '' && typeof v === 'string')
+            .filter(
+              (v) =>
+                v !== undefined && v !== null && v !== '' && typeof v === 'string'
+            )
             .forEach((v) => formData.append(key, v));
         } else if (key === 'file' && value) {
           formData.append(key, value);
@@ -20,7 +23,7 @@ export const createTeacherPost = createAsyncThunk(
         }
       });
 
-        const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token');
 
       const response = await axios.post('http://localhost:5000/api/posts', formData, {
         headers: {
@@ -36,6 +39,31 @@ export const createTeacherPost = createAsyncThunk(
   }
 );
 
+// Async thunk to update a teacher post
+export const updateTeacherPost = createAsyncThunk(
+  'teacherPosts/updateTeacherPost',
+  async ({ id, updatedData }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+
+      // We assume updatedData is a plain object, not FormData
+      // Adjust headers and body accordingly if you want to send multipart/form-data instead
+      const response = await axios.put(
+        `http://localhost:5000/api/posts/${id}`,
+        updatedData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
+  }
+);
 
 const teacherPostSlice = createSlice({
   name: 'teacherPosts',
@@ -51,6 +79,7 @@ const teacherPostSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // createTeacherPost cases
       .addCase(createTeacherPost.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -62,6 +91,24 @@ const teacherPostSlice = createSlice({
       .addCase(createTeacherPost.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || 'Failed to create post';
+      })
+
+      // updateTeacherPost cases
+      .addCase(updateTeacherPost.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateTeacherPost.fulfilled, (state, action) => {
+        state.loading = false;
+        // Find and update post in posts array
+        const index = state.posts.findIndex((p) => p._id === action.payload._id);
+        if (index !== -1) {
+          state.posts[index] = action.payload;
+        }
+      })
+      .addCase(updateTeacherPost.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Failed to update post';
       });
   },
 });
