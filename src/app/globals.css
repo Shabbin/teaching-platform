@@ -1,3 +1,25 @@
 @import "tailwindcss";
 @plugin "daisyui";
-/* globals.css */
+globals.css
+@keyframes comicPop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-comicPop {
+  animation: comicPop 0.3s ease forwards;
+}
+
+.font-comicSans {
+  font-family: "Comic Sans MS", cursive, sans-serif;
+}

@@ -128,6 +128,18 @@ export default function DashboardLayout({ children }) {
                 className="absolute right-0 top-14 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden"
               >
                 <ul className="flex flex-col text-sm text-gray-800 divide-y divide-gray-100">
+
+                  {role === 'teacher' && (
+                    <li>
+                      <Link
+                        href="/dashboard/teacher/post-content"
+                        className="flex items-center px-4 py-3 hover:bg-gray-100"
+                      >
+                        ✍️ Post Content
+                      </Link>
+                    </li>
+                  )}
+
                   <li>
                     <Link
                       href={`/dashboard/${role}/profile`}

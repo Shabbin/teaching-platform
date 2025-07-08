@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 
-const TagInput = ({ label, options, selected = [], setSelected, maxTags = 5 }) => {
+const TagInput = ({ options, selected = [], setSelected, maxTags = 5 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -27,9 +27,12 @@ const TagInput = ({ label, options, selected = [], setSelected, maxTags = 5 }) =
 
   return (
     <div ref={wrapperRef} className="relative mb-4">
-      {label && <label className="block font-semibold mb-1">{label}</label>}
+      {/* Label above field */}
+      <label className="block text-sm font-semibold mb-1 text-gray-700">
+        Click to select subjects (max {maxTags})
+      </label>
 
-      {/* Tag input area */}
+      {/* Tag display and input box */}
       <div
         onClick={() => {
           if (selected.length < maxTags) setDropdownOpen(!dropdownOpen);
@@ -39,7 +42,7 @@ const TagInput = ({ label, options, selected = [], setSelected, maxTags = 5 }) =
         }`}
       >
         {selected.length === 0 && (
-          <span className="text-gray-400">Click to select subjects</span>
+          <span className="text-gray-400">No subjects selected</span>
         )}
         {selected.map((tag) => (
           <span
@@ -59,9 +62,6 @@ const TagInput = ({ label, options, selected = [], setSelected, maxTags = 5 }) =
             </button>
           </span>
         ))}
-        {selected.length >= maxTags && (
-          <span className="text-sm text-red-500 ml-2">Max {maxTags} subjects</span>
-        )}
       </div>
 
       {/* Dropdown */}
@@ -82,7 +82,7 @@ const TagInput = ({ label, options, selected = [], setSelected, maxTags = 5 }) =
         </ul>
       )}
 
-      {/* Animation class */}
+      {/* Fade-in animation */}
       <style jsx>{`
         .animate-fade-in {
           animation: fadeIn 0.15s ease-in-out;
