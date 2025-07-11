@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 const TeacherPostsPage = () => {
   const { id } = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const subjectParams = searchParams.getAll('subject'); // ✅ supports multiple subjects
 
@@ -42,6 +43,14 @@ const TeacherPostsPage = () => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* ✅ Go Back to All Teachers */}
+      <button
+        onClick={() => router.push('/dashboard/student/teachers')}
+        className="mb-6 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+      >
+        ← Go Back to All Teachers
+      </button>
+
       <h1 className="text-3xl font-bold mb-6 text-gray-800">
         📚 Posts by {teacher.name}{' '}
         {subjectParams.length > 0 && `(Filtered by ${subjectParams.join(', ')})`}
@@ -64,7 +73,7 @@ const TeacherPostsPage = () => {
             </div>
 
             <div className="mt-4">
-              <Link href={`/dashboard/posts/${post._id}`}>
+              <Link href={`/dashboard/posts/${post._id}?teacherId=${teacher._id}`}>
                 <button className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
                   View Details
                 </button>

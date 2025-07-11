@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from "react";
 
 export default function ChatInput({ onSend }) {
@@ -17,6 +19,7 @@ export default function ChatInput({ onSend }) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         placeholder="Type a message"
+        onKeyDown={e => e.key === 'Enter' && handleSend()}
       />
       <button
         className="bg-blue-600 text-white px-3 py-1 rounded"

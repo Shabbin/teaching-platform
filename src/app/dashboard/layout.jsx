@@ -46,7 +46,7 @@ export default function DashboardLayout({ children }) {
     } else if (role === 'student') {
       setNavItems([
         { label: 'Dashboard Home', href: '/dashboard/student' },
-        { label: 'My Requests', href: '/dashboard/student/requests' },
+        // { label: 'My Requests', href: '/dashboard/student/requests' },
         { label: 'Find Teachers', href: '/dashboard/student/teachers' },
         { label: 'My Schedule', href: '/dashboard/student/schedule' },
         { label: 'My Bookings', href: '/dashboard/student/bookings' },

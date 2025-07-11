@@ -1,23 +1,30 @@
 'use client';
 
-import { useSelector, useDispatch } from 'react-redux';
-import { useRouter } from 'next/navigation';
+import { useSelector } from 'react-redux';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
-import { deleteTeacherPost } from '../../../redux/teacherPostSlice';
+
+import TuitionRequestModal from '../components/formComponents/tuitionRequestComponent';
+import TopicHelpModal from '../components/formComponents/TopicHelpModal'; // import your topic help modal
 
 const ViewPostDetails = ({ post }) => {
-  const dispatch = useDispatch();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  const [showTuitionModal, setShowTuitionModal] = useState(false);
+  const [showTopicHelpModal, setShowTopicHelpModal] = useState(false);
 
   const user = useSelector((state) => state.user);
   const userInfo = user?.userInfo || {};
   const userId = userInfo?.id || userInfo?._id;
   const userRole = userInfo?.role;
 
+  const teacherIdFromQuery = searchParams.get('teacherId');
   const fallbackTeacher = post.teacher || {
     _id: userId,
     name: userInfo?.name || 'Unnamed',
@@ -25,7 +32,7 @@ const ViewPostDetails = ({ post }) => {
     location: userInfo?.location || '',
   };
 
-  const teacherId = post.teacher?._id || userId;
+  const teacherId = post.teacher?._id || teacherIdFromQuery || userId;
   const isOwner = userRole === 'teacher' && String(userId) === String(teacherId);
 
   const getImageUrl = (img) =>
@@ -35,28 +42,24 @@ const ViewPostDetails = ({ post }) => {
       ? img
       : `http://localhost:5000/${img}`;
 
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this post?')) return;
-    setSaving(true);
-    setError(null);
-
-    try {
-      const result = await dispatch(deleteTeacherPost(post._id));
-      if (deleteTeacherPost.fulfilled.match(result)) {
-        router.push('/dashboard/teacher/post-content');
-      } else {
-        setError(result.payload || 'Failed to delete post');
-      }
-    } catch (err) {
-      setError(err.message || 'Something went wrong');
-    } finally {
-      setSaving(false);
+  const handleGoBack = () => {
+    if (userRole === 'teacher') {
+      router.push('/dashboard/teacher/post-content');
+    } else if (teacherIdFromQuery) {
+      router.push(`/teachers/${teacherIdFromQuery}/posts`);
+    } else {
+      router.back();
     }
   };
 
-  const handleGoBack = () => {
-    router.push('/dashboard/teacher/post-content');
+  const extractYouTubeId = (url) => {
+    const match = url.match(
+      /^.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?.+&v=)([^#&?]*).*/
+    );
+    return match && match[1].length === 11 ? match[1] : null;
   };
+
+  const youtubeId = post.youtubeLink ? extractYouTubeId(post.youtubeLink) : null;
 
   const entries = {
     'Education System': post.educationSystem,
@@ -71,15 +74,11 @@ const ViewPostDetails = ({ post }) => {
     Tags: post.tags?.join(', '),
   };
 
-  // ✅ Extract YouTube video ID
-  const extractYouTubeId = (url) => {
-    const match = url.match(
-      /^.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?.+&v=)([^#&?]*).*/
-    );
-    return match && match[1].length === 11 ? match[1] : null;
+  const handleRequestSuccess = () => {
+    setShowTuitionModal(false);
+    setShowTopicHelpModal(false);
+    // Optionally show toast or message here
   };
-
-  const youtubeId = post.youtubeLink ? extractYouTubeId(post.youtubeLink) : null;
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
@@ -110,14 +109,37 @@ const ViewPostDetails = ({ post }) => {
 
         {/* Main Content */}
         <main className="flex-1 space-y-6 lg:pl-8">
-          {/* Go Back Button */}
-          <button
-            onClick={handleGoBack}
-            className="mb-6 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-            aria-label="Go back to posts list"
-          >
-            ← Go Back
-          </button>
+          {/* Top Navigation */}
+          <div className="flex gap-4 flex-wrap">
+            <button
+              onClick={handleGoBack}
+              className="mb-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+              aria-label="Go back to posts list"
+            >
+              ← Go Back
+            </button>
+
+            {!isOwner && (
+              <button
+                onClick={() => router.push('/dashboard/student/teachers')}
+                className="mb-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+              >
+                🎓 All Teachers
+              </button>
+            )}
+          </div>
+
+          {/* YouTube at Top */}
+          {youtubeId && (
+            <div>
+              <iframe
+                className="w-full aspect-video rounded-md border mb-6"
+                src={`https://www.youtube.com/embed/${youtubeId}`}
+                title="Intro Video"
+                allowFullScreen
+              />
+            </div>
+          )}
 
           <h1 className="text-4xl font-bold text-gray-800">{post.title}</h1>
 
@@ -140,19 +162,6 @@ const ViewPostDetails = ({ post }) => {
             )}
           </div>
 
-          {/* ✅ YouTube Embed */}
-          {youtubeId && (
-            <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">Intro Video</h3>
-              <iframe
-                className="w-full aspect-video rounded-md border"
-                src={`https://www.youtube.com/embed/${youtubeId}`}
-                title="Intro Video"
-                allowFullScreen
-              />
-            </div>
-          )}
-
           {error && <p className="text-red-600">{error}</p>}
 
           {/* Footer Buttons */}
@@ -165,7 +174,7 @@ const ViewPostDetails = ({ post }) => {
                   </button>
                 </Link>
                 <button
-                  onClick={handleDelete}
+                  onClick={() => alert('Delete not implemented here')}
                   disabled={saving}
                   className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
                 >
@@ -173,11 +182,39 @@ const ViewPostDetails = ({ post }) => {
                 </button>
               </>
             ) : (
-              <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                📩 Request Tuition
-              </button>
+              <div className="space-x-4">
+                <button
+                  onClick={() => setShowTuitionModal(true)}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  📩 Request Tuition
+                </button>
+                <button
+                  onClick={() => setShowTopicHelpModal(true)}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  📩 Ask for Topic Help
+                </button>
+              </div>
             )}
           </div>
+
+          {showTuitionModal && (
+            <TuitionRequestModal
+              teacherId={teacherId}
+              postId={post._id}
+              onClose={() => setShowTuitionModal(false)}
+              onSuccess={handleRequestSuccess}
+            />
+          )}
+
+          {showTopicHelpModal && (
+            <TopicHelpModal
+              teacherId={teacherId}
+              onClose={() => setShowTopicHelpModal(false)}
+              onSuccess={handleRequestSuccess}
+            />
+          )}
         </main>
       </div>
     </div>
@@ -185,185 +222,3 @@ const ViewPostDetails = ({ post }) => {
 };
 
 export default ViewPostDetails;
-
-
-
-
-//................................................
-// The code component below is an outstanding one
-//.................................................
-
-// 'use client';
-
-// import { useSelector, useDispatch } from 'react-redux';
-// import { useRouter } from 'next/navigation';
-// import Image from 'next/image';
-// import Link from 'next/link';
-// import { useState } from 'react';
-// import { deleteTeacherPost } from '../../../redux/teacherPostSlice';
-
-// const PostDetails = ({ post }) => {
-//   const dispatch = useDispatch();
-//   const router = useRouter();
-//   const [saving, setSaving] = useState(false);
-//   const [error, setError] = useState(null);
-
-//   const user = useSelector((state) => state.user);
-//   const userInfo = user?.userInfo || {};
-//   const userId = userInfo?.id || userInfo?._id;
-//   const userRole = userInfo?.role;
-
-//   if (!post) {
-//     return <p className="p-6 text-center text-gray-500">Loading post...</p>;
-//   }
-
-//   const fallbackTeacher = post.teacher || {
-//     _id: userId,
-//     name: userInfo?.name || 'Unnamed',
-//     profileImage: userInfo?.profileImage || '',
-//     location: userInfo?.location || '',
-//   };
-
-//   const teacherId = post.teacher?._id || userId;
-//   const isOwner = userRole === 'teacher' && userId && String(userId) === String(teacherId);
-
-//   const getTeacherImageUrl = (image) => {
-//     if (!image || image.trim() === '') return '/default-profile.png';
-//     return image.startsWith('http') ? image : `http://localhost:5000/${image}`;
-//   };
-
-//   const handleDelete = async () => {
-//     if (!confirm('Are you sure you want to delete this post?')) return;
-//     setSaving(true);
-//     setError(null);
-
-//     try {
-//       const result = await dispatch(deleteTeacherPost(post._id));
-//       if (deleteTeacherPost.fulfilled.match(result)) {
-//         router.push('/dashboard/teacher/post-content');
-//       } else {
-//         setError(result.payload || 'Failed to delete post');
-//       }
-//     } catch (err) {
-//       setError(err.message || 'Something went wrong');
-//     } finally {
-//       setSaving(false);
-//     }
-//   };
-
-//   return (
-//     <div className="min-h-screen bg-gray-50 relative max-w-7xl mx-auto p-6">
-//       {/* Go Back Button */}
-//       <button
-//         onClick={() => router.push('/dashboard/teacher/post-content')}
-//         className="mb-6 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-//         aria-label="Go back"
-//       >
-//         ← Go Back
-//       </button>
-
-//       <div className="flex flex-col lg:flex-row gap-8">
-//         {/* Sidebar Teacher Info */}
-//         <div className="hidden lg:block sticky top-8 bg-white rounded-xl p-6 shadow-lg flex flex-col items-center w-64">
-//           <div className="w-40 h-40 rounded-full overflow-hidden">
-//             <Image
-//               src={getTeacherImageUrl(fallbackTeacher?.profileImage)}
-//               alt={fallbackTeacher?.name || 'Teacher'}
-//               width={160}
-//               height={160}
-//               className="object-cover w-full h-full"
-//             />
-//           </div>
-//           <div className="mt-4 text-center text-gray-700 text-base space-y-1">
-//             <div className="font-semibold text-gray-800">
-//               {fallbackTeacher?.name || 'Unnamed Teacher'}
-//             </div>
-//             <div className="text-sm text-gray-500">
-//               📍 {post?.location || fallbackTeacher?.location || 'Unknown'}
-//             </div>
-//             <div className="text-sm text-yellow-500">★★★★☆ (12 reviews)</div>
-//           </div>
-//         </div>
-
-//         {/* Post Content */}
-//         <div className="flex-1 space-y-6">
-//           <h1 className="text-4xl font-bold text-gray-800">{post.title}</h1>
-
-//           <div className="text-gray-700 text-lg leading-relaxed whitespace-pre-line">
-//             {post.description}
-//           </div>
-
-//           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-700 text-base">
-//             <div className="bg-gray-100 rounded-lg p-3">
-//               <span className="font-semibold">Subjects:</span><br />
-//               <span className="text-gray-600">{post.subjects?.join(', ')}</span>
-//             </div>
-//             <div className="bg-gray-100 rounded-lg p-3">
-//               <span className="font-semibold">Location:</span><br />
-//               <span className="text-gray-600">{post.location}</span>
-//             </div>
-//             <div className="bg-gray-100 rounded-lg p-3">
-//               <span className="font-semibold">Language:</span><br />
-//               <span className="text-gray-600">{post.language}</span>
-//             </div>
-//             <div className="bg-gray-100 rounded-lg p-3">
-//               <span className="font-semibold">Hourly Rate:</span><br />
-//               <span className="text-gray-600">{post.hourlyRate} BDT/hr</span>
-//             </div>
-//           </div>
-
-//           {post.youtubeLink && (
-//             <div>
-//               <h3 className="text-lg font-semibold text-gray-800 mb-2">Intro Video</h3>
-//               <iframe
-//                 className="w-full aspect-video rounded-md border"
-//                 src={`https://www.youtube.com/embed/${extractYouTubeId(post.youtubeLink)}`}
-//                 title="Intro Video"
-//                 allowFullScreen
-//               />
-//             </div>
-//           )}
-
-//           {error && <p className="text-red-600">{error}</p>}
-
-//           {/* Footer Actions */}
-//           <div className="flex justify-end gap-4 pt-4">
-//             {isOwner ? (
-//               <>
-//                 <Link href={`/dashboard/posts/${post._id}/edit?from=view`}>
-//                   <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
-//                     ✏️ Edit Post
-//                   </button>
-//                 </Link>
-//                 <button
-//                   onClick={handleDelete}
-//                   disabled={saving}
-//                   className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-//                 >
-//                   {saving ? 'Deleting...' : '🗑 Delete Post'}
-//                 </button>
-//               </>
-//             ) : (
-//               <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-//                 📩 Request Tuition
-//               </button>
-//             )}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
-// // Helper to extract YouTube video ID from full link
-// function extractYouTubeId(url) {
-//   // Simple regex to extract id
-//   const regExp =
-//     /^.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?.+&v=)([^#&?]*).*/;
-//   const match = url.match(regExp);
-//   return match && match[1].length === 11 ? match[1] : '';
-// }
-
-// export default PostDetails;
-
-
