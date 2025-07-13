@@ -1,13 +1,13 @@
 'use client';
-
+//dashboard\student\components\viewPostDetails.jsx
 import { useSelector } from 'react-redux';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useState } from 'react';
 
-import TuitionRequestModal from '../components/formComponents/tuitionRequestComponent';
-import TopicHelpModal from '../components/formComponents/TopicHelpModal'; // import your topic help modal
+import TuitionRequestModal from './tuitionRequestComponent';
+import TopicHelpModal from './topicHelpModal'; // import your topic help modal
 
 const ViewPostDetails = ({ post }) => {
   const router = useRouter();
@@ -23,7 +23,7 @@ const ViewPostDetails = ({ post }) => {
   const userInfo = user?.userInfo || {};
   const userId = userInfo?.id || userInfo?._id;
   const userRole = userInfo?.role;
-
+console.log(userInfo)
   const teacherIdFromQuery = searchParams.get('teacherId');
   const fallbackTeacher = post.teacher || {
     _id: userId,

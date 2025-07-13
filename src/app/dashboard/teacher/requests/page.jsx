@@ -1,5 +1,6 @@
 'use client';
 
+import { request } from 'http';
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 
@@ -12,8 +13,7 @@ export default function RequestsPage() {
   const userInfo = useSelector((state) => state.user.userInfo);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const teacherId = userInfo?.id;
-console.log(token,teacherId,"ID")
-console.log(requests)
+console.log(requests,"REQUESTS")
   useEffect(() => {
     if (!teacherId || !token) {
       setError('You must be logged in as a teacher.');
@@ -28,15 +28,10 @@ console.log(requests)
           headers: {
             Authorization: `Bearer ${token}`,
           },
-     
         });
-    
+
         if (!res.ok) throw new Error('Failed to fetch requests');
         const data = await res.json();
-
-        // You can keep this filter if backend doesn't filter yet:
-        // setRequests(data.filter(req => req.teacherId.toString() === teacherId.toString()));
-
         setRequests(data);
       } catch (err) {
         setError(err.message);
@@ -63,10 +58,18 @@ console.log(requests)
           },
         }
       );
-
+console.log(res,"RES")
       if (!res.ok) {
         const errData = await res.json();
         throw new Error(errData.message || 'Failed to update request');
+      }
+
+      const data = await res.json();
+
+      if (action === 'approve' && data.threadId) {
+      
+window.location.href = `/dashboard/teacher/chat/${data.threadId}`;
+       
       }
 
       setRequests((prev) =>
@@ -94,7 +97,7 @@ console.log(requests)
           const isLoading = loadingIds.includes(req._id);
           return (
             <li key={req._id}>
-              <strong>{req.studentName}</strong> wants help on <em>{req.topic}</em>
+              <strong>{req.studentName}</strong> wants help on <em>{req.topic || 'tuition'}</em>
               <br />
               Status: <b>{req.status}</b>
               {req.status === 'pending' && (

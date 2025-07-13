@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import ViewPostDetails from '../../../dashboard/teacher/components/viewPostDetails';
+import ViewPostDetails from '../../student/components/viewPostDetails';
 
 const PostDetailPage = () => {
   const { id } = useParams();

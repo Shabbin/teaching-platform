@@ -1,132 +1,149 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
-import { useSelector } from 'react-redux';
-import io from 'socket.io-client';
 
-let socket;
+import React, { useEffect, useState, useRef } from 'react';
 
-export default function ChatWindow({ requestId }) {
-  const user = useSelector((state) => state.user.userInfo);
-  const token = localStorage.getItem('token');
-
-  const [thread, setThread] = useState(null);
+export default function ChatWindow({ requestId, user, token }) {
   const [messages, setMessages] = useState([]);
-  const [text, setText] = useState('');
-  const messagesEndRef = useRef();
-
-  // Initialize socket once
+  const [newMessage, setNewMessage] = useState('');
+  const [threadId, setThreadId] = useState(null);
+  const messagesEndRef = useRef(null);
+console.log(messages,"Messages")
+console.log(newMessage,"MessagesNew")
+  // Fetch or create chat thread by requestId once
   useEffect(() => {
-    if (!token) return;
+    const fetchThreadAndMessages = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/chat/thread/${requestId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-    socket = io('http://localhost:5000', {
-      auth: { token },
-    });
+        if (!res.ok) throw new Error('Failed to fetch chat thread');
 
-    return () => {
-      socket.disconnect();
+        const data = await res.json();
+        console.log(data,"DATAA")
+      setThreadId(data._id); // 
+        setMessages(data.messages || []);
+      } catch (error) {
+        console.error('❌ Chat thread error:', error);
+      }
     };
-  }, [token]);
 
-  // Fetch or create chat thread by tuition request ID
-  useEffect(() => {
-    if (!requestId || !token) return;
-
-    fetch(`http://localhost:5000/api/chat/thread/${requestId}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setThread(data);
-
-        // Fetch messages for this thread
-        fetch(`http://localhost:5000/api/chat/messages/${data._id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-          .then((res) => res.json())
-          .then((msgData) => {
-            setMessages(msgData.messages);
-
-            // Join socket room
-            socket.emit('join_thread', { threadId: data._id });
-          });
-      })
-      .catch(console.error);
+    if (requestId) fetchThreadAndMessages();
   }, [requestId, token]);
 
-  // Listen for new messages from socket
+  // Polling to refresh messages every 5 seconds
   useEffect(() => {
-    if (!socket) return;
+    if (!threadId) return;
 
-    socket.on('receive_message', ({ message }) => {
-      setMessages((prev) => [...prev, message]);
-    });
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/chat/threadById/${threadId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch updated thread');
+        const data = await res.json();
+        setMessages(data.messages || []);
+      } catch (error) {
+        console.error('Failed to fetch updated messages:', error);
+      }
+    }, 5000);
 
-    return () => {
-      socket.off('receive_message');
-    };
-  }, []);
+    return () => clearInterval(interval);
+  }, [threadId, token]);
 
-  // Auto-scroll to bottom on new messages
+  // Auto scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!text.trim() || !thread || !user) return;
+  // Send new message
+  const sendMessage = async () => {
+    if (!threadId) {
+      console.error('No thread ID available to send message.');
+      return;
+    }
+    if (!newMessage.trim()) {
+      console.warn('Cannot send empty message.');
+      return;
+    }
 
-    const messageData = {
-      threadId: thread._id,
-      senderId: user._id,
-      text: text.trim(),
-    };
+    try {
+      const res = await fetch(`http://localhost:5000/api/chat/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          threadId,
+          senderId: user.id || user._id, // support both user id keys
+          text: newMessage.trim(),
+        }),
+      });
 
-    socket.emit('send_message', messageData);
+      if (!res.ok) throw new Error('Failed to send message');
 
-    setText('');
+      const savedMessage = await res.json();
+      setMessages((prev) => [...prev, savedMessage]);
+      setNewMessage('');
+    } catch (error) {
+      console.error('❌ Send message error:', error);
+    }
   };
 
-  if (!user) return <p>Loading user info...</p>;
+  // Send on Enter key (without Shift)
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
 
   return (
-    <div className="flex flex-col h-full max-w-md border rounded shadow">
-      <div className="p-3 border-b font-bold">Chat</div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-gray-50">
-        {messages.length === 0 && <p className="text-gray-500">No messages yet</p>}
-        {messages.map((msg, i) => {
-          const isMe =
-            msg.senderId === user._id || (msg.senderId?._id && msg.senderId._id === user._id);
-          return (
-            <div
-              key={i}
-              className={`max-w-[70%] p-2 rounded ${
-                isMe ? 'bg-blue-600 text-white self-end' : 'bg-gray-300 self-start'
+    <div className="w-full max-w-2xl bg-white shadow-lg rounded-lg p-4 flex flex-col">
+      <div className="h-96 overflow-y-auto border rounded p-2 mb-4 flex-grow">
+        {messages.length === 0 && (
+          <p className="text-gray-400 text-center mt-8">No messages yet.</p>
+        )}
+        {messages.map((msg, idx) => (
+          <div
+            key={idx}
+            className={`mb-2 ${
+              msg.senderId === (user.id || user._id) ? 'text-right' : 'text-left'
+            }`}
+          >
+            <span
+              className={`inline-block px-3 py-2 rounded ${
+                msg.senderId === (user.id || user._id)
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200'
               }`}
             >
               {msg.text}
-              <div className="text-xs text-gray-700 mt-1">
-                {new Date(msg.timestamp || msg.createdAt).toLocaleTimeString()}
-              </div>
-            </div>
-          );
-        })}
+            </span>
+          </div>
+        ))}
         <div ref={messagesEndRef} />
       </div>
-
-      <div className="p-3 border-t flex gap-2">
-        <input
-          type="text"
-          className="flex-1 border rounded px-2 py-1"
-          placeholder="Type a message..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleSend();
-          }}
+      <div className="flex gap-2">
+        <textarea
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          onKeyDown={handleKeyPress}
+          className="flex-grow border p-2 rounded resize-none"
+          rows={2}
+          placeholder="Type your message..."
         />
         <button
-          className="bg-blue-600 text-white px-4 rounded"
-          onClick={handleSend}
-          disabled={!text.trim()}
+          onClick={sendMessage}
+          disabled={!newMessage.trim()}
+          className={`px-4 py-2 rounded text-white ${
+            newMessage.trim()
+              ? 'bg-blue-600 hover:bg-blue-700'
+              : 'bg-gray-400 cursor-not-allowed'
+          }`}
         >
           Send
         </button>

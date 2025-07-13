@@ -1,34 +1,32 @@
 'use client';
-
+//student\components\tuitionRequestComponent.jsx
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { sendTopicHelpRequest, clearMessages } from '../../../../redux/requestSlice';
+import { sendTuitionRequest, clearMessages } from '../../../redux/requestSlice';
 
-export default function TopicHelpRequestModal({ teacherId, onClose, onSuccess }) {
+export default function TuitionRequestModal({ teacherId, postId, onClose, onSuccess }) {
   const dispatch = useDispatch();
   const { loading, error, successMessage } = useSelector((state) => state.requests);
 
-  const [topic, setTopic] = useState('');
   const [message, setMessage] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!topic.trim() || !message.trim()) {
-      alert('Both topic and message are required');
+    if (!message.trim()) {
+      alert('Message is required');
       return;
     }
 
-    // Dispatch action with correct payload keys according to your backend teacherRequest model
-    const result = await dispatch(sendTopicHelpRequest({ 
-      teacherId,   // matches backend "teacherId"
-      topic,       // topic string
-      message,     // message string
+    // Dispatch action with correct payload keys for tuition request
+    const result = await dispatch(sendTuitionRequest({
+      teacherId,  // matches backend "teacherId"
+      postId,     // postId for tuition post
+      message,    // message string
     }));
 
-    if (sendTopicHelpRequest.fulfilled.match(result)) {
+    if (sendTuitionRequest.fulfilled.match(result)) {
       dispatch(clearMessages());
-      setTopic('');
       setMessage('');
       onSuccess();
     }
@@ -36,7 +34,6 @@ export default function TopicHelpRequestModal({ teacherId, onClose, onSuccess })
 
   const handleClose = () => {
     dispatch(clearMessages());
-    setTopic('');
     setMessage('');
     onClose();
   };
@@ -44,16 +41,8 @@ export default function TopicHelpRequestModal({ teacherId, onClose, onSuccess })
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-4">Ask for Topic Help</h2>
+        <h2 className="text-xl font-semibold mb-4">Request Tuition</h2>
         <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            className="w-full p-2 border rounded mb-4"
-            placeholder="Topic"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            required
-          />
           <textarea
             className="w-full p-2 border rounded mb-4"
             rows={5}
