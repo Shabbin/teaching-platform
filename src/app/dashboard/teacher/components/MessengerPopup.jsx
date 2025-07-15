@@ -1,11 +1,63 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function MessengerPopup() {
   const [open, setOpen] = useState(false);
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [token, setToken] = useState(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setToken(localStorage.getItem('token'));
+  }, []);
+
+  useEffect(() => {
+    if (open && token) fetchConversations();
+  }, [open, token]);
+
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('http://localhost:5000/api/teacher-requests', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+
+      const convos = data.map((r) => ({
+        requestId: r._id,
+        studentName: r.studentName,
+        status: r.status,
+        topic: r.topic,
+        lastMessage: r.message,
+        unreadCount: r.unreadCount || 0,
+      }));
+
+      setConversations(convos);
+    } catch (err) {
+      console.error('Error fetching popup messages:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApprove = async (requestId) => {
+    await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/approve`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchConversations(); // refresh list
+  };
+
+  const handleReject = async (requestId) => {
+    await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/reject`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    fetchConversations(); // refresh list
+  };
 
   return (
     <>
@@ -23,15 +75,43 @@ export default function MessengerPopup() {
             <button onClick={() => setOpen(false)}>❌</button>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
-            <p className="text-sm text-gray-500">No messages yet.</p>
+          <div className="flex-1 overflow-y-auto space-y-3">
+            {loading ? (
+              <p className="text-sm text-gray-500">Loading...</p>
+            ) : conversations.length === 0 ? (
+              <p className="text-sm text-gray-500">No messages yet.</p>
+            ) : (
+              conversations.map((chat) => (
+                <div key={chat.requestId} className="border-b pb-2">
+                  <div className="font-semibold">{chat.studentName}</div>
+                  <div className="text-sm text-gray-600">{chat.lastMessage || 'No message'}</div>
+                  {chat.status === 'pending' ? (
+                    <div className="mt-2 space-x-2">
+                      <button
+                        className="px-2 py-1 text-xs bg-green-500 text-white rounded"
+                        onClick={() => handleApprove(chat.requestId)}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        className="px-2 py-1 text-xs bg-red-500 text-white rounded"
+                        onClick={() => handleReject(chat.requestId)}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-green-600 mt-1">Approved</div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
 
-          {/* ✅ Button that navigates to full-page Messenger */}
           <button
             onClick={() => {
-              setOpen(false); // close popup
-              router.push('/dashboard/teacher/messenger'); // go to page
+              setOpen(false);
+              router.push('/dashboard/teacher/messenger');
             }}
             className="mt-4 text-sm text-indigo-600 hover:underline self-end"
           >
