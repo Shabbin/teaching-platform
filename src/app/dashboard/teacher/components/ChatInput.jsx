@@ -1,5 +1,5 @@
 'use client';
-
+//src\app\dashboard\teacher\components\ChatInput.jsx
 import { useState } from 'react';
 
 export default function ChatInput({ threadId, userId, token, onSendMessage }) {

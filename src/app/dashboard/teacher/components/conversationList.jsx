@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-
+//src\app\dashboard\teacher\components\conversationList.jsx
 export default function ConversationList({ conversations, selectedChatId, onSelect }) {
   return (
     <aside className="w-1/3 border-r p-4 bg-white overflow-y-auto">

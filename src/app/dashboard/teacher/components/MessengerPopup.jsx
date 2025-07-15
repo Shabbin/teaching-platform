@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 export default function MessengerPopup() {
@@ -21,19 +21,54 @@ export default function MessengerPopup() {
   const fetchConversations = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:5000/api/teacher-requests', {
+      const res = await fetch('http://localhost:5000/api/teacher-requests/teacher', {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (!res.ok) throw new Error('Failed to fetch requests');
       const data = await res.json();
 
-      const convos = data.map((r) => ({
-        requestId: r._id,
-        studentName: r.studentName,
-        status: r.status,
-        topic: r.topic,
-        lastMessage: r.message,
-        unreadCount: r.unreadCount || 0,
-      }));
+      // Filter only tuition requests (with postId), keep latest per student
+      const latestPerStudent = {};
+      for (const r of data) {
+        if (!r.postId) continue;
+        const existing = latestPerStudent[r.studentId];
+        if (!existing || new Date(r.requestedAt) > new Date(existing.requestedAt)) {
+          latestPerStudent[r.studentId] = r;
+        }
+      }
+
+      const filtered = Object.values(latestPerStudent);
+
+      const convos = await Promise.all(
+        filtered.map(async (r) => {
+          let threadId = r.threadId || null;
+          let lastMessage = r.message;
+
+          if (r.status === 'approved') {
+            const threadRes = await fetch(`http://localhost:5000/api/chat/thread/${r._id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (threadRes.ok) {
+              const threadData = await threadRes.json();
+              threadId = threadData._id;
+              const messages = threadData.messages || [];
+              if (messages.length > 0) {
+                lastMessage = messages[messages.length - 1].text;
+              }
+            }
+          }
+
+          return {
+            requestId: r._id,
+            studentName: r.studentName,
+            status: r.status,
+            topic: r.topic,
+            lastMessage,
+            unreadCount: r.unreadCount || 0,
+            threadId,
+          };
+        })
+      );
 
       setConversations(convos);
     } catch (err) {
@@ -43,28 +78,31 @@ export default function MessengerPopup() {
     }
   };
 
-  const handleApprove = async (requestId) => {
-    await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/approve`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    fetchConversations(); // refresh list
-  };
+  const handleApprove = useCallback(
+    async (requestId) => {
+      await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/approve`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchConversations();
+    },
+    [token]
+  );
 
-  const handleReject = async (requestId) => {
-    await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/reject`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    fetchConversations(); // refresh list
-  };
+  const handleReject = useCallback(
+    async (requestId) => {
+      await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/reject`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchConversations();
+    },
+    [token]
+  );
 
   return (
     <>
-      <button
-        onClick={() => setOpen(!open)}
-        className="text-gray-600 hover:text-indigo-600"
-      >
+      <button onClick={() => setOpen(!open)} className="text-gray-600 hover:text-indigo-600">
         💬
       </button>
 
@@ -85,6 +123,7 @@ export default function MessengerPopup() {
                 <div key={chat.requestId} className="border-b pb-2">
                   <div className="font-semibold">{chat.studentName}</div>
                   <div className="text-sm text-gray-600">{chat.lastMessage || 'No message'}</div>
+
                   {chat.status === 'pending' ? (
                     <div className="mt-2 space-x-2">
                       <button

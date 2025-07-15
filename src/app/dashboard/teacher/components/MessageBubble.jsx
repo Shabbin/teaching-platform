@@ -1,3 +1,4 @@
+//src\app\dashboard\teacher\components\MessageBubble.jsx
 export default function MessageBubble({ message, currentUserId }) {
   const isMine = message.senderId === currentUserId;
   return (
