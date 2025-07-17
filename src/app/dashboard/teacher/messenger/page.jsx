@@ -15,7 +15,7 @@ export default function MessengerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch conversations helper
+  // Fetch conversations helper (removed selectedChat from deps!)
   const fetchConversations = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -64,6 +64,7 @@ export default function MessengerPage() {
             threadId,
             lastMessage: messages.at(-1)?.text || r.message || '',
             unreadCount: 0,
+            messages, // keep messages here for quick access
           };
         })
       );
@@ -82,7 +83,7 @@ export default function MessengerPage() {
       setLoading(false);
       return [];
     }
-  }, [selectedChat, token]);
+  }, [token]); // <-- Only depend on token
 
   // Socket callbacks
   const handleNewMessage = (message) => {
@@ -90,12 +91,15 @@ export default function MessengerPage() {
       setSelectedChat((prev) => ({
         ...prev,
         lastMessage: message.text,
+        messages: [...(prev.messages || []), message], // update messages
       }));
     }
 
     setConversations((prevConvos) =>
       prevConvos.map((c) =>
-        c.threadId === message.threadId ? { ...c, lastMessage: message.text } : c
+        c.threadId === message.threadId
+          ? { ...c, lastMessage: message.text }
+          : c
       )
     );
   };
@@ -159,7 +163,7 @@ export default function MessengerPage() {
       <ConversationList
         conversations={conversations}
         selectedChatId={selectedChat?.requestId}
-        onSelect={setSelectedChat}
+        onSelect={setSelectedChat} // Just sets selected chat, no fetch triggered
       />
       <ChatPanel
         chat={selectedChat}
