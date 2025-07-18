@@ -1,8 +1,8 @@
 'use client';
 import { useEffect, useState, useCallback } from 'react';
 import { useSelector } from 'react-redux';
-import ConversationList from '../components/conversationList';
-import ChatPanel from '../components/chatPanel';
+import ConversationList from '../../components/chat-components/conversationList';
+import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
 
 export default function MessengerPage() {

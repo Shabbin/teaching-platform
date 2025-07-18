@@ -16,7 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import MessengerPopup from './teacher/components/MessengerPopup';
+import MessengerPopup from './components/chat-components/MessengerPopup';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -103,7 +103,7 @@ export default function DashboardLayout({ children }) {
             <Bell className="w-5 h-5" />
           </button>
 
-          <MessengerPopup />
+        <MessengerPopup user={userInfo} role={userInfo?.role} />
 
           <img
             src={

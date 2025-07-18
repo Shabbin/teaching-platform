@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-//src\app\dashboard\teacher\components\conversationList.jsx
+
 export default function ConversationList({ conversations, selectedChatId, onSelect }) {
   return (
     <aside className="w-1/3 border-r p-4 bg-white overflow-y-auto">
@@ -9,16 +9,16 @@ export default function ConversationList({ conversations, selectedChatId, onSele
         {conversations.length === 0 && (
           <p className="text-sm text-gray-500">No conversations yet.</p>
         )}
-        {conversations.map((chat) => (
+        {conversations.map((chat, index) => (
           <li
-            key={chat.requestId}
+            key={chat.threadId || chat.requestId || index}
             onClick={() => onSelect(chat)}
             className={`flex justify-between items-center p-2 rounded cursor-pointer hover:bg-gray-100 ${
-              selectedChatId === chat.requestId ? 'bg-gray-100' : ''
+              selectedChatId === (chat.threadId || chat.requestId) ? 'bg-gray-100' : ''
             }`}
           >
             <div>
-              <div className="font-semibold">{chat.studentName}</div>
+              <div className="font-semibold">{chat.teacherName || chat.studentName || chat.name || 'No Name'}</div>
               <div className="text-sm text-gray-500 truncate">
                 {chat.status === 'pending'
                   ? 'New tuition request'

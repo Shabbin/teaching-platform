@@ -12,15 +12,20 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
   // Callback to add new incoming message from socket
   const onReceiveMessage = useCallback(
     (message) => {
+      console.log('[ChatPanel] Received new message via socket:', message);
+
       setMessages((prev) => {
-        // Avoid duplicate messages by timestamp + text + senderId (optional)
+        // Avoid duplicate messages by timestamp + text + senderId
         const exists = prev.some(
           (m) =>
             m.timestamp === message.timestamp &&
             m.text === message.text &&
             m.senderId === message.senderId
         );
-        if (exists) return prev;
+        if (exists) {
+          console.log('[ChatPanel] Duplicate message ignored');
+          return prev;
+        }
         return [...prev, message];
       });
     },
@@ -33,13 +38,19 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
   // Join socket room for this thread when chat changes
   useEffect(() => {
     if (chat?.threadId && joinThread) {
+      console.log('[ChatPanel] Joining socket room for threadId:', chat.threadId);
       joinThread(chat.threadId);
+    } else {
+      console.log('[ChatPanel] No threadId or joinThread not ready', chat?.threadId, joinThread);
     }
   }, [chat?.threadId, joinThread]);
 
   // Fetch messages when chat or token changes
   useEffect(() => {
+    console.log('[ChatPanel] chat.threadId or chat.status changed:', chat?.threadId, chat?.status);
+
     if (!chat?.threadId || chat.status !== 'approved') {
+      console.log('[ChatPanel] Clearing messages (no thread or not approved)');
       setMessages([]);
       return;
     }
@@ -49,11 +60,13 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
         const res = await fetch(`http://localhost:5000/api/chat/threadById/${chat.threadId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-        if (!res.ok) throw new Error('Failed to fetch messages');
+        if (!res.ok) throw new Error(`Failed to fetch messages. Status: ${res.status}`);
+
         const data = await res.json();
+        console.log('[ChatPanel] Fetched thread data:', data);
         setMessages(data.messages || []);
       } catch (err) {
-        console.error('Error loading chat messages:', err);
+        console.error('[ChatPanel] Error loading chat messages:', err);
         setMessages([]);
       }
     };
@@ -67,7 +80,18 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
   }, [messages]);
 
   const handleSend = () => {
-    if (!newMessage.trim() || !chat?.threadId || !sendMessage) return;
+    if (!newMessage.trim()) {
+      console.log('[ChatPanel] Message is empty, ignoring send');
+      return;
+    }
+    if (!chat?.threadId) {
+      console.warn('[ChatPanel] No threadId, cannot send message');
+      return;
+    }
+    if (!sendMessage) {
+      console.warn('[ChatPanel] sendMessage function not ready');
+      return;
+    }
 
     const messageData = {
       threadId: chat.threadId,
@@ -76,11 +100,11 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
       timestamp: new Date().toISOString(),
     };
 
+    console.log('[ChatPanel] Sending message:', messageData);
     // Send message via socket
     sendMessage(messageData);
 
-    // Optimistic UI update
-    setMessages((prev) => [...prev, messageData]);
+    // DO NOT add message optimistically here to avoid duplicates
     setNewMessage('');
   };
 
@@ -91,20 +115,26 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
   return (
     <div className="flex-1 p-4 flex flex-col justify-between bg-gray-50">
       <div>
-        <h2 className="text-lg font-semibold">{chat.studentName}</h2>
+        <h2 className="text-lg font-semibold">{chat.studentName || chat.teacherName || 'Chat'}</h2>
         <div className="space-y-2 mt-2 max-h-[70vh] overflow-y-auto">
           {chat.status === 'pending' ? (
             <>
               <p className="text-gray-600 mb-2">Request: {chat.topic || 'Tuition Request'}</p>
               <div className="space-x-4">
                 <button
-                  onClick={() => onApprove(chat.requestId)}
+                  onClick={() => {
+                    console.log('[ChatPanel] Approve clicked for requestId:', chat.requestId);
+                    onApprove(chat.requestId);
+                  }}
                   className="px-4 py-1 bg-green-500 text-white rounded"
                 >
                   Approve
                 </button>
                 <button
-                  onClick={() => onReject(chat.requestId)}
+                  onClick={() => {
+                    console.log('[ChatPanel] Reject clicked for requestId:', chat.requestId);
+                    onReject(chat.requestId);
+                  }}
                   className="px-4 py-1 bg-red-500 text-white rounded"
                 >
                   Reject
