@@ -18,9 +18,9 @@ export default function StudentMessengerPage() {
 
   const hasFetchedRef = useRef(false);
 
-  // Fetch student's chat threads
+  // ✅ Fetch chat threads
   const fetchConversations = useCallback(async () => {
-    if (!studentId) return;
+    if (!studentId || !token) return;
     setLoading(true);
     setError(null);
     try {
@@ -31,8 +31,8 @@ export default function StudentMessengerPage() {
       const data = await res.json();
 
       const convos = data.map((thread) => {
-        const teacher = thread.participants.find(p => p._id !== studentId);
-        const latestSession = thread.sessions?.length ? thread.sessions[thread.sessions.length - 1] : null;
+        const teacher = thread.participants.find((p) => p._id !== studentId);
+        const latestSession = thread.sessions?.[thread.sessions.length - 1];
         const status = latestSession?.status || 'approved';
 
         return {
@@ -47,21 +47,20 @@ export default function StudentMessengerPage() {
       });
 
       setConversations(convos);
-      // Only set selectedChat if none is selected to avoid re-render loop
       if (!selectedChat && convos.length > 0) {
         setSelectedChat(convos[0]);
       }
-      setLoading(false);
+
       hasFetchedRef.current = true;
-      return convos;
+      setLoading(false);
     } catch (err) {
+      console.error('Error fetching conversations:', err.message);
       setError(err.message || 'Unknown error');
       setLoading(false);
-      return [];
     }
-  }, [studentId, token]); // Removed selectedChat from deps!
+  }, [studentId, token, selectedChat]);
 
-  // Socket callback for new messages
+  // ✅ Socket logic
   const handleNewMessage = (message) => {
     if (selectedChat && message.threadId === selectedChat.threadId) {
       setSelectedChat((prev) => ({
@@ -78,17 +77,14 @@ export default function StudentMessengerPage() {
     );
   };
 
-  // Initialize socket
   const { joinThread, sendMessage } = useSocket(studentId, handleNewMessage);
 
-  // Join chat room on selected chat change
   useEffect(() => {
     if (selectedChat?.threadId) {
       joinThread(selectedChat.threadId);
     }
   }, [selectedChat, joinThread]);
 
-  // Load conversations on mount and when studentId/token changes
   useEffect(() => {
     if (studentId && token && !hasFetchedRef.current) {
       fetchConversations();
