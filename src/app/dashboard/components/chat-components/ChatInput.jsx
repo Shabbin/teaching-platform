@@ -1,8 +1,7 @@
 'use client';
-//src\app\dashboard\teacher\components\ChatInput.jsx
 import { useState } from 'react';
 
-export default function ChatInput({ threadId, userId, token, onSendMessage }) {
+export default function ChatInput({ threadId, userId, token }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
@@ -29,8 +28,8 @@ export default function ChatInput({ threadId, userId, token, onSendMessage }) {
         if (!res.ok) throw new Error(`Error sending message: ${res.status}`);
         return res.json();
       })
-      .then(savedMessage => {
-        onSendMessage(savedMessage);
+      .then(() => {
+        // No need to call onSendMessage here — socket will handle it
         setText('');
         setSending(false);
       })

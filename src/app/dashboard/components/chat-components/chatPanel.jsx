@@ -1,89 +1,76 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import MessageBubble from './MessageBubble';
 import useSocket from '../../../hooks/useSocket';
+import {
+  clearMessagesForThread as clearMessagesAction,
+  addMessageToThread as addMessageAction,
+} from '../../../redux/chatSlice';
+import {
+  fetchMessagesThunk,
+  sendMessageThunk,
+} from '../../../redux/chatThunks';
 
 export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
-  const [messages, setMessages] = useState([]);
+  const dispatch = useDispatch();
+  const messages = useSelector((state) => state.chat.messagesByThread[chat?.threadId] || []);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef();
 
-  const onReceiveMessage = useCallback((message) => {
-    console.log('[ChatPanel] Received new message via socket:', message);
+  const { sendMessage: socketSendMessage, joinThread /*, socket removed here*/ } = useSocket(chat?.threadId);
 
-    setMessages((prev) => {
-      const exists = prev.some(
-        (m) =>
-          m.timestamp === message.timestamp &&
-          m.text === message.text &&
-          m.senderId === message.senderId
-      );
-      if (exists) {
-        console.log('[ChatPanel] Duplicate message ignored');
-        return prev;
-      }
-      return [...prev, message];
-    });
-  }, []);
-
-  const { sendMessage, joinThread } = useSocket(chat?.threadId, onReceiveMessage);
-
+  // Keep ref updated for latest messages if you want to use in your hook for duplicate check
+  const latestMessagesRef = useRef(messages);
   useEffect(() => {
-    if (chat?.threadId && joinThread) {
-      console.log('[ChatPanel] Joining socket room for threadId:', chat.threadId);
-      joinThread(chat.threadId);
-    } else {
-      console.log('[ChatPanel] No threadId or joinThread not ready', chat?.threadId, joinThread);
-    }
-  }, [chat?.threadId, joinThread]);
+    latestMessagesRef.current = messages;
+  }, [messages]);
 
-  useEffect(() => {
-    console.log('[ChatPanel] chat.threadId or chat.status changed:', chat?.threadId, chat?.status);
-
-    if (!chat?.threadId || chat.status !== 'approved') {
-      setMessages([]);
-      return;
-    }
-
-    const fetchMessages = async () => {
-      try {
-        const res = await fetch(`http://localhost:5000/api/chat/threadById/${chat.threadId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error(`Failed to fetch messages. Status: ${res.status}`);
-        const data = await res.json();
-        console.log('[ChatPanel] Fetched thread data:', data);
-        setMessages(data.messages || []);
-      } catch (err) {
-        console.error('[ChatPanel] Error loading chat messages:', err);
-        setMessages([]);
-      }
-    };
-
-    fetchMessages();
-  }, [chat?.threadId, chat?.status, token]);
-
+  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = () => {
-    if (!newMessage.trim()) return;
-    if (!chat?.threadId || !sendMessage) return;
+  // Clear old messages & fetch messages on threadId or status change
+  useEffect(() => {
+    if (!chat?.threadId || chat.status !== 'approved') {
+      if (chat?.threadId) dispatch(clearMessagesAction(chat.threadId));
+      return;
+    }
+    dispatch(clearMessagesAction(chat.threadId));
+    dispatch(fetchMessagesThunk(chat.threadId));
+  }, [chat?.threadId, chat?.status, dispatch]);
 
-    const messageData = {
-      threadId: chat.threadId,
-      senderId: user._id || user.id,
-      senderName: user.name,
-      senderProfileImage: user.profileImage, // Real image
-      text: newMessage.trim(),
-      timestamp: new Date().toISOString(),
-    };
+  // Join socket room
+  useEffect(() => {
+    if (chat?.threadId && joinThread) {
+      joinThread(chat.threadId);
+    }
+  }, [chat?.threadId, joinThread]);
 
-    sendMessage(messageData);
-    setNewMessage('');
+  // Send message handler
+const handleSend = async () => {
+  if (!newMessage.trim()) return;
+  if (!chat?.threadId || !socketSendMessage) return;
+
+  const messageData = {
+    threadId: chat.threadId,
+    senderId: user._id || user.id,
+    senderName: user.name,
+    senderProfileImage: user.profileImage,
+    text: newMessage.trim(),
+    timestamp: new Date().toISOString(),
   };
+
+  try {
+    // Just send the message via socket, do NOT add locally here
+    socketSendMessage(messageData);
+    setNewMessage('');
+  } catch (err) {
+    console.error('Failed to send message:', err);
+  }
+};
 
   const getAvatar = (msg) => {
     return (
@@ -133,7 +120,7 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
           ) : (
             messages.map((msg, i) => (
               <MessageBubble
-                key={`${msg.timestamp}-${i}`}
+                key={msg._id || `${msg.timestamp}-${i}`}
                 message={msg}
                 currentUserId={user._id || user.id}
                 avatar={getAvatar(msg)}

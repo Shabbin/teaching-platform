@@ -1,8 +1,13 @@
 // src/app/dashboard/teacher/components/MessageBubble.jsx
 
 export default function MessageBubble({ message, currentUserId, avatar }) {
-  const isMine = message.senderId === currentUserId;
+const senderId =
+  typeof message.senderId === "string"
+    ? message.senderId
+    : message.senderId?._id;
 
+const isMine = senderId === currentUserId;
+console.log("Message Sender:", message.senderId, "Current User:", currentUserId);
   return (
     <div className={`flex items-start max-w-[70%] ${isMine ? 'ml-auto justify-end' : 'mr-auto justify-start'}`}>
       {/* Show avatar only if message is NOT mine */}

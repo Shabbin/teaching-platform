@@ -2,179 +2,172 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { setConversations, setLoading, setError } from '../../../redux/chatSlice';
 
 export default function MessengerPopup({ role: propRole }) {
   const user = useSelector((state) => state.user.userInfo);
+  const conversations = useSelector((state) => state.chat.conversations);
+  const loading = useSelector((state) => state.chat.loading);
+  const error = useSelector((state) => state.chat.error);
+  
   const [open, setOpen] = useState(false);
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [token, setToken] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
   const router = useRouter();
+  const dispatch = useDispatch();
 
   const userId = user?._id || user?.id;
   const role = propRole || user?.role || 'teacher';
 
+  // Load token once
   useEffect(() => {
     setToken(localStorage.getItem('token'));
   }, []);
 
+  // Fetch conversations when popup opens and token is ready
   useEffect(() => {
     if (open && token) fetchConversations();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, token]);
 
-  // Avatar helper: prioritize real profileImage, fallback to generated avatar
+  // Avatar helper unchanged
   const getAvatar = (conv) => {
-    // These fields should be real image URLs if populated by backend
     if (conv.participantProfileImage) return conv.participantProfileImage;
     if (conv.studentProfileImage) return conv.studentProfileImage;
     if (conv.teacherProfileImage) return conv.teacherProfileImage;
-
-    // If none found, fallback to generating an avatar URL with unique ID string
     const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
     return `https://i.pravatar.cc/150?u=${fallbackId}`;
   };
 
-const fetchConversations = async () => {
-  setLoading(true);
-  try {
-    if (role === 'teacher') {
-      // Fetch teacher requests for this teacher
-      const res = await fetch(`http://localhost:5000/api/teacher-requests/teacher`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to fetch teacher requests');
-      const data = await res.json();
+  const fetchConversations = async () => {
+    dispatch(setLoading(true));
+    dispatch(setError(null));
+    try {
+      if (role === 'teacher') {
+        const res = await fetch(`http://localhost:5000/api/teacher-requests/teacher`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch teacher requests');
+        const data = await res.json();
 
-      // Filter relevant requests with postId and pending/approved status
-      const filteredRequests = data.filter(
-        (r) => ['pending', 'approved'].includes(r.status) && r.postId
-      );
-
-      // Keep only latest request per student to avoid duplicates
-      const latestPerStudent = {};
-      for (const r of filteredRequests) {
-        const existing = latestPerStudent[r.studentId];
-        if (!existing || new Date(r.requestedAt) > new Date(existing.requestedAt)) {
-          latestPerStudent[r.studentId] = r;
-        }
-      }
-
-      // Build conversation array
-      const convos = await Promise.all(
-        Object.values(latestPerStudent).map(async (r) => {
-          let threadId = r.threadId || null;
-          let lastMessage = r.message || '';
-
-          if (r.status === 'approved') {
-            const threadRes = await fetch(`http://localhost:5000/api/chat/thread/${r._id}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (threadRes.ok) {
-              const threadData = await threadRes.json();
-              threadId = threadData._id;
-              const messages = threadData.messages || [];
-              if (messages.length > 0) lastMessage = messages[messages.length - 1].text;
-
-              // Find student participant from thread participants array (role === 'student')
-              const studentParticipant = threadData.participants.find(
-                (p) => p.role === 'student'
-              );
-
-              return {
-                requestId: r._id,
-                name: studentParticipant?.name || r.studentName || 'Student',
-                topic: r.topic,
-                status: r.status,
-                lastMessage,
-                unreadCount: r.unreadCount || 0,
-                threadId,
-                studentProfileImage: studentParticipant?.profileImage || null,
-                studentId: studentParticipant?._id || r.studentId,
-                participantId: studentParticipant?._id || r.studentId,
-                avatar: null,
-              };
-            }
-          }
-
-          // Fallback for pending requests (no thread yet), use student info if populated
-          const studentObj = typeof r.studentId === 'object' ? r.studentId : null;
-          return {
-            requestId: r._id,
-            name: studentObj?.name || r.studentName || 'Student',
-            topic: r.topic,
-            status: r.status,
-            lastMessage,
-            unreadCount: r.unreadCount || 0,
-            threadId,
-            studentProfileImage: studentObj?.profileImage || null,
-            studentId: studentObj?._id || r.studentId,
-            participantId: studentObj?._id || r.studentId,
-            avatar: null,
-          };
-        })
-      );
-
-      setConversations(convos);
-    } else if (role === 'student') {
-      // Fetch chat threads for student
-      const chatRes = await fetch(`http://localhost:5000/api/chat/student/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!chatRes.ok) throw new Error('Failed to fetch student chat threads');
-      const chatData = await chatRes.json();
-
-      // Fetch student requests for status map
-      const requestRes = await fetch(`http://localhost:5000/api/teacher-requests/student`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const requestData = requestRes.ok ? await requestRes.json() : [];
-
-      const statusMap = {};
-      for (const r of requestData) {
-        statusMap[r._id] = r.status;
-      }
-
-      // Build conversation list by picking teacher participant
-      const convos = chatData.map((thread) => {
-        const latestSession = thread.sessions.reduce((latest, session) =>
-          !latest || new Date(session.startedAt) > new Date(latest.startedAt) ? session : latest,
-          null
+        const filteredRequests = data.filter(
+          (r) => ['pending', 'approved'].includes(r.status) && r.postId
         );
 
-        const requestId = latestSession?.requestId;
-        const status = requestId ? statusMap[requestId] || 'pending' : 'pending';
+        const latestPerStudent = {};
+        for (const r of filteredRequests) {
+          const existing = latestPerStudent[r.studentId];
+          if (!existing || new Date(r.requestedAt) > new Date(existing.requestedAt)) {
+            latestPerStudent[r.studentId] = r;
+          }
+        }
 
-        // Find teacher participant (role === 'teacher')
-        const teacherParticipant = thread.participants.find((p) => p.role === 'teacher');
+        const convos = await Promise.all(
+          Object.values(latestPerStudent).map(async (r) => {
+            let threadId = r.threadId || null;
+            let lastMessage = r.message || '';
 
-        const lastMessage = thread.messages?.[thread.messages.length - 1]?.text || '';
+            if (r.status === 'approved') {
+              const threadRes = await fetch(`http://localhost:5000/api/chat/thread/${r._id}`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (threadRes.ok) {
+                const threadData = await threadRes.json();
+                threadId = threadData._id;
+                const messages = threadData.messages || [];
+                if (messages.length > 0) lastMessage = messages[messages.length - 1].text;
 
-        return {
-          threadId: thread._id,
-          name: teacherParticipant?.name || 'Unknown',
-          lastMessage,
-          status,
-          unreadCount: 0,
-          teacherProfileImage: teacherParticipant?.profileImage || null,
-          participantId: teacherParticipant?._id,
-          avatar: null,
-        };
-      });
+                const studentParticipant = threadData.participants.find((p) => p.role === 'student');
 
-      setConversations(convos);
+                return {
+                  requestId: r._id,
+                  name: studentParticipant?.name || r.studentName || 'Student',
+                  topic: r.topic,
+                  status: r.status,
+                  lastMessage,
+                  unreadCount: r.unreadCount || 0,
+                  threadId,
+                  studentProfileImage: studentParticipant?.profileImage || null,
+                  studentId: studentParticipant?._id || r.studentId,
+                  participantId: studentParticipant?._id || r.studentId,
+                  avatar: null,
+                };
+              }
+            }
+
+            const studentObj = typeof r.studentId === 'object' ? r.studentId : null;
+            return {
+              requestId: r._id,
+              name: studentObj?.name || r.studentName || 'Student',
+              topic: r.topic,
+              status: r.status,
+              lastMessage,
+              unreadCount: r.unreadCount || 0,
+              threadId,
+              studentProfileImage: studentObj?.profileImage || null,
+              studentId: studentObj?._id || r.studentId,
+              participantId: studentObj?._id || r.studentId,
+              avatar: null,
+            };
+          })
+        );
+
+        dispatch(setConversations(convos));
+      } else if (role === 'student') {
+        const chatRes = await fetch(`http://localhost:5000/api/chat/student/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!chatRes.ok) throw new Error('Failed to fetch student chat threads');
+        const chatData = await chatRes.json();
+
+        const requestRes = await fetch(`http://localhost:5000/api/teacher-requests/student`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const requestData = requestRes.ok ? await requestRes.json() : [];
+
+        const statusMap = {};
+        for (const r of requestData) {
+          statusMap[r._id] = r.status;
+        }
+
+        const convos = chatData.map((thread) => {
+          const latestSession = thread.sessions.reduce(
+            (latest, session) =>
+              !latest || new Date(session.startedAt) > new Date(latest.startedAt) ? session : latest,
+            null
+          );
+
+          const requestId = latestSession?.requestId;
+          const status = requestId ? statusMap[requestId] || 'pending' : 'pending';
+
+          const teacherParticipant = thread.participants.find((p) => p.role === 'teacher');
+
+          const lastMessage = thread.messages?.[thread.messages.length - 1]?.text || '';
+
+          return {
+            threadId: thread._id,
+            name: teacherParticipant?.name || 'Unknown',
+            lastMessage,
+            status,
+            unreadCount: 0,
+            teacherProfileImage: teacherParticipant?.profileImage || null,
+            participantId: teacherParticipant?._id,
+            avatar: null,
+          };
+        });
+
+        dispatch(setConversations(convos));
+      }
+    } catch (err) {
+      console.error('Messenger popup error:', err);
+      dispatch(setError(err.message || 'Failed to fetch conversations'));
+    } finally {
+      dispatch(setLoading(false));
     }
-  } catch (err) {
-    console.error('Messenger popup error:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-
-  // Approve & Reject handlers for teacher
+  // Approve & Reject handlers for teacher - dispatch fetchConversations to update redux state after
   const handleApprove = useCallback(
     async (requestId) => {
       await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/approve`, {
@@ -197,7 +190,7 @@ const fetchConversations = async () => {
     [token]
   );
 
-  // Filter conversations by search
+  // Filter conversations by search term
   const filteredConversations = conversations.filter(
     (conv) =>
       conv.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -254,6 +247,8 @@ const fetchConversations = async () => {
           <div className="flex-1 overflow-y-auto space-y-3">
             {loading ? (
               <p className="text-sm text-gray-500 text-center mt-8">Loading...</p>
+            ) : error ? (
+              <p className="text-sm text-red-500 text-center mt-8">{error}</p>
             ) : filteredConversations.length === 0 ? (
               <p className="text-sm text-gray-500 text-center mt-8">No conversations found.</p>
             ) : (
