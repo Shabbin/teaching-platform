@@ -11,9 +11,9 @@ export default function MessengerPopup({ role: propRole }) {
   const loading = useSelector((state) => state.chat.loading);
   const error = useSelector((state) => state.chat.error);
 
-  console.log('user from Redux:', user);
-  console.log('userId:', user?.id);
-  console.log('token from localStorage:', localStorage.getItem('token'));
+  // console.log('user from Redux:', user);
+  // console.log('userId:', user?.id);
+  // console.log('token from localStorage:', localStorage.getItem('token'));
 
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(null);

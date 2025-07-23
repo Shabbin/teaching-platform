@@ -145,8 +145,88 @@ export const refreshConversationThunk = createAsyncThunk(
   async (requestId, thunkAPI) => {
     try {
       const res = await axios.get(`${BACKEND_URL}/api/teacher-requests/request/${requestId}`);
-      thunkAPI.dispatch(addOrUpdateConversation(res.data));
-      return res.data;
+      const data = res.data;
+
+      const state = thunkAPI.getState();
+      const userId = state.user.userInfo.id;
+
+      const otherParticipant = data.participants.find(p => p._id !== userId);
+      const latestSession = data.sessions?.[data.sessions.length - 1];
+      const status = latestSession?.status || 'approved';
+
+      const normalizedConvo = {
+        threadId: data._id,
+        requestId: data.requestId || requestId,
+        messages: data.messages || [],
+        lastMessage: data.messages?.at(-1)?.text || '',
+        unreadCount: 0,
+        status,
+        teacherId: otherParticipant?._id,
+        teacherName: otherParticipant?.name,
+      };
+
+      thunkAPI.dispatch(addOrUpdateConversation(normalizedConvo));
+      return normalizedConvo;
+    } catch (err) {
+      thunkAPI.dispatch(setError(err.message));
+      return thunkAPI.rejectWithValue(err.message);
+    }
+  }
+);
+export const approveRequestThunk = createAsyncThunk(
+  'chat/approveRequest',
+  async (requestId, thunkAPI) => {
+    try {
+      const token = localStorage.getItem('token');
+
+      // 1. Approve the request
+      await axios.post(
+        `${BACKEND_URL}/api/teacher-requests/${requestId}/approve`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // 2. Get ChatThread by requestId
+      const threadRes = await axios.get(
+        `${BACKEND_URL}/api/chat/thread/${requestId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const threadData = threadRes.data;
+
+      // 3. Get messages using threadId
+      const messagesRes = await axios.get(
+        `${BACKEND_URL}/api/chat/messages/${threadData._id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      const messages = messagesRes.data;
+
+      // 4. Normalize and dispatch
+      const state = thunkAPI.getState();
+      const userId = state.user.userInfo.id;
+      const otherParticipant = threadData.participants.find(p => p._id !== userId);
+
+      const latestSession = threadData.sessions?.[threadData.sessions.length - 1];
+      const status = latestSession?.status || 'approved';
+
+      const normalizedConvo = {
+        threadId: threadData._id,
+        requestId: threadData.requestId || requestId,
+        messages,
+        lastMessage: messages.at(-1)?.text || '',
+        unreadCount: 0,
+        status,
+        teacherId: otherParticipant?._id,
+        teacherName: otherParticipant?.name,
+      };
+
+      thunkAPI.dispatch(addOrUpdateConversation(normalizedConvo));
+      return normalizedConvo;
     } catch (err) {
       thunkAPI.dispatch(setError(err.message));
       return thunkAPI.rejectWithValue(err.message);

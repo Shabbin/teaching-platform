@@ -79,11 +79,25 @@ const chatSlice = createSlice({
         state.messagesByThread[threadId].push(message);
       }
     },
-    updateConversationStatus(state, action) {
-      const { requestId, status } = action.payload;
-      const convo = state.conversations.find(c => c.requestId === requestId);
-      if (convo) convo.status = status;
-    },
+ updateLastMessageInConversation(state, action) {
+  const { threadId, message } = action.payload;
+
+  const convo = state.conversations.find(
+    (c) => c.threadId === threadId || c.requestId === threadId
+  );
+
+  if (convo) {
+    convo.lastMessage = message.text || message.content || '';
+    convo.lastMessageTimestamp = message.timestamp || message.createdAt || new Date().toISOString();
+  }
+
+  // Optional: sort conversations by latest message
+  state.conversations = [...state.conversations].sort((a, b) => {
+    const dateA = new Date(a.lastMessageTimestamp || 0);
+    const dateB = new Date(b.lastMessageTimestamp || 0);
+    return dateB - dateA;
+  });
+},
     clearMessagesForThread(state, action) {
       const threadId = action.payload;
       delete state.messagesByThread[threadId];

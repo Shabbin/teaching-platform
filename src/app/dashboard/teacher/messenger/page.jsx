@@ -9,7 +9,7 @@ import {
   addOrUpdateConversation,
   updateConversationStatus,
 } from '../../../redux/chatSlice';
-import { fetchConversationsThunk, refreshConversationThunk } from '../../../redux/chatThunks';  // <-- added refreshConversationThunk import
+import { fetchConversationsThunk, refreshConversationThunk,approveRequestThunk } from '../../../redux/chatThunks';  // <-- added refreshConversationThunk import
 
 export default function MessengerPage() {
   const dispatch = useDispatch();
@@ -143,26 +143,14 @@ export default function MessengerPage() {
   // Approve request handler
 const handleApprove = async (requestId) => {
   try {
-    await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/approve`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    // Dispatch thunk to approve and update conversation in Redux
+    const updatedConvo = await dispatch(approveRequestThunk(requestId)).unwrap();
 
-    // Optimistically update selectedChat status locally
-    setSelectedChat((prev) => {
-      if (prev && prev.requestId === requestId) {
-        return { ...prev, status: 'approved' };
-      }
-      return prev;
-    });
-
-    // Also update Redux conversations state (optional, but recommended)
-    dispatch(updateConversationStatus({ requestId, status: 'approved' }));
-
-    // Optionally, refresh the full conversation list in background
-    fetchConversations();
+    // Update selectedChat in local state based on updated conversation from thunk
+    setSelectedChat(updatedConvo);
   } catch (err) {
     console.error('Approve request failed:', err);
+    // Optionally show UI error feedback here
   }
 };
 
