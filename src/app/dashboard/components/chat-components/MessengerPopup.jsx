@@ -10,7 +10,11 @@ export default function MessengerPopup({ role: propRole }) {
   const conversations = useSelector((state) => state.chat.conversations);
   const loading = useSelector((state) => state.chat.loading);
   const error = useSelector((state) => state.chat.error);
-  
+
+  console.log('user from Redux:', user);
+  console.log('userId:', user?.id);
+  console.log('token from localStorage:', localStorage.getItem('token'));
+
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,7 +22,8 @@ export default function MessengerPopup({ role: propRole }) {
   const router = useRouter();
   const dispatch = useDispatch();
 
-  const userId = user?._id || user?.id;
+  // Use only user.id because your Redux user object has `id`
+  const userId = user?.id;
   const role = propRole || user?.role || 'teacher';
 
   // Load token once
@@ -26,10 +31,20 @@ export default function MessengerPopup({ role: propRole }) {
     setToken(localStorage.getItem('token'));
   }, []);
 
-  // Fetch conversations when popup opens and token is ready
+  // === NEW: Fetch conversations once on mount if closed and no conversations ===
   useEffect(() => {
-    if (open && token) fetchConversations();
-  }, [open, token]);
+    if (!open && token && userId && conversations.length === 0) {
+      fetchConversations();
+    }
+  }, [open, token, userId, conversations.length]);
+  // ================================================================
+
+  // Fetch conversations when popup opens and token and userId are ready
+  useEffect(() => {
+    if (open && token && userId) {
+      fetchConversations();
+    }
+  }, [open, token, userId]);
 
   // Avatar helper unchanged
   const getAvatar = (conv) => {
@@ -89,8 +104,8 @@ export default function MessengerPopup({ role: propRole }) {
                   unreadCount: r.unreadCount || 0,
                   threadId,
                   studentProfileImage: studentParticipant?.profileImage || null,
-                  studentId: studentParticipant?._id || r.studentId,
-                  participantId: studentParticipant?._id || r.studentId,
+                  studentId: studentParticipant?.id || r.studentId,
+                  participantId: studentParticipant?.id || r.studentId,
                   avatar: null,
                 };
               }
@@ -106,8 +121,8 @@ export default function MessengerPopup({ role: propRole }) {
               unreadCount: r.unreadCount || 0,
               threadId,
               studentProfileImage: studentObj?.profileImage || null,
-              studentId: studentObj?._id || r.studentId,
-              participantId: studentObj?._id || r.studentId,
+              studentId: studentObj?.id || r.studentId,
+              participantId: studentObj?.id || r.studentId,
               avatar: null,
             };
           })
@@ -115,6 +130,11 @@ export default function MessengerPopup({ role: propRole }) {
 
         dispatch(setConversations(convos));
       } else if (role === 'student') {
+        if (!userId) {
+          console.warn('No userId - skipping student fetch');
+          dispatch(setLoading(false));
+          return;
+        }
         const chatRes = await fetch(`http://localhost:5000/api/chat/student/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -152,7 +172,7 @@ export default function MessengerPopup({ role: propRole }) {
             status,
             unreadCount: 0,
             teacherProfileImage: teacherParticipant?.profileImage || null,
-            participantId: teacherParticipant?._id,
+            participantId: teacherParticipant?.id,
             avatar: null,
           };
         });
@@ -191,11 +211,15 @@ export default function MessengerPopup({ role: propRole }) {
   );
 
   // Filter conversations by search term
-  const filteredConversations = conversations.filter(
-    (conv) =>
-      conv.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (conv.lastMessage && conv.lastMessage.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredConversations = conversations.filter((conv) => {
+    const displayName = conv.name || conv.teacherName || conv.studentName || '';
+    const lastMessage = conv.lastMessage || '';
+
+    return (
+      displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lastMessage.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  });
 
   return (
     <>

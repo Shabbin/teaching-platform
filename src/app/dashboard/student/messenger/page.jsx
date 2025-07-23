@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';  // added dispatch
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
+import { fetchConversationsThunk } from '../../../redux/chatThunks';  // import thunk
 
 export default function StudentMessengerPage() {
+  const dispatch = useDispatch();  // added dispatch
   const user = useSelector((state) => state.user.userInfo);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const studentId = user?.id || user?._id;
@@ -18,49 +20,27 @@ export default function StudentMessengerPage() {
 
   const hasFetchedRef = useRef(false);
 
-  // ✅ Fetch chat threads
+  // ✅ Fetch chat threads via thunk instead of manual fetch
   const fetchConversations = useCallback(async () => {
     if (!studentId || !token) return;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`http://localhost:5000/api/chat/student/${studentId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to fetch chat threads');
-      const data = await res.json();
-
-      const convos = data.map((thread) => {
-        const teacher = thread.participants.find((p) => p._id !== studentId);
-        const latestSession = thread.sessions?.[thread.sessions.length - 1];
-        const status = latestSession?.status || 'approved';
-
-        return {
-          threadId: thread._id,
-          teacherId: teacher?._id,
-          teacherName: teacher?.name,
-          messages: thread.messages,
-          lastMessage: thread.messages.at(-1)?.text || '',
-          unreadCount: 0,
-          status,
-        };
-      });
-
+      const convos = await dispatch(fetchConversationsThunk({ role: 'student', userId: studentId })).unwrap();
       setConversations(convos);
       if (!selectedChat && convos.length > 0) {
         setSelectedChat(convos[0]);
       }
-
       hasFetchedRef.current = true;
-      setLoading(false);
     } catch (err) {
-      console.error('Error fetching conversations:', err.message);
+      console.error('Error fetching conversations:', err);
       setError(err.message || 'Unknown error');
+    } finally {
       setLoading(false);
     }
-  }, [studentId, token, selectedChat]);
+  }, [dispatch, studentId, token, selectedChat]);
 
-  // ✅ Socket logic
+  // ✅ Socket logic (unchanged)
   const handleNewMessage = (message) => {
     if (selectedChat && message.threadId === selectedChat.threadId) {
       setSelectedChat((prev) => ({

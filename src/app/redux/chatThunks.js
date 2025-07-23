@@ -12,18 +12,69 @@ import axios from 'axios';
 const BACKEND_URL = 'http://localhost:5000'; // <-- Set your backend base URL here
 
 // 🔁 Fetch all conversations for current user (teacher or student)
+
 export const fetchConversationsThunk = createAsyncThunk(
   'chat/fetchConversations',
   async ({ role, userId }, thunkAPI) => {
     try {
       thunkAPI.dispatch(setLoading(true));
-      let endpoint =
+
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No auth token found');
+
+      // Choose API endpoint based on role
+      const endpoint =
         role === 'teacher'
-          ? `${BACKEND_URL}/api/teacher-requests/teacher/${userId}`
-          : `${BACKEND_URL}/api/teacher-requests/student/${userId}`;
-      const res = await axios.get(endpoint);
-      thunkAPI.dispatch(setConversations(res.data));
-      return res.data;
+          ? `${BACKEND_URL}/api/teacher-requests/teacher`
+          : `${BACKEND_URL}/api/chat/student/${userId}`;
+
+      const res = await axios.get(endpoint, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      let data = res.data;
+
+      // Transform response for teacher
+      if (role === 'teacher') {
+        data = data.map((thread) => {
+          const student = thread.participants?.find((p) => p._id !== userId);
+          const latestSession = thread.sessions?.[thread.sessions.length - 1];
+          const status = latestSession?.status || 'approved';
+
+          return {
+            threadId: thread._id,
+            participantId: student?._id,
+            participantName: student?.name || 'Unknown Student',
+            messages: thread.messages || [],
+            lastMessage: thread.messages?.at(-1)?.text || '',
+            unreadCount: 0,
+            status,
+            requestId: thread.requestId || null,
+          };
+        });
+      }
+
+      // Transform response for student
+      else if (role === 'student') {
+        data = data.map((thread) => {
+          const teacher = thread.participants?.find((p) => p._id !== userId);
+          const latestSession = thread.sessions?.[thread.sessions.length - 1];
+          const status = latestSession?.status || 'approved';
+
+          return {
+  threadId: thread._id,
+  teacherId: teacher?._id,
+  teacherName: teacher?.name || 'Unknown Teacher',  // <-- change here
+  messages: thread.messages || [],
+  lastMessage: thread.messages?.at(-1)?.text || '',
+  unreadCount: 0,
+  status,
+  requestId: thread.requestId || null,
+};
+        });
+      }
+
+      return data;
     } catch (err) {
       thunkAPI.dispatch(setError(err.message));
       return thunkAPI.rejectWithValue(err.message);
@@ -32,6 +83,7 @@ export const fetchConversationsThunk = createAsyncThunk(
     }
   }
 );
+
 
 // 💬 Load messages for a given threadId
 // chatThunks.js

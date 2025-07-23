@@ -24,16 +24,37 @@ const chatSlice = createSlice({
   initialState,
   reducers: {
     setConversations(state, action) {
-      state.conversations = action.payload;
+      const normalizedConversations = action.payload.map(convo => {
+        let lastMessage = convo.lastMessage;
+        if (lastMessage && typeof lastMessage !== 'string') {
+          lastMessage = lastMessage.text || '';
+        }
+        return {
+          ...convo,
+          lastMessage,
+        };
+      });
+      state.conversations = normalizedConversations;
     },
     addOrUpdateConversation(state, action) {
       const convo = action.payload;
       const id = convo.threadId || convo.requestId;
+
+      let lastMessage = convo.lastMessage;
+      if (lastMessage && typeof lastMessage !== 'string') {
+        lastMessage = lastMessage.text || '';
+      }
+
+      const normalizedConvo = {
+        ...convo,
+        lastMessage,
+      };
+
       const index = state.conversations.findIndex(c => (c.threadId || c.requestId) === id);
       if (index === -1) {
-        state.conversations.push(convo);
+        state.conversations.push(normalizedConvo);
       } else {
-        state.conversations[index] = convo;
+        state.conversations[index] = normalizedConvo;
       }
     },
     setMessagesForThread(state, action) {
@@ -73,6 +94,24 @@ const chatSlice = createSlice({
     setError(state, action) {
       state.error = action.payload;
     },
+    updateLastMessageInConversation(state, action) {
+      const { threadId, message } = action.payload;
+
+      const convo = state.conversations.find(
+        (c) => c.threadId === threadId || c.requestId === threadId
+      );
+
+      if (convo) {
+        convo.lastMessage = message.text || message.content || '';
+      }
+
+      // Re-sort conversations by lastMessage date if available
+      state.conversations = [...state.conversations].sort((a, b) => {
+        const dateA = new Date(a.lastMessage?.createdAt || 0);
+        const dateB = new Date(b.lastMessage?.createdAt || 0);
+        return dateB - dateA;
+      });
+    },
   },
 });
 
@@ -83,6 +122,7 @@ export const {
   addMessageToThread,
   updateConversationStatus,
   clearMessagesForThread,
+  updateLastMessageInConversation,
   setLoading,
   setError,
 } = chatSlice.actions;

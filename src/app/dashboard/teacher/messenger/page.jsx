@@ -1,89 +1,80 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
-import { useSelector } from 'react-redux';
+
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
+import {
+  addOrUpdateConversation,
+  updateConversationStatus,
+} from '../../../redux/chatSlice';
+import { fetchConversationsThunk, refreshConversationThunk } from '../../../redux/chatThunks';  // <-- added refreshConversationThunk import
 
 export default function MessengerPage() {
+  const dispatch = useDispatch();
   const user = useSelector((state) => state.user.userInfo);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const teacherId = user?.id || user?._id;
 
-  const [conversations, setConversations] = useState([]);
+  const conversations = useSelector((state) => state.chat.conversations);
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch conversations helper (removed selectedChat from deps!)
+  const hasFetchedRef = useRef(false);
+
+  // Deduplicate conversations by threadId to avoid duplicate keys and repeated UI entries
+  const dedupedConversations = useMemo(() => {
+    const map = new Map();
+    conversations.forEach((c) => {
+      if (c.threadId && !map.has(c.threadId)) {
+        map.set(c.threadId, c);
+      }
+    });
+    return Array.from(map.values());
+  }, [conversations]);
+
+  // Debug: log deduped conversations
+  useEffect(() => {
+    console.log('Deduped conversations:', dedupedConversations);
+  }, [dedupedConversations]);
+
+  // Fetch conversations using thunk
   const fetchConversations = useCallback(async () => {
+    if (!teacherId || !token) return;
     setLoading(true);
     setError(null);
+
     try {
-      const res = await fetch('http://localhost:5000/api/teacher-requests/teacher', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Failed to fetch requests');
+      const convos = await dispatch(fetchConversationsThunk({ role: user.role, userId: teacherId })).unwrap();
+      console.log('Fetched conversations:', convos);
 
-      const data = await res.json();
-
-      // Deduplicate and keep latest per student (only tuition requests with postId)
-      const latestPerStudent = {};
-      for (const r of data) {
-        if (!r.postId) continue;
-        const existing = latestPerStudent[r.studentId];
-        if (!existing || new Date(r.requestedAt) > new Date(existing.requestedAt)) {
-          latestPerStudent[r.studentId] = r;
-        }
-      }
-      const filteredRequests = Object.values(latestPerStudent);
-
-      // Fetch threads for approved requests
-      const convos = await Promise.all(
-        filteredRequests.map(async (r) => {
-          let threadId = r.threadId || null;
-          let messages = [];
-
-          if (r.status === 'approved') {
-            const threadRes = await fetch(`http://localhost:5000/api/chat/thread/${r._id}`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (threadRes.ok) {
-              const threadData = await threadRes.json();
-              threadId = threadData._id;
-              messages = threadData.messages || [];
-            }
+      if (convos.length > 0) {
+        if (!selectedChat) {
+          setSelectedChat(convos[0]);
+          console.log('Auto-selected first conversation:', convos[0]);
+        } else {
+          // Try to find updated version of selectedChat and update it
+          const updated = convos.find(c => c.threadId === selectedChat.threadId);
+          if (updated) {
+            setSelectedChat(updated);
+            console.log('Updated selectedChat with fresh data:', updated);
+          } else {
+            setSelectedChat(convos[0]);
+            console.log('Selected chat missing, switched to first conversation:', convos[0]);
           }
-
-          return {
-            studentId: r.studentId,
-            studentName: r.studentName,
-            requestId: r._id,
-            topic: r.topic,
-            status: r.status,
-            threadId,
-            lastMessage: messages.at(-1)?.text || r.message || '',
-            unreadCount: 0,
-            messages, // keep messages here for quick access
-          };
-        })
-      );
-
-      setConversations(convos);
-
-      // Auto-select first chat if none selected
-      if (!selectedChat && convos.length > 0) {
-        setSelectedChat(convos[0]);
+        }
+      } else {
+        setSelectedChat(null);
+        console.log('No conversations found, cleared selection');
       }
-
-      setLoading(false);
-      return convos;
     } catch (err) {
-      setError(err.message || 'Unknown error');
+      setError(err.message || 'Failed to fetch conversations');
+    } finally {
       setLoading(false);
-      return [];
     }
-  }, [token]); // <-- Only depend on token
+  }, [dispatch, token, teacherId, selectedChat, user.role]);
 
   // Socket callbacks
   const handleNewMessage = (message) => {
@@ -91,68 +82,101 @@ export default function MessengerPage() {
       setSelectedChat((prev) => ({
         ...prev,
         lastMessage: message.text,
-        messages: [...(prev.messages || []), message], // update messages
+        messages: [...(prev.messages || []), message],
       }));
     }
 
-    setConversations((prevConvos) =>
-      prevConvos.map((c) =>
-        c.threadId === message.threadId
-          ? { ...c, lastMessage: message.text }
-          : c
-      )
-    );
+    dispatch(addOrUpdateConversation({
+      threadId: message.threadId,
+      lastMessage: message.text,
+    }));
   };
 
-  const handleRequestUpdate = (updatedRequest) => {
-    setConversations((prevConvos) => {
-      const updatedConvos = prevConvos.map((c) =>
-        c.requestId === updatedRequest._id ? { ...c, status: updatedRequest.status } : c
-      );
-      return updatedConvos;
-    });
+  // UPDATED: handleRequestUpdate now fetches full updated conversation and sets selectedChat accordingly
+  const handleRequestUpdate = async (updatedRequest) => {
+    dispatch(updateConversationStatus({ requestId: updatedRequest._id, status: updatedRequest.status }));
 
-    if (selectedChat && selectedChat.requestId === updatedRequest._id) {
-      setSelectedChat((prev) => ({ ...prev, status: updatedRequest.status }));
+    try {
+      const fullUpdatedConvo = await dispatch(refreshConversationThunk(updatedRequest._id)).unwrap();
+      if (selectedChat && selectedChat.requestId === updatedRequest._id) {
+        setSelectedChat(fullUpdatedConvo);
+      }
+    } catch (err) {
+      console.error('Failed to refresh conversation after status update', err);
     }
   };
 
-  // Initialize socket
+  // Initialize socket with callbacks
   const { joinThread, sendMessage } = useSocket(teacherId, handleNewMessage, handleRequestUpdate);
 
-  // Join chat room on selected chat change
+  // Join thread on selected chat change
   useEffect(() => {
     if (selectedChat?.threadId) {
       joinThread(selectedChat.threadId);
+      console.log('Joined thread:', selectedChat.threadId);
     }
   }, [selectedChat, joinThread]);
 
-  // Load conversations on mount and when teacherId/token changes
+  // Fetch conversations on mount / token or teacherId change
   useEffect(() => {
-    if (teacherId && token) {
+    if (teacherId && token && !hasFetchedRef.current) {
       fetchConversations();
+      hasFetchedRef.current = true;
     }
   }, [teacherId, token, fetchConversations]);
 
-  // Approve request & select updated chat
-  const handleApprove = async (requestId) => {
+  // When dedupedConversations changes, validate selectedChat still exists
+  useEffect(() => {
+    if (dedupedConversations.length === 0) {
+      if (selectedChat !== null) {
+        setSelectedChat(null);
+        console.log('No conversations available, clearing selectedChat');
+      }
+      return;
+    }
+    if (!selectedChat || !dedupedConversations.find(c => c.threadId === selectedChat.threadId)) {
+      setSelectedChat(dedupedConversations[0]);
+      console.log('Updated selectedChat to first deduped conversation');
+    }
+  }, [dedupedConversations, selectedChat]);
+
+  // Approve request handler
+const handleApprove = async (requestId) => {
+  try {
     await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/approve`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
-    const convos = await fetchConversations();
-    const updated = convos.find((c) => c.requestId === requestId);
-    if (updated) setSelectedChat(updated);
-  };
 
-  // Reject request & deselect chat
-  const handleReject = async (requestId) => {
-    await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/reject`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
+    // Optimistically update selectedChat status locally
+    setSelectedChat((prev) => {
+      if (prev && prev.requestId === requestId) {
+        return { ...prev, status: 'approved' };
+      }
+      return prev;
     });
-    await fetchConversations();
-    setSelectedChat(null);
+
+    // Also update Redux conversations state (optional, but recommended)
+    dispatch(updateConversationStatus({ requestId, status: 'approved' }));
+
+    // Optionally, refresh the full conversation list in background
+    fetchConversations();
+  } catch (err) {
+    console.error('Approve request failed:', err);
+  }
+};
+
+  // Reject request handler
+  const handleReject = async (requestId) => {
+    try {
+      await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/reject`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await fetchConversations();
+    } catch (err) {
+      console.error('Reject request failed:', err);
+    }
   };
 
   if (loading) return <p className="p-4">Loading conversations...</p>;
@@ -161,9 +185,9 @@ export default function MessengerPage() {
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       <ConversationList
-        conversations={conversations}
-        selectedChatId={selectedChat?.requestId}
-        onSelect={setSelectedChat} // Just sets selected chat, no fetch triggered
+        conversations={dedupedConversations}
+        selectedChatId={selectedChat?.threadId} /* Make sure this key matches ConversationList */
+        onSelect={setSelectedChat}
       />
       <ChatPanel
         chat={selectedChat}

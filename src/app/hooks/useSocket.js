@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useDispatch } from 'react-redux';
-import { addMessageToThread, updateConversationStatus } from '../redux/chatSlice';
+import { addMessageToThread, updateConversationStatus,updateLastMessageInConversation } from '../redux/chatSlice';
 
 const SOCKET_URL = 'http://localhost:5000';
 
@@ -20,22 +20,28 @@ export default function useSocket(userId) {
       console.log('[useSocket] connected:', socketRef.current.id);
     });
 
-    socketRef.current.on('new_message', (message) => {
-      console.log('[useSocket] new_message:', message);
+socketRef.current.on('new_message', (message) => {
+  console.log('[useSocket] new_message:', message);
 
-      // Dispatch a thunk to access getState and prevent duplicate message
-      dispatch((dispatch, getState) => {
-        const state = getState();
-        const messages = state.chat.messagesByThread?.[message.threadId] || [];
-        const exists = messages.some(m => m._id === message._id);
+  // Dispatch a thunk to access getState and prevent duplicate message
+  dispatch((dispatch, getState) => {
+    const state = getState();
+    const messages = state.chat.messagesByThread?.[message.threadId] || [];
+    const exists = messages.some(m => m._id === message._id);
 
-        if (!exists) {
-          dispatch(addMessageToThread({ threadId: message.threadId, message }));
-        } else {
-          console.log('[useSocket] Duplicate message skipped in dispatch');
-        }
-      });
-    });
+    if (!exists) {
+      dispatch(addMessageToThread({ threadId: message.threadId, message }));
+      
+      // ✅ Add this line to update last message in conversation list
+      dispatch(updateLastMessageInConversation({
+        threadId: message.threadId,
+        message,
+      }));
+    } else {
+      console.log('[useSocket] Duplicate message skipped in dispatch');
+    }
+  });
+});
 
     socketRef.current.on('request_update', (data) => {
       console.log('[useSocket] request_update:', data);

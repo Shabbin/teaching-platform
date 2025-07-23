@@ -19,20 +19,24 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef();
 
-  const { sendMessage: socketSendMessage, joinThread /*, socket removed here*/ } = useSocket(chat?.threadId);
+  const { sendMessage: socketSendMessage, joinThread } = useSocket(chat?.threadId);
 
-  // Keep ref updated for latest messages if you want to use in your hook for duplicate check
   const latestMessagesRef = useRef(messages);
   useEffect(() => {
     latestMessagesRef.current = messages;
   }, [messages]);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Clear old messages & fetch messages on threadId or status change
+  // Debug logs for troubleshooting
+  useEffect(() => {
+    console.log('THREAD ID:', chat?.threadId);
+    console.log('Fetched messages:', messages);
+    console.log('Chat object:', chat);
+  }, [chat?.threadId, messages]);
+
   useEffect(() => {
     if (!chat?.threadId || chat.status !== 'approved') {
       if (chat?.threadId) dispatch(clearMessagesAction(chat.threadId));
@@ -42,35 +46,34 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
     dispatch(fetchMessagesThunk(chat.threadId));
   }, [chat?.threadId, chat?.status, dispatch]);
 
-  // Join socket room
   useEffect(() => {
     if (chat?.threadId && joinThread) {
       joinThread(chat.threadId);
     }
   }, [chat?.threadId, joinThread]);
 
-  // Send message handler
-const handleSend = async () => {
-  if (!newMessage.trim()) return;
-  if (!chat?.threadId || !socketSendMessage) return;
+  const handleSend = async () => {
+    if (!newMessage.trim()) return;
+    if (!chat?.threadId || !socketSendMessage) return;
 
-  const messageData = {
-    threadId: chat.threadId,
-    senderId: user._id || user.id,
-    senderName: user.name,
-    senderProfileImage: user.profileImage,
-    text: newMessage.trim(),
-    timestamp: new Date().toISOString(),
+    const messageData = {
+      threadId: chat.threadId,
+      senderId: user._id || user.id,
+      senderName: user.name,
+      senderProfileImage: user.profileImage,
+      text: newMessage.trim(),
+      timestamp: new Date().toISOString(),
+    };
+
+    console.log('Sending message:', messageData);
+
+    try {
+      socketSendMessage(messageData);
+      setNewMessage('');
+    } catch (err) {
+      console.error('Failed to send message:', err);
+    }
   };
-
-  try {
-    // Just send the message via socket, do NOT add locally here
-    socketSendMessage(messageData);
-    setNewMessage('');
-  } catch (err) {
-    console.error('Failed to send message:', err);
-  }
-};
 
   const getAvatar = (msg) => {
     return (
@@ -84,12 +87,22 @@ const handleSend = async () => {
     return <p className="p-4 text-gray-500">Select a conversation to view messages.</p>;
   }
 
+  // Normalize current user ID and find the other participant's name
+  const currentUserIdStr = String(user?._id || user?.id);
+  const otherParticipant = chat.participants?.find((p) => String(p._id) !== currentUserIdStr);
+
+  const chatName =
+  chat.name ||               // <-- add this line first
+  chat.participantName ||
+  chat.studentName ||
+  chat.teacherName ||
+  (chat.participants?.find((p) => p._id !== currentUserId)?.name) ||
+  'No Name';
+console.log('nameas',chatName);
   return (
     <div className="flex-1 p-4 flex flex-col justify-between bg-gray-50">
       <div>
-        <h2 className="text-lg font-semibold">
-          {chat.studentName || chat.teacherName || 'Chat'}
-        </h2>
+        <h2 className="text-lg font-semibold">{chatName}</h2>
 
         <div className="space-y-2 mt-2 max-h-[70vh] overflow-y-auto">
           {chat.status === 'pending' ? (

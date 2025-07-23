@@ -1,8 +1,11 @@
 'use client';
 import React, { useState } from 'react';
+import { useSelector } from 'react-redux'; // ✅ get latest messages from chatSlice
 
 export default function ConversationList({ conversations, selectedChatId, onSelect }) {
   const [hoveredChatId, setHoveredChatId] = useState(null);
+
+  const lastMessages = useSelector((state) => state.chat.lastMessagesByThread); // ✅ mapping of threadId => lastMessage
 
   return (
     <aside className="w-1/3 border-r border-gray-200 p-4 bg-white overflow-y-auto relative">
@@ -12,11 +15,11 @@ export default function ConversationList({ conversations, selectedChatId, onSele
           <p className="text-sm text-gray-500">No conversations yet.</p>
         )}
         {conversations.map((chat, index) => {
-          // Determine if the current user is a teacher or student
-          const isTeacher = !!chat.student; // If there's a student, the viewer is the teacher
+          const isTeacher = !!chat.student;
           const otherUser = isTeacher ? chat.student : chat.teacher;
 
-          const displayName = otherUser?.name || chat.teacherName || chat.studentName || chat.name || 'No Name';
+          const displayName =
+            otherUser?.name || chat.teacherName || chat.studentName || chat.name || 'No Name';
 
           const avatarUrl =
             otherUser?.profileImage ||
@@ -29,17 +32,20 @@ export default function ConversationList({ conversations, selectedChatId, onSele
           };
           const statusClass = statusColors[chat.status] || 'bg-gray-100 text-gray-600';
 
-          const isSelected = selectedChatId === (chat.threadId || chat.requestId);
-console.log('chat.student:', chat.student);
-console.log('chat.teacher:', chat.teacher);
+          const threadKey = chat.threadId || chat.requestId;
+          const isSelected = selectedChatId === threadKey;
+
+          const lastMessageObj = lastMessages?.[threadKey]; // ✅ redux-driven last message
+          const lastMessageText = lastMessageObj?.text || chat.lastMessage || 'No messages yet';
+
           return (
             <li
-              key={chat.threadId || chat.requestId || index}
+              key={threadKey || index}
               onClick={() => onSelect(chat)}
               className={`flex justify-between items-center p-2 rounded cursor-pointer hover:bg-gray-100 transition ${
                 isSelected ? 'bg-gray-100' : ''
               }`}
-              onMouseEnter={() => setHoveredChatId(chat.threadId || chat.requestId)}
+              onMouseEnter={() => setHoveredChatId(threadKey)}
               onMouseLeave={() => setHoveredChatId(null)}
             >
               {/* Left: avatar and details */}
@@ -55,12 +61,12 @@ console.log('chat.teacher:', chat.teacher);
                   <div className="text-sm text-gray-500 truncate">
                     {chat.status === 'pending'
                       ? 'New tuition request'
-                      : chat.lastMessage || 'No messages yet'}
+                      : lastMessageText}
                   </div>
                 </div>
 
                 {/* Hover tooltip */}
-                {hoveredChatId === (chat.threadId || chat.requestId) && (
+                {hoveredChatId === threadKey && (
                   <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-50 text-sm text-gray-700">
                     <div className="flex items-center space-x-3 mb-2">
                       <img
@@ -86,7 +92,7 @@ console.log('chat.teacher:', chat.teacher);
                     </div>
                     <div>
                       <div className="font-semibold mb-1">Last message:</div>
-                      <p className="truncate">{chat.lastMessage || 'No messages yet'}</p>
+                      <p className="truncate">{lastMessageText}</p>
                     </div>
                   </div>
                 )}
