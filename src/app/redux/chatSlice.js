@@ -79,35 +79,6 @@ const chatSlice = createSlice({
         state.messagesByThread[threadId].push(message);
       }
     },
- updateLastMessageInConversation(state, action) {
-  const { threadId, message } = action.payload;
-
-  const convo = state.conversations.find(
-    (c) => c.threadId === threadId || c.requestId === threadId
-  );
-
-  if (convo) {
-    convo.lastMessage = message.text || message.content || '';
-    convo.lastMessageTimestamp = message.timestamp || message.createdAt || new Date().toISOString();
-  }
-
-  // Optional: sort conversations by latest message
-  state.conversations = [...state.conversations].sort((a, b) => {
-    const dateA = new Date(a.lastMessageTimestamp || 0);
-    const dateB = new Date(b.lastMessageTimestamp || 0);
-    return dateB - dateA;
-  });
-},
-    clearMessagesForThread(state, action) {
-      const threadId = action.payload;
-      delete state.messagesByThread[threadId];
-    },
-    setLoading(state, action) {
-      state.loading = action.payload;
-    },
-    setError(state, action) {
-      state.error = action.payload;
-    },
     updateLastMessageInConversation(state, action) {
       const { threadId, message } = action.payload;
 
@@ -117,14 +88,33 @@ const chatSlice = createSlice({
 
       if (convo) {
         convo.lastMessage = message.text || message.content || '';
+        convo.lastMessageTimestamp = message.timestamp || message.createdAt || new Date().toISOString();
       }
 
-      // Re-sort conversations by lastMessage date if available
+      // Sort conversations by latest message timestamp descending
       state.conversations = [...state.conversations].sort((a, b) => {
-        const dateA = new Date(a.lastMessage?.createdAt || 0);
-        const dateB = new Date(b.lastMessage?.createdAt || 0);
+        const dateA = new Date(a.lastMessageTimestamp || 0);
+        const dateB = new Date(b.lastMessageTimestamp || 0);
         return dateB - dateA;
       });
+    },
+    updateConversationStatus(state, action) {
+      const { requestId, status } = action.payload;
+
+      const convo = state.conversations.find(c => c.requestId === requestId);
+      if (convo) {
+        convo.status = status;
+      }
+    },
+    clearMessagesForThread(state, action) {
+      const threadId = action.payload;
+      delete state.messagesByThread[threadId];
+    },
+    setLoading(state, action) {
+      state.loading = action.payload;
+    },
+    setError(state, action) {
+      state.error = action.payload;
     },
   },
 });
