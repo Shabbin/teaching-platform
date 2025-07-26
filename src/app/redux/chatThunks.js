@@ -15,18 +15,14 @@ const BACKEND_URL = 'http://localhost:5000'; // <-- Set your backend base URL he
 
 export const fetchConversationsThunk = createAsyncThunk(
   'chat/fetchConversations',
-  async ({ role, userId }, thunkAPI) => {
+  async ({ userId }, thunkAPI) => {
     try {
       thunkAPI.dispatch(setLoading(true));
 
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No auth token found');
 
-      // Choose API endpoint based on role
-      const endpoint =
-        role === 'teacher'
-          ? `${BACKEND_URL}/api/teacher-requests/teacher`
-          : `${BACKEND_URL}/api/chat/student/${userId}`;
+      const endpoint = `${BACKEND_URL}/api/chat/conversations/${userId}`;
 
       const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
@@ -34,47 +30,30 @@ export const fetchConversationsThunk = createAsyncThunk(
 
       let data = res.data;
 
-      // Transform response for teacher
-      if (role === 'teacher') {
-        data = data.map((thread) => {
-          const student = thread.participants?.find((p) => p._id !== userId);
-          const latestSession = thread.sessions?.[thread.sessions.length - 1];
-          const status = latestSession?.status || 'approved';
+      // 🛠 Normalize every item to ensure `threadId` is present and consistent
+      const normalized = data
+        .filter(chat => chat) // Remove nulls just in case
+        .map(chat => ({
+          ...chat,
+          threadId: chat.threadId || chat._id || chat.requestId, // Fallbacks
+          lastMessage: chat.lastMessage || '',
+          lastMessageTimestamp:
+            chat.lastMessage?.timestamp ||
+            chat.lastMessage?.createdAt ||
+            chat.updatedAt ||
+            chat.createdAt ||
+            null,
+        }))
+        .filter(chat => chat.threadId); // Make sure no conversation without a threadId
 
-          return {
-            threadId: thread._id,
-            participantId: student?._id,
-            participantName: student?.name || 'Unknown Student',
-            messages: thread.messages || [],
-            lastMessage: thread.messages?.at(-1)?.text || '',
-            unreadCount: 0,
-            status,
-            requestId: thread.requestId || null,
-          };
-        });
-      }
+      // 🔁 Sort by timestamp (desc)
+      normalized.sort((a, b) => {
+        const timeA = new Date(a.lastMessageTimestamp || 0);
+        const timeB = new Date(b.lastMessageTimestamp || 0);
+        return timeB - timeA;
+      });
 
-      // Transform response for student
-      else if (role === 'student') {
-        data = data.map((thread) => {
-          const teacher = thread.participants?.find((p) => p._id !== userId);
-          const latestSession = thread.sessions?.[thread.sessions.length - 1];
-          const status = latestSession?.status || 'approved';
-
-          return {
-  threadId: thread._id,
-  teacherId: teacher?._id,
-  teacherName: teacher?.name || 'Unknown Teacher',  // <-- change here
-  messages: thread.messages || [],
-  lastMessage: thread.messages?.at(-1)?.text || '',
-  unreadCount: 0,
-  status,
-  requestId: thread.requestId || null,
-};
-        });
-      }
-
-      return data;
+      return normalized;
     } catch (err) {
       thunkAPI.dispatch(setError(err.message));
       return thunkAPI.rejectWithValue(err.message);
@@ -83,6 +62,8 @@ export const fetchConversationsThunk = createAsyncThunk(
     }
   }
 );
+
+
 
 
 // 💬 Load messages for a given threadId
@@ -146,7 +127,7 @@ export const refreshConversationThunk = createAsyncThunk(
     try {
       const res = await axios.get(`${BACKEND_URL}/api/teacher-requests/request/${requestId}`);
       const data = res.data;
-
+console.log(res,"dataa")
       const state = thunkAPI.getState();
       const userId = state.user.userInfo.id;
 

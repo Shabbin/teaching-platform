@@ -7,7 +7,7 @@ import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
 import {
   addOrUpdateConversation,
-  updateConversationStatus,
+  updateConversationStatus,setConversations
 } from '../../../redux/chatSlice';
 import { fetchConversationsThunk, refreshConversationThunk,approveRequestThunk } from '../../../redux/chatThunks';  // <-- added refreshConversationThunk import
 import { playKnock } from '../../../utils/knock'; // Adjust path as needed
@@ -163,19 +163,28 @@ const handleNewMessage = (message) => {
 const handleApprove = async (requestId) => {
   try {
     const updatedConvo = await dispatch(approveRequestThunk(requestId)).unwrap();
-    
-    // Update global conversations
-    dispatch(setConversations((prev) => {
-      const filtered = prev.filter((c) => c.requestId !== updatedConvo.requestId);
-      return [...filtered, updatedConvo];
-    }));
+    console.log(updatedConvo, "Updated Conversations");
 
-    // Update selected chat UI
+    const filtered = conversations.filter(
+      (c) => c.requestId !== updatedConvo.requestId
+    );
+
+    const updatedList = [...filtered, updatedConvo].sort((a, b) =>
+      new Date(b.lastMessage?.timestamp || b.createdAt) -
+      new Date(a.lastMessage?.timestamp || a.createdAt)
+    );
+
+    dispatch(setConversations(updatedList));
+
+    // <-- Add this line to auto-open the chat for the approved request
     setSelectedChat(updatedConvo);
-  } catch (err) {
-    console.error('Approve request failed:', err);
+  } catch (error) {
+    console.log('conversations in handleApprove:', conversations);
+
+    console.error('Approve request failed:', error);
   }
 };
+
 
   // Reject request handler
   const handleReject = async (requestId) => {
@@ -192,13 +201,23 @@ const handleApprove = async (requestId) => {
 
   if (loading) return <p className="p-4">Loading conversations...</p>;
   if (error) return <p className="p-4 text-red-600">Error: {error}</p>;
+const handleSelectChat = (selected) => {
+  const full = conversations.find(
+    (c) => c.threadId === selected.threadId
+  );
 
+  if (!full) {
+    console.warn("Could not find full conversation for:", selected.threadId);
+  }
+
+  setSelectedChat(full || selected); // fallback to avoid crash
+};
   return (
     <div className="flex h-[calc(100vh-4rem)]">
       <ConversationList
         conversations={dedupedConversations}
         selectedChatId={selectedChat?.threadId} /* Make sure this key matches ConversationList */
-        onSelect={setSelectedChat}
+        onSelect={handleSelectChat}
       />
       <ChatPanel
         chat={selectedChat}

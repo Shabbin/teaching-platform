@@ -1,7 +1,7 @@
 'use client';
 import { useSelector, useDispatch } from 'react-redux';
 import { useState, useEffect } from 'react';
-import { sendTuitionRequest, clearMessages } from '../../../redux/requestSlice';
+import { sendTuitionRequest, clearMessages } from '../../../../redux/requestSlice';
 
 export default function TuitionRequestModal({ teacherId, postId, onClose, onSuccess }) {
   const dispatch = useDispatch();
@@ -32,14 +32,17 @@ export default function TuitionRequestModal({ teacherId, postId, onClose, onSucc
 
     // Dispatch Redux async thunk
     dispatch(sendTuitionRequest({ teacherId, message, postId }))
-      .unwrap()
-      .then(() => {
-        onSuccess();
-        dispatch(clearMessages());
-      })
-      .catch(() => {
-        // Error handled in Redux slice, just keep it here
-      });
+  .unwrap()
+  .then((res) => {
+    const requestId = res.request._id;
+    console.log('✅ Got new requestId:', requestId);
+    onSuccess(requestId);      // <-- Pass it to parent
+    dispatch(clearMessages());
+  })
+  .catch((err) => {
+    console.error('❌ Error sending request:', err);
+  });
+
   };
 
   return (

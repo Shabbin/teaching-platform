@@ -13,13 +13,20 @@ import {
   sendMessageThunk,
 } from '../../../redux/chatThunks';
 
-export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
+export default function ChatPanel({ chat, user, sendMessage, onApprove, onReject }) {
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messagesByThread[chat?.threadId] || []);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef();
-
   const { sendMessage: socketSendMessage, joinThread } = useSocket(chat?.threadId);
+
+  // Debug logs
+  console.log('🔄 ChatPanel render');
+  console.log('🧾 Props -> chat:', chat);
+  console.log('🧑‍💼 Props -> user:', user);
+  console.log('🧵 Current threadId:', chat?.threadId);
+  console.log('📨 Existing messages:', messages);
+  
 
   const latestMessagesRef = useRef(messages);
   useEffect(() => {
@@ -30,48 +37,44 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Debug logs for troubleshooting
-  useEffect(() => {
-    console.log('THREAD ID:', chat?.threadId);
-    console.log('Fetched messages:', messages);
-    console.log('Chat object:', chat);
-  }, [chat?.threadId, messages]);
-
   useEffect(() => {
     if (!chat?.threadId || chat.status !== 'approved') {
+      console.log('⛔ No valid threadId or chat not approved. Clearing messages...');
       if (chat?.threadId) dispatch(clearMessagesAction(chat.threadId));
       return;
     }
+
+    console.log('📥 Fetching messages for thread:', chat.threadId);
     dispatch(clearMessagesAction(chat.threadId));
     dispatch(fetchMessagesThunk(chat.threadId));
   }, [chat?.threadId, chat?.status, dispatch]);
 
   useEffect(() => {
     if (chat?.threadId && joinThread) {
+      console.log('🔌 Joining socket thread:', chat.threadId);
       joinThread(chat.threadId);
     }
   }, [chat?.threadId, joinThread]);
 
   const handleSend = async () => {
-    if (!newMessage.trim()) return;
-    if (!chat?.threadId || !socketSendMessage) return;
+    if (!newMessage.trim() || !chat?.threadId || !socketSendMessage) return;
 
     const messageData = {
       threadId: chat.threadId,
-      senderId: user._id || user.id,
-      senderName: user.name,
-      senderProfileImage: user.profileImage,
+      senderId: user?._id || user?.id,
+      senderName: user?.name,
+      senderProfileImage: user?.profileImage,
       text: newMessage.trim(),
       timestamp: new Date().toISOString(),
     };
 
-    console.log('Sending message:', messageData);
+    console.log('📤 Sending message:', messageData);
 
     try {
       socketSendMessage(messageData);
       setNewMessage('');
     } catch (err) {
-      console.error('Failed to send message:', err);
+      console.error('❌ Failed to send message:', err);
     }
   };
 
@@ -84,21 +87,22 @@ export default function ChatPanel({ chat, user, token, onApprove, onReject }) {
   };
 
   if (!chat) {
+    console.log('❕ No chat selected');
     return <p className="p-4 text-gray-500">Select a conversation to view messages.</p>;
   }
 
-  // Normalize current user ID and find the other participant's name
-  const currentUserIdStr = String(user?._id || user?.id);
-  const otherParticipant = chat.participants?.find((p) => String(p._id) !== currentUserIdStr);
+  const currentUserId = user?._id || user?.id;
 
   const chatName =
-  chat.name ||               // <-- add this line first
-  chat.participantName ||
-  chat.studentName ||
-  chat.teacherName ||
-  (chat.participants?.find((p) => p._id !== currentUserId)?.name) ||
-  'No Name';
-console.log('nameas',chatName);
+    chat.name ||
+    chat.participantName ||
+    chat.studentName ||
+    chat.teacherName ||
+    chat.participants?.find((p) => p && p._id !== currentUserId)?.name ||
+    'No Name';
+
+  console.log('📛 Chat name resolved:', chatName);
+
   return (
     <div className="flex-1 p-4 flex flex-col justify-between bg-gray-50">
       <div>
@@ -109,20 +113,26 @@ console.log('nameas',chatName);
             <>
               <p className="text-gray-600 mb-2">Request: {chat.topic || 'Tuition Request'}</p>
 
-              {user.role === 'student' ? (
+              {user?.role === 'student' ? (
                 <p className="italic text-gray-700">
                   You: {chat.topic || 'Tuition Request'} (Pending approval)
                 </p>
               ) : (
                 <div className="space-x-4">
                   <button
-                    onClick={() => onApprove(chat.requestId)}
+                    onClick={() => {
+                      console.log('✅ Approve clicked for requestId:', chat.requestId);
+                      onApprove(chat.requestId);
+                    }}
                     className="px-4 py-1 bg-green-500 text-white rounded"
                   >
                     Approve
                   </button>
                   <button
-                    onClick={() => onReject(chat.requestId)}
+                    onClick={() => {
+                      console.log('❌ Reject clicked for requestId:', chat.requestId);
+                      onReject(chat.requestId);
+                    }}
                     className="px-4 py-1 bg-red-500 text-white rounded"
                   >
                     Reject
@@ -135,7 +145,7 @@ console.log('nameas',chatName);
               <MessageBubble
                 key={msg._id || `${msg.timestamp}-${i}`}
                 message={msg}
-                currentUserId={user._id || user.id}
+                currentUserId={currentUserId}
                 avatar={getAvatar(msg)}
               />
             ))

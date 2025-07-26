@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { setConversations, setLoading, setError } from '../../../redux/chatSlice';
-
+import { approveRequestThunk } from '../../../redux/chatThunks';
 export default function MessengerPopup({ role: propRole }) {
   const user = useSelector((state) => state.user.userInfo);
   const conversations = useSelector((state) => state.chat.conversations);
@@ -188,16 +188,39 @@ export default function MessengerPopup({ role: propRole }) {
   };
 
   // Approve & Reject handlers for teacher - dispatch fetchConversations to update redux state after
-  const handleApprove = useCallback(
-    async (requestId) => {
-      await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/approve`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchConversations();
-    },
-    [token]
-  );
+const handleApprove = async (requestId) => {
+  try {
+    const updatedConvo = await dispatch(approveRequestThunk(requestId)).unwrap();
+
+    const filtered = conversations.filter(
+      (c) => c.requestId !== updatedConvo.requestId
+    );
+
+    const updatedList = [...filtered, updatedConvo].sort((a, b) =>
+      new Date(b.lastMessage?.timestamp || b.createdAt) -
+      new Date(a.lastMessage?.timestamp || a.createdAt)
+    );
+
+    dispatch(setConversations(updatedList));
+  } catch (error) {
+    console.error('Approve request failed:', error);
+  }
+};
+
+
+
+  // const handleApprove = useCallback(
+  //   async (requestId) => {
+  //     await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/approve`, {
+  //       method: 'POST',
+  //       headers: { Authorization: `Bearer ${token}` },
+  //     });
+  //     fetchConversations();
+  //   },
+  //   [token]
+  // );
+
+
 
   const handleReject = useCallback(
     async (requestId) => {

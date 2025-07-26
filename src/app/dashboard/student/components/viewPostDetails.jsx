@@ -74,11 +74,14 @@ console.log(userInfo)
     Tags: post.tags?.join(', '),
   };
 
-  const handleRequestSuccess = () => {
-    setShowTuitionModal(false);
-    setShowTopicHelpModal(false);
-    // Optionally show toast or message here
-  };
+ const handleRequestSuccess = (requestId) => {
+  setShowTuitionModal(false);
+  setShowTopicHelpModal(false);
+
+  if (requestId) {
+    router.push(`/messenger/${requestId}`);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-50 relative">
