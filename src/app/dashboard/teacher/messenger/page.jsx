@@ -10,7 +10,7 @@ import {
   updateConversationStatus,
 } from '../../../redux/chatSlice';
 import { fetchConversationsThunk, refreshConversationThunk,approveRequestThunk } from '../../../redux/chatThunks';  // <-- added refreshConversationThunk import
-
+import { playKnock } from '../../../utils/knock'; // Adjust path as needed
 export default function MessengerPage() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.user.userInfo);
@@ -25,15 +25,24 @@ export default function MessengerPage() {
   const hasFetchedRef = useRef(false);
 
   // Deduplicate conversations by threadId to avoid duplicate keys and repeated UI entries
-  const dedupedConversations = useMemo(() => {
-    const map = new Map();
-    conversations.forEach((c) => {
-      if (c.threadId && !map.has(c.threadId)) {
-        map.set(c.threadId, c);
-      }
-    });
-    return Array.from(map.values());
-  }, [conversations]);
+const dedupedConversations = useMemo(() => {
+  const map = new Map();
+  conversations.forEach((c) => {
+    if (c.threadId && !map.has(c.threadId)) {
+      map.set(c.threadId, c);
+    }
+  });
+
+  const deduped = Array.from(map.values());
+
+  // Sort again by lastMessageTimestamp just to be sure
+  return deduped.sort((a, b) => {
+    const timeA = new Date(a.lastMessageTimestamp || 0);
+    const timeB = new Date(b.lastMessageTimestamp || 0);
+    return timeB - timeA;
+  });
+}, [conversations]);
+
 
   // Debug: log deduped conversations
   useEffect(() => {
@@ -74,23 +83,33 @@ export default function MessengerPage() {
     } finally {
       setLoading(false);
     }
-  }, [dispatch, token, teacherId, selectedChat, user.role]);
+  }, [dispatch, token, teacherId, selectedChat, user?.role]);
 
   // Socket callbacks
-  const handleNewMessage = (message) => {
-    if (selectedChat && message.threadId === selectedChat.threadId) {
-      setSelectedChat((prev) => ({
-        ...prev,
-        lastMessage: message.text,
-        messages: [...(prev.messages || []), message],
-      }));
-    }
+const handleNewMessage = (message) => {
+  const myUserId = String(user._id || user.id);
+  const isMyMessage = String(message.senderId) === myUserId;
+  const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
 
-    dispatch(addOrUpdateConversation({
-      threadId: message.threadId,
+  if (!isMyMessage && !isCurrentThread) {
+    console.log("cookieee")
+    playKnock();
+  }
+
+  if (selectedChat && message.threadId === selectedChat.threadId) {
+    setSelectedChat((prev) => ({
+      ...prev,
       lastMessage: message.text,
+      messages: [...(prev.messages || []), message],
     }));
-  };
+  }
+
+  dispatch(addOrUpdateConversation({
+    threadId: message.threadId,
+    lastMessage: message.text,
+  }));
+};
+
 
   // UPDATED: handleRequestUpdate now fetches full updated conversation and sets selectedChat accordingly
   const handleRequestUpdate = async (updatedRequest) => {
@@ -143,14 +162,18 @@ export default function MessengerPage() {
   // Approve request handler
 const handleApprove = async (requestId) => {
   try {
-    // Dispatch thunk to approve and update conversation in Redux
     const updatedConvo = await dispatch(approveRequestThunk(requestId)).unwrap();
+    
+    // Update global conversations
+    dispatch(setConversations((prev) => {
+      const filtered = prev.filter((c) => c.requestId !== updatedConvo.requestId);
+      return [...filtered, updatedConvo];
+    }));
 
-    // Update selectedChat in local state based on updated conversation from thunk
+    // Update selected chat UI
     setSelectedChat(updatedConvo);
   } catch (err) {
     console.error('Approve request failed:', err);
-    // Optionally show UI error feedback here
   }
 };
 
