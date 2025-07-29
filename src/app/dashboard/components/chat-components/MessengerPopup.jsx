@@ -3,26 +3,22 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
-import { setConversations, setLoading, setError } from '../../../redux/chatSlice';
-import { approveRequestThunk } from '../../../redux/chatThunks';
+import { setLoading, setError } from '../../../redux/chatSlice';
+import { fetchConversationsThunk, approveRequestThunk } from '../../../redux/chatThunks';
+
 export default function MessengerPopup({ role: propRole }) {
   const user = useSelector((state) => state.user.userInfo);
   const conversations = useSelector((state) => state.chat.conversations);
   const loading = useSelector((state) => state.chat.loading);
   const error = useSelector((state) => state.chat.error);
 
-  // console.log('user from Redux:', user);
-  // console.log('userId:', user?.id);
-  // console.log('token from localStorage:', localStorage.getItem('token'));
-
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const router = useRouter();
   const dispatch = useDispatch();
 
-  // Use only user.id because your Redux user object has `id`
   const userId = user?.id;
   const role = propRole || user?.role || 'teacher';
 
@@ -31,207 +27,70 @@ export default function MessengerPopup({ role: propRole }) {
     setToken(localStorage.getItem('token'));
   }, []);
 
-  // === NEW: Fetch conversations once on mount if closed and no conversations ===
+  // Fetch conversations on mount if closed and no conversations
   useEffect(() => {
     if (!open && token && userId && conversations.length === 0) {
       fetchConversations();
     }
   }, [open, token, userId, conversations.length]);
-  // ================================================================
 
-  // Fetch conversations when popup opens and token and userId are ready
+  // Fetch conversations when popup opens
   useEffect(() => {
     if (open && token && userId) {
       fetchConversations();
     }
   }, [open, token, userId]);
 
-  // Avatar helper unchanged
-  const getAvatar = (conv) => {
-    if (conv.participantProfileImage) return conv.participantProfileImage;
-    if (conv.studentProfileImage) return conv.studentProfileImage;
-    if (conv.teacherProfileImage) return conv.teacherProfileImage;
-    const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
-    return `https://i.pravatar.cc/150?u=${fallbackId}`;
-  };
-
-  const fetchConversations = async () => {
-    dispatch(setLoading(true));
-    dispatch(setError(null));
+  // Fetch conversations using centralized thunk
+  const fetchConversations = useCallback(async () => {
+    if (!token || !userId) return;
     try {
-      if (role === 'teacher') {
-        const res = await fetch(`http://localhost:5000/api/teacher-requests/teacher`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) throw new Error('Failed to fetch teacher requests');
-        const data = await res.json();
-
-        const filteredRequests = data.filter(
-          (r) => ['pending', 'approved'].includes(r.status) && r.postId
-        );
-
-        const latestPerStudent = {};
-        for (const r of filteredRequests) {
-          const existing = latestPerStudent[r.studentId];
-          if (!existing || new Date(r.requestedAt) > new Date(existing.requestedAt)) {
-            latestPerStudent[r.studentId] = r;
-          }
-        }
-
-        const convos = await Promise.all(
-          Object.values(latestPerStudent).map(async (r) => {
-            let threadId = r.threadId || null;
-            let lastMessage = r.message || '';
-
-            if (r.status === 'approved') {
-              const threadRes = await fetch(`http://localhost:5000/api/chat/thread/${r._id}`, {
-                headers: { Authorization: `Bearer ${token}` },
-              });
-              if (threadRes.ok) {
-                const threadData = await threadRes.json();
-                threadId = threadData._id;
-                const messages = threadData.messages || [];
-                if (messages.length > 0) lastMessage = messages[messages.length - 1].text;
-
-                const studentParticipant = threadData.participants.find((p) => p.role === 'student');
-
-                return {
-                  requestId: r._id,
-                  name: studentParticipant?.name || r.studentName || 'Student',
-                  topic: r.topic,
-                  status: r.status,
-                  lastMessage,
-                  unreadCount: r.unreadCount || 0,
-                  threadId,
-                  studentProfileImage: studentParticipant?.profileImage || null,
-                  studentId: studentParticipant?.id || r.studentId,
-                  participantId: studentParticipant?.id || r.studentId,
-                  avatar: null,
-                };
-              }
-            }
-
-            const studentObj = typeof r.studentId === 'object' ? r.studentId : null;
-            return {
-              requestId: r._id,
-              name: studentObj?.name || r.studentName || 'Student',
-              topic: r.topic,
-              status: r.status,
-              lastMessage,
-              unreadCount: r.unreadCount || 0,
-              threadId,
-              studentProfileImage: studentObj?.profileImage || null,
-              studentId: studentObj?.id || r.studentId,
-              participantId: studentObj?.id || r.studentId,
-              avatar: null,
-            };
-          })
-        );
-
-        dispatch(setConversations(convos));
-      } else if (role === 'student') {
-        if (!userId) {
-          console.warn('No userId - skipping student fetch');
-          dispatch(setLoading(false));
-          return;
-        }
-        const chatRes = await fetch(`http://localhost:5000/api/chat/student/${userId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!chatRes.ok) throw new Error('Failed to fetch student chat threads');
-        const chatData = await chatRes.json();
-
-        const requestRes = await fetch(`http://localhost:5000/api/teacher-requests/student`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const requestData = requestRes.ok ? await requestRes.json() : [];
-
-        const statusMap = {};
-        for (const r of requestData) {
-          statusMap[r._id] = r.status;
-        }
-
-        const convos = chatData.map((thread) => {
-          const latestSession = thread.sessions.reduce(
-            (latest, session) =>
-              !latest || new Date(session.startedAt) > new Date(latest.startedAt) ? session : latest,
-            null
-          );
-
-          const requestId = latestSession?.requestId;
-          const status = requestId ? statusMap[requestId] || 'pending' : 'pending';
-
-          const teacherParticipant = thread.participants.find((p) => p.role === 'teacher');
-
-          const lastMessage = thread.messages?.[thread.messages.length - 1]?.text || '';
-
-          return {
-            threadId: thread._id,
-            name: teacherParticipant?.name || 'Unknown',
-            lastMessage,
-            status,
-            unreadCount: 0,
-            teacherProfileImage: teacherParticipant?.profileImage || null,
-            participantId: teacherParticipant?.id,
-            avatar: null,
-          };
-        });
-
-        dispatch(setConversations(convos));
-      }
+      dispatch(setLoading(true));
+      dispatch(setError(null));
+      await dispatch(fetchConversationsThunk({ userId, role })).unwrap();
     } catch (err) {
-      console.error('Messenger popup error:', err);
+      console.error('MessengerPopup fetchConversations error:', err);
       dispatch(setError(err.message || 'Failed to fetch conversations'));
     } finally {
       dispatch(setLoading(false));
     }
+  }, [dispatch, token, userId, role]);
+
+  // Approve request handler
+  const handleApprove = async (requestId) => {
+    try {
+      await dispatch(approveRequestThunk(requestId)).unwrap();
+      // After approve, refresh conversations to update UI
+      fetchConversations();
+    } catch (error) {
+      console.error('Approve request failed:', error);
+    }
   };
 
-  // Approve & Reject handlers for teacher - dispatch fetchConversations to update redux state after
-const handleApprove = async (requestId) => {
-  try {
-    const updatedConvo = await dispatch(approveRequestThunk(requestId)).unwrap();
-
-    const filtered = conversations.filter(
-      (c) => c.requestId !== updatedConvo.requestId
-    );
-
-    const updatedList = [...filtered, updatedConvo].sort((a, b) =>
-      new Date(b.lastMessage?.timestamp || b.createdAt) -
-      new Date(a.lastMessage?.timestamp || a.createdAt)
-    );
-
-    dispatch(setConversations(updatedList));
-  } catch (error) {
-    console.error('Approve request failed:', error);
-  }
-};
-
-
-
-  // const handleApprove = useCallback(
-  //   async (requestId) => {
-  //     await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/approve`, {
-  //       method: 'POST',
-  //       headers: { Authorization: `Bearer ${token}` },
-  //     });
-  //     fetchConversations();
-  //   },
-  //   [token]
-  // );
-
-
-
-  const handleReject = useCallback(
-    async (requestId) => {
+  // Reject request handler
+  const handleReject = async (requestId) => {
+    try {
       await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/reject`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
+      // After reject, refresh conversations to update UI
       fetchConversations();
-    },
-    [token]
-  );
+    } catch (err) {
+      console.error('Reject request failed:', err);
+    }
+  };
+
+  // Avatar helper unchanged
+const getAvatar = (conv) => {
+  if (conv.profileImage) return conv.profileImage;
+  if (conv.participantProfileImage) return conv.participantProfileImage;
+  if (conv.studentProfileImage) return conv.studentProfileImage;
+  if (conv.teacherProfileImage) return conv.teacherProfileImage;
+
+  const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
+  return `https://i.pravatar.cc/150?u=${fallbackId}`;
+};
 
   // Filter conversations by search term
   const filteredConversations = conversations.filter((conv) => {

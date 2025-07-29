@@ -7,9 +7,9 @@ import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
 import {
   addOrUpdateConversation,
-  updateConversationStatus,
+
 } from '../../../redux/chatSlice';
-import { fetchConversationsThunk, refreshConversationThunk } from '../../../redux/chatThunks';
+import { fetchConversationsThunk,  } from '../../../redux/chatThunks';
 
 export default function StudentMessengerPage() {
   const dispatch = useDispatch();

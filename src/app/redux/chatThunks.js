@@ -3,7 +3,7 @@ import {
   setConversations,
   addOrUpdateConversation,
   setMessagesForThread,
-  addMessageToThread,
+
   setLoading,
   setError,
 } from './chatSlice';
@@ -18,41 +18,48 @@ export const fetchConversationsThunk = createAsyncThunk(
   async ({ userId }, thunkAPI) => {
     try {
       thunkAPI.dispatch(setLoading(true));
-
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No auth token found');
 
       const endpoint = `${BACKEND_URL}/api/chat/conversations/${userId}`;
-
       const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      let data = res.data;
+      const data = res.data;
 
-      // 🛠 Normalize every item to ensure `threadId` is present and consistent
       const normalized = data
-        .filter(chat => chat) // Remove nulls just in case
-        .map(chat => ({
-          ...chat,
-          threadId: chat.threadId || chat._id || chat.requestId, // Fallbacks
-          lastMessage: chat.lastMessage || '',
-          lastMessageTimestamp:
-            chat.lastMessage?.timestamp ||
-            chat.lastMessage?.createdAt ||
-            chat.updatedAt ||
-            chat.createdAt ||
-            null,
-        }))
-        .filter(chat => chat.threadId); // Make sure no conversation without a threadId
+        .filter(chat => chat)
+        .map(chat => {
+          // Get the other participant
+          const otherParticipant = chat.participants?.find(
+            (p) => p._id !== userId
+          );
 
-      // 🔁 Sort by timestamp (desc)
+          return {
+            ...chat,
+            threadId: chat.threadId || chat._id || chat.requestId,
+            lastMessage: chat.lastMessage || '',
+            lastMessageTimestamp:
+              chat.lastMessage?.timestamp ||
+              chat.lastMessage?.createdAt ||
+              chat.updatedAt ||
+              chat.createdAt ||
+              null,
+            name: otherParticipant?.name || 'No Name',
+            profileImage: otherParticipant?.profileImage || null,
+          };
+        })
+        .filter(chat => chat.threadId);
+
+      // Sort by latest message
       normalized.sort((a, b) => {
         const timeA = new Date(a.lastMessageTimestamp || 0);
         const timeB = new Date(b.lastMessageTimestamp || 0);
         return timeB - timeA;
       });
 
+      thunkAPI.dispatch(setConversations(normalized));
       return normalized;
     } catch (err) {
       thunkAPI.dispatch(setError(err.message));
@@ -62,6 +69,9 @@ export const fetchConversationsThunk = createAsyncThunk(
     }
   }
 );
+
+
+
 
 
 

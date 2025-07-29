@@ -60,8 +60,6 @@ setConversations(state, action) {
   state.conversations = sortConversationsByLatest(normalized);
 },
 
-
-
     addOrUpdateConversation(state, action) {
       const convo = action.payload;
       const id = convo.threadId || convo.requestId;

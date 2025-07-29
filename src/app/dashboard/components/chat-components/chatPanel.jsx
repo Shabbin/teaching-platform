@@ -10,7 +10,7 @@ import {
 } from '../../../redux/chatSlice';
 import {
   fetchMessagesThunk,
-  sendMessageThunk,
+
 } from '../../../redux/chatThunks';
 
 export default function ChatPanel({ chat, user, sendMessage, onApprove, onReject }) {
@@ -21,11 +21,11 @@ export default function ChatPanel({ chat, user, sendMessage, onApprove, onReject
   const { sendMessage: socketSendMessage, joinThread } = useSocket(chat?.threadId);
 
   // Debug logs
-  console.log('🔄 ChatPanel render');
-  console.log('🧾 Props -> chat:', chat);
-  console.log('🧑‍💼 Props -> user:', user);
-  console.log('🧵 Current threadId:', chat?.threadId);
-  console.log('📨 Existing messages:', messages);
+  // console.log('🔄 ChatPanel render');
+  // console.log('🧾 Props -> chat:', chat);
+  // console.log('🧑‍💼 Props -> user:', user);
+  // console.log('🧵 Current threadId:', chat?.threadId);
+  // console.log('📨 Existing messages:', messages);
   
 
   const latestMessagesRef = useRef(messages);
