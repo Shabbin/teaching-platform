@@ -1,5 +1,4 @@
 'use client';
-//student\components\tuitionRequestComponent.jsx
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { sendTuitionRequest, clearMessages } from '../../../redux/requestSlice';
@@ -12,18 +11,12 @@ export default function TuitionRequestModal({ teacherId, postId, onClose, onSucc
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!message.trim()) {
       alert('Message is required');
       return;
     }
 
-    // Dispatch action with correct payload keys for tuition request
-    const result = await dispatch(sendTuitionRequest({
-      teacherId,  // matches backend "teacherId"
-      postId,     // postId for tuition post
-      message,    // message string
-    }));
+    const result = await dispatch(sendTuitionRequest({ teacherId, postId, message }));
 
     if (sendTuitionRequest.fulfilled.match(result)) {
       dispatch(clearMessages());
@@ -39,32 +32,44 @@ export default function TuitionRequestModal({ teacherId, postId, onClose, onSucc
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <h2 className="text-xl font-semibold mb-4">Request Tuition</h2>
-        <form onSubmit={handleSubmit}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm transition-all">
+      <div className="relative w-full max-w-lg mx-4 sm:mx-auto bg-white rounded-2xl shadow-xl p-6 sm:p-8 animate-fade-in">
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition"
+        >
+          ✕
+        </button>
+
+        <h2 className="text-2xl font-semibold text-gray-800 mb-2">Request Tuition</h2>
+        <p className="text-gray-500 mb-4">
+          Send a message to the teacher explaining your needs. Be clear and polite!
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <textarea
-            className="w-full p-2 border rounded mb-4"
-            rows={5}
-            placeholder="Write your message here..."
+            className="w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            rows={6}
+            placeholder="Write your message..."
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            required
           />
-          {error && <p className="text-red-600 mb-2">{error}</p>}
-          {successMessage && <p className="text-green-600 mb-2">{successMessage}</p>}
-          <div className="flex justify-end gap-3">
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
+
+          <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 border rounded hover:bg-gray-100"
+              className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-100 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              className="px-5 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {loading ? 'Sending...' : 'Send Request'}
             </button>

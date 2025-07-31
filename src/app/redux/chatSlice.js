@@ -1,5 +1,4 @@
-// redux/chatSlice.js
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 const initialState = {
   conversations: [],
@@ -8,7 +7,7 @@ const initialState = {
   error: null,
 };
 
-// 🔁 Deduplicates messages by _id or fallback
+// Deduplicates messages by _id or fallback
 function deduplicateMessages(messages) {
   const seen = new Set();
   return messages.filter((msg) => {
@@ -19,7 +18,7 @@ function deduplicateMessages(messages) {
   });
 }
 
-// 🧠 Sort helper for conversations
+// Sort helper for conversations by latest message timestamp
 function sortConversationsByLatest(convos) {
   return convos.slice().sort((a, b) => {
     const dateA = new Date(a.lastMessageTimestamp || 0);
@@ -28,129 +27,192 @@ function sortConversationsByLatest(convos) {
   });
 }
 
+// Async thunk to mark thread as read (already exists)
+export const markThreadAsRead = createAsyncThunk(
+  'chat/markThreadAsRead',
+  async ({ threadId, userId }, thunkAPI) => {
+    try {
+      const response = await fetch('/api/chat/markRead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId, userId }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to mark thread as read');
+      }
+      return { threadId, userId };
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.message);
+    }
+  }
+);
+
 const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
-setConversations(state, action) {
-  const normalized = action.payload.map((convo) => {
-    let lastMessage = convo.lastMessage;
+    setConversations(state, action) {
+      const normalized = action.payload.map((convo) => {
+        let lastMessage = convo.lastMessage;
 
-    if (lastMessage && typeof lastMessage !== 'string') {
-      lastMessage = lastMessage.text || lastMessage.content || '';
-    } else if (typeof lastMessage === 'string') {
-      lastMessage = lastMessage;
-    }
+        if (lastMessage && typeof lastMessage !== 'string') {
+          lastMessage = lastMessage.text || lastMessage.content || '';
+        } else if (typeof lastMessage === 'string') {
+          lastMessage = lastMessage;
+        }
 
-    const lastTimestamp =
-      convo.lastMessage?.timestamp ||
-      convo.lastMessage?.createdAt ||
-      convo.lastMessageTimestamp ||
-      null;
+        const lastTimestamp =
+          convo.lastMessage?.timestamp ||
+          convo.lastMessage?.createdAt ||
+          convo.lastMessageTimestamp ||
+          null;
 
-    return {
-      ...convo,
-      lastMessage,
-      lastMessageTimestamp: lastTimestamp,
-    };
-  });
+        return {
+          ...convo,
+          lastMessage,
+          lastMessageTimestamp: lastTimestamp,
+          unreadCount: convo.unreadCount || 0,  // ensure unreadCount is present
+        };
+      });
 
-  console.log("Normalized conversations after refresh:", normalized);
+      console.log("Normalized conversations after refresh:", normalized);
 
-  state.conversations = sortConversationsByLatest(normalized);
+      state.conversations = sortConversationsByLatest(normalized);
+    },
+setCurrentThreadId(state, action) {
+  state.currentThreadId = action.payload;
 },
+    addOrUpdateConversation(state, action) {
+      const convo = action.payload;
+      const id = convo.threadId || convo._id || convo.requestId;
 
-addOrUpdateConversation(state, action) {
-  const convo = action.payload;
-  const id = convo.threadId || convo._id || convo.requestId;
+      let lastMessage = convo.lastMessage;
+      if (lastMessage && typeof lastMessage !== 'string') {
+        lastMessage = lastMessage.text || '';
+      }
 
-  let lastMessage = convo.lastMessage;
-  if (lastMessage && typeof lastMessage !== 'string') {
-    lastMessage = lastMessage.text || '';
-  }
+      const lastTimestampRaw =
+        convo.lastMessage?.timestamp ||
+        convo.lastMessage?.createdAt ||
+        convo.lastMessageTimestamp ||
+        convo.updatedAt ||
+        convo.messages?.at(-1)?.timestamp ||
+        null;
 
-  const lastTimestampRaw =
-    convo.lastMessage?.timestamp ||
-    convo.lastMessage?.createdAt ||
-    convo.lastMessageTimestamp ||
-    convo.updatedAt ||
-    convo.messages?.at(-1)?.timestamp ||
-    null;
+      const lastMessageTimestamp = lastTimestampRaw ? new Date(lastTimestampRaw).toISOString() : null;
 
-  const lastMessageTimestamp = lastTimestampRaw ? new Date(lastTimestampRaw).toISOString() : null;
+      const existingIndex = state.conversations.findIndex(
+        (c) => (c.threadId || c._id || c.requestId) === id
+      );
 
-  const existingIndex = state.conversations.findIndex(
-    (c) => (c.threadId || c._id || c.requestId) === id
-  );
+      if (existingIndex === -1) {
+        // New conversation: add normalized, ensure unreadCount defaults to 0
+        const normalizedConvo = {
+          ...convo,
+          threadId: id,
+          lastMessage,
+          lastMessageTimestamp,
+          unreadCount: convo.unreadCount || 0,
+        };
+        state.conversations.push(normalizedConvo);
+      } else {
+        // Merge carefully, including unreadCount
+        const existingConvo = state.conversations[existingIndex];
 
-  if (existingIndex === -1) {
-    // New conversation: add normalized
-    const normalizedConvo = {
-      ...convo,
-      threadId: id,
-      lastMessage,
-      lastMessageTimestamp,
-    };
-    state.conversations.push(normalizedConvo);
-  } else {
-    // Merge with care to not overwrite arrays (messages, participants)
-    const existingConvo = state.conversations[existingIndex];
+        const mergedConvo = {
+          ...existingConvo,
+          ...convo,
+          threadId: id,
+          lastMessage,
+          lastMessageTimestamp,
+          unreadCount:
+            convo.unreadCount !== undefined
+              ? convo.unreadCount
+              : existingConvo.unreadCount || 0,
+          messages: convo.messages || existingConvo.messages,
+          participants: convo.participants || existingConvo.participants,
+          sessions: convo.sessions || existingConvo.sessions,
+        };
 
-    const mergedConvo = {
-      ...existingConvo,
-      ...convo,
-      threadId: id,
-      lastMessage,
-      lastMessageTimestamp,
-      messages: convo.messages || existingConvo.messages,
-      participants: convo.participants || existingConvo.participants,
-      sessions: convo.sessions || existingConvo.sessions,
-    };
+        state.conversations[existingIndex] = mergedConvo;
+      }
 
-    state.conversations[existingIndex] = mergedConvo;
-  }
+      state.conversations = sortConversationsByLatest(state.conversations);
+    },
 
-  state.conversations = sortConversationsByLatest(state.conversations);
-},
-
-
+    // New reducer to increment unread count for a conversation by threadId
+    incrementUnreadCount(state, action) {
+      const { threadId } = action.payload;
+      const convo = state.conversations.find((c) => c.threadId === threadId);
+      if (convo) {
+        convo.unreadCount = (convo.unreadCount || 0) + 1;
+      }
+    },
 
     setMessagesForThread(state, action) {
       const { threadId, messages } = action.payload;
       state.messagesByThread[threadId] = deduplicateMessages(messages);
     },
 
-    addMessageToThread(state, action) {
-      const { threadId, message } = action.payload;
-      if (!state.messagesByThread[threadId]) {
-        state.messagesByThread[threadId] = [];
-      }
-
-      const messageId = message._id || `${message.text}-${message.timestamp}`;
-      const exists = state.messagesByThread[threadId].some((m) => {
-        const existingId = m._id || `${m.text}-${m.timestamp}`;
-        return existingId === messageId;
-      });
-
-      if (!exists) {
-        state.messagesByThread[threadId].push(message);
-      }
-    },
-
-updateLastMessageInConversation: (state, action) => {
+  addMessageToThread(state, action) {
   const { threadId, message } = action.payload;
-  const conversation = state.conversations.find(c => c.threadId === threadId);
-  if (conversation) {
-    conversation.lastMessage = message.text || '';
-    
-    // Normalize timestamp: ensure it's a valid Date or ISO string
-    const ts = message.timestamp || new Date().toISOString();
-    conversation.lastMessageTimestamp = new Date(ts).toISOString();
 
-    state.conversations = [...sortConversationsByLatest(state.conversations)];
+  if (!message || !threadId) {
+    // Defensive: ignore if message or threadId is missing
+    return;
+  }
+
+  if (!state.messagesByThread[threadId]) {
+    state.messagesByThread[threadId] = [];
+  }
+
+  // Defensive: make sure message has _id or text and timestamp before generating ID
+  const messageId =
+    (typeof message._id === 'string' && message._id) ||
+    (typeof message.text === 'string' && message.timestamp
+      ? `${message.text}-${message.timestamp}`
+      : null);
+
+  if (!messageId) {
+    // Invalid message id, ignore this message
+    return;
+  }
+
+  const exists = state.messagesByThread[threadId].some((m) => {
+    const existingId =
+      (typeof m._id === 'string' && m._id) ||
+      (typeof m.text === 'string' && m.timestamp
+        ? `${m.text}-${m.timestamp}`
+        : null);
+    return existingId === messageId;
+  });
+
+  if (!exists) {
+    state.messagesByThread[threadId].push(message);
   }
 },
 
+
+    updateLastMessageInConversation(state, action) {
+      const { threadId, message } = action.payload;
+      const conversation = state.conversations.find(c => c.threadId === threadId);
+      if (conversation) {
+        conversation.lastMessage = message.text || '';
+
+        // Normalize timestamp: ensure it's a valid Date or ISO string
+        const ts = message.timestamp || new Date().toISOString();
+        conversation.lastMessageTimestamp = new Date(ts).toISOString();
+
+        state.conversations = [...sortConversationsByLatest(state.conversations)];
+      }
+    },
+resetUnreadCount(state, action) {
+  const { threadId } = action.payload;
+  const convo = state.conversations.find((c) => c.threadId === threadId);
+  if (convo) {
+    convo.unreadCount = 0;
+  }
+},
     updateConversationStatus(state, action) {
       const { requestId, status } = action.payload;
 
@@ -173,16 +235,33 @@ updateLastMessageInConversation: (state, action) => {
       state.error = action.payload;
     },
   },
+
+  extraReducers: (builder) => {
+    builder
+      .addCase(markThreadAsRead.fulfilled, (state, action) => {
+        const { threadId } = action.payload;
+        const convo = state.conversations.find(c => c.threadId === threadId);
+        if (convo) {
+          convo.unreadCount = 0;  // reset unread count locally
+        }
+      })
+      .addCase(markThreadAsRead.rejected, (state, action) => {
+        state.error = action.payload || 'Failed to mark thread as read';
+      });
+  },
 });
 
 export const {
   setConversations,
   addOrUpdateConversation,
+  incrementUnreadCount,
   setMessagesForThread,
   addMessageToThread,
   updateConversationStatus,
   clearMessagesForThread,
   updateLastMessageInConversation,
+    resetUnreadCount,
+    setCurrentThreadId,
   setLoading,
   setError,
 } = chatSlice.actions;

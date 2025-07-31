@@ -6,11 +6,11 @@ import MessageBubble from './MessageBubble';
 import useSocket from '../../../hooks/useSocket';
 import {
   clearMessagesForThread as clearMessagesAction,
-  addMessageToThread as addMessageAction,
+  addMessageToThread as resetUnreadCount
 } from '../../../redux/chatSlice';
 import {
   fetchMessagesThunk,
-
+    // << import thunk here
 } from '../../../redux/chatThunks';
 
 export default function ChatPanel({ chat, user, onApprove, onReject }) {
@@ -18,15 +18,8 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
   const messages = useSelector((state) => state.chat.messagesByThread[chat?.threadId] || []);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef();
-  const { sendMessage: socketSendMessage, joinThread } = useSocket(chat?.threadId);
-
-  // Debug logs
-  // console.log('🔄 ChatPanel render');
-  // console.log('🧾 Props -> chat:', chat);
-  // console.log('🧑‍💼 Props -> user:', user);
-  // console.log('🧵 Current threadId:', chat?.threadId);
-  // console.log('📨 Existing messages:', messages);
-  
+  const { sendMessage: socketSendMessage, joinThread, socketRef } = useSocket(chat?.threadId); 
+  // ^-- added socketRef here, adjust your hook export if needed (see note below)
 
   const latestMessagesRef = useRef(messages);
   useEffect(() => {
@@ -39,19 +32,27 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
 
   useEffect(() => {
     if (!chat?.threadId || chat.status !== 'approved') {
-      console.log('⛔ No valid threadId or chat not approved. Clearing messages...');
       if (chat?.threadId) dispatch(clearMessagesAction(chat.threadId));
       return;
     }
 
-    console.log('📥 Fetching messages for thread:', chat.threadId);
     dispatch(clearMessagesAction(chat.threadId));
     dispatch(fetchMessagesThunk(chat.threadId));
-  }, [chat?.threadId, chat?.status, dispatch]);
+
+    // --- NEW: Mark thread read on load ---
+    dispatch(resetUnreadCount({ threadId: chat.threadId, userId: user?._id || user?.id }));
+
+    // Also emit event via socket if socketRef available
+    if (socketRef && socketRef.current) {
+      socketRef.current.emit('mark_thread_read', {
+        threadId: chat.threadId,
+        userId: user?._id || user?.id,
+      });
+    }
+  }, [chat?.threadId, chat?.status, dispatch, user, socketRef]);
 
   useEffect(() => {
     if (chat?.threadId && joinThread) {
-      console.log('🔌 Joining socket thread:', chat.threadId);
       joinThread(chat.threadId);
     }
   }, [chat?.threadId, joinThread]);
@@ -68,13 +69,21 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
       timestamp: new Date().toISOString(),
     };
 
-    console.log('📤 Sending message:', messageData);
-
     try {
       socketSendMessage(messageData);
       setNewMessage('');
+
+      // --- NEW: Mark thread read on send message ---
+      dispatch(resetUnreadCount({ threadId: chat.threadId, userId: user?._id || user?.id }));
+
+      if (socketRef && socketRef.current) {
+        socketRef.current.emit('mark_thread_read', {
+          threadId: chat.threadId,
+          userId: user?._id || user?.id,
+        });
+      }
     } catch (err) {
-      console.error('❌ Failed to send message:', err);
+      console.error('Failed to send message:', err);
     }
   };
 
@@ -87,7 +96,6 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
   };
 
   if (!chat) {
-    console.log('❕ No chat selected');
     return <p className="p-4 text-gray-500">Select a conversation to view messages.</p>;
   }
 
@@ -100,8 +108,6 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
     chat.teacherName ||
     chat.participants?.find((p) => p && p._id !== currentUserId)?.name ||
     'No Name';
-
-  console.log('📛 Chat name resolved:', chatName);
 
   return (
     <div className="flex-1 p-4 flex flex-col justify-between bg-gray-50">
@@ -120,19 +126,13 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
               ) : (
                 <div className="space-x-4">
                   <button
-                    onClick={() => {
-                      console.log('✅ Approve clicked for requestId:', chat.requestId);
-                      onApprove(chat.requestId);
-                    }}
+                    onClick={() => onApprove(chat.requestId)}
                     className="px-4 py-1 bg-green-500 text-white rounded"
                   >
                     Approve
                   </button>
                   <button
-                    onClick={() => {
-                      console.log('❌ Reject clicked for requestId:', chat.requestId);
-                      onReject(chat.requestId);
-                    }}
+                    onClick={() => onReject(chat.requestId)}
                     className="px-4 py-1 bg-red-500 text-white rounded"
                   >
                     Reject

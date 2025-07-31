@@ -3,8 +3,17 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
-import { setLoading, setError, addOrUpdateConversation, updateLastMessageInConversation } from '../../../redux/chatSlice';
-import { fetchConversationsThunk, approveRequestThunk } from '../../../redux/chatThunks';
+import {
+  setLoading,
+  setError,
+  addOrUpdateConversation,
+  updateLastMessageInConversation,
+} from '../../../redux/chatSlice';
+import {
+  fetchConversationsThunk,
+  approveRequestThunk,
+  markThreadAsRead,
+} from '../../../redux/chatThunks'; // <-- import markThreadAsRead
 import useSocket from '../../../hooks/useSocket';
 
 export default function MessengerPopup({ role: propRole }) {
@@ -57,23 +66,24 @@ export default function MessengerPopup({ role: propRole }) {
 
   // Called when a new message arrives via socket
   const handleNewMessage = (message) => {
-    // Update last message inside conversation in redux
-    dispatch(updateLastMessageInConversation({
-      threadId: message.threadId,
-      message: { text: message.text, timestamp: message.timestamp }
-    }));
+    dispatch(
+      updateLastMessageInConversation({
+        threadId: message.threadId,
+        message: { text: message.text, timestamp: message.timestamp },
+      })
+    );
 
-    // Update or add conversation with minimal info to update header immediately
-    dispatch(addOrUpdateConversation({
-      threadId: message.threadId,
-      lastMessage: message.text,
-      lastMessageTimestamp: message.timestamp,
-    }));
+    dispatch(
+      addOrUpdateConversation({
+        threadId: message.threadId,
+        lastMessage: message.text,
+        lastMessageTimestamp: message.timestamp,
+      })
+    );
   };
 
   // Called when full thread update arrives (from 'conversation_list_updated' event)
   const handleConversationListUpdate = (fullThread) => {
-    // Add or update conversation with full data from backend
     dispatch(addOrUpdateConversation(fullThread));
   };
 
@@ -83,7 +93,7 @@ export default function MessengerPopup({ role: propRole }) {
   // Join all conversation threads to get real-time updates anywhere
   useEffect(() => {
     if (!userId) return;
-    conversations.forEach(convo => {
+    conversations.forEach((convo) => {
       if (convo.threadId) {
         joinThread(convo.threadId);
       }
@@ -94,7 +104,6 @@ export default function MessengerPopup({ role: propRole }) {
   const handleApprove = async (requestId) => {
     try {
       await dispatch(approveRequestThunk(requestId)).unwrap();
-      // Refresh conversations after approve
       fetchConversations();
     } catch (error) {
       console.error('Approve request failed:', error);
@@ -108,7 +117,6 @@ export default function MessengerPopup({ role: propRole }) {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Refresh conversations after reject
       fetchConversations();
     } catch (err) {
       console.error('Reject request failed:', err);
@@ -196,8 +204,19 @@ export default function MessengerPopup({ role: propRole }) {
                 <div
                   key={chat.threadId || chat.requestId || index}
                   className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100 transition"
-                  onClick={() => {
+                  onClick={async () => {
                     setOpen(false);
+
+                    if (chat.threadId && userId) {
+                      try {
+                        await dispatch(
+                          markThreadAsRead({ threadId: chat.threadId, userId })
+                        );
+                      } catch (err) {
+                        console.error('Failed to mark thread as read:', err);
+                      }
+                    }
+
                     router.push(
                       role === 'teacher'
                         ? `/dashboard/${role}/messenger/${chat.threadId || chat.requestId}`

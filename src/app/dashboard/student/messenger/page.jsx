@@ -1,15 +1,16 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import ConversationList from '../../components/chat-components/conversationList';
-import ChatPanel from '../../components/chat-components/chatPanel';
+import { useDispatch, useSelector } from 'react-redux';
 import useSocket from '../../../hooks/useSocket';
 import {
   addOrUpdateConversation,
-
+  setCurrentThreadId,
+  resetUnreadCount,
 } from '../../../redux/chatSlice';
-import { fetchConversationsThunk,  } from '../../../redux/chatThunks';
+import { fetchConversationsThunk } from '../../../redux/chatThunks';
+import ConversationList from '../../components/chat-components/conversationList';
+import ChatPanel from '../../components/chat-components/chatPanel';
 
 export default function StudentMessengerPage() {
   const dispatch = useDispatch();
@@ -17,19 +18,17 @@ export default function StudentMessengerPage() {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const studentId = user?.id || user?._id;
 
-  // Use conversations from Redux chat slice
- const conversations = useSelector((state) => {
-  const baseConversations = state.chat.conversations || [];
-  const lastMessages = state.chat.lastMessagesByThread || {};
-  const statuses = state.chat.conversationStatusesById || {};
+  const conversations = useSelector((state) => {
+    const base = state.chat.conversations || [];
+    const lastMessages = state.chat.lastMessagesByThread || {};
+    const statuses = state.chat.conversationStatusesById || {};
 
-  return baseConversations.map((conv) => ({
-    ...conv,
-    lastMessage: lastMessages[conv.threadId]?.text || conv.lastMessage,
-    status: statuses[conv.requestId] || conv.status,
-    // add other derived fields as needed, e.g. unread count
-  }));
-});
+    return base.map((conv) => ({
+      ...conv,
+      lastMessage: lastMessages[conv.threadId]?.text || conv.lastMessage,
+      status: statuses[conv.requestId] || conv.status,
+    }));
+  });
 
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -37,7 +36,6 @@ export default function StudentMessengerPage() {
 
   const hasFetchedRef = useRef(false);
 
-  // Deduplicate conversations by threadId to avoid duplicate keys and repeated UI entries
   const dedupedConversations = useMemo(() => {
     const map = new Map();
     conversations.forEach((c) => {
@@ -48,7 +46,6 @@ export default function StudentMessengerPage() {
     return Array.from(map.values());
   }, [conversations]);
 
-  // Fetch conversations using thunk
   const fetchConversations = useCallback(async () => {
     if (!studentId || !token) return;
     setLoading(true);
@@ -56,14 +53,11 @@ export default function StudentMessengerPage() {
 
     try {
       const convos = await dispatch(fetchConversationsThunk({ role: 'student', userId: studentId })).unwrap();
-      // Conversations are saved to Redux state by thunk's fulfilled reducer
-      // We just handle local UI here
 
       if (convos.length > 0) {
         if (!selectedChat) {
           setSelectedChat(convos[0]);
         } else {
-          // Update selectedChat with fresh data if available
           const updated = convos.find(c => c.threadId === selectedChat.threadId);
           if (updated) {
             setSelectedChat(updated);
@@ -74,6 +68,7 @@ export default function StudentMessengerPage() {
       } else {
         setSelectedChat(null);
       }
+
       hasFetchedRef.current = true;
     } catch (err) {
       setError(err.message || 'Failed to fetch conversations');
@@ -82,7 +77,7 @@ export default function StudentMessengerPage() {
     }
   }, [dispatch, token, studentId, selectedChat]);
 
-  // Socket callbacks
+  // --- Socket logic ---
   const handleNewMessage = (message) => {
     if (selectedChat && message.threadId === selectedChat.threadId) {
       setSelectedChat((prev) => ({
@@ -98,32 +93,27 @@ export default function StudentMessengerPage() {
     }));
   };
 
-  // Optional: If you want to handle request status update later, you can add handleRequestUpdate similar to teacher's
+  // Get joinThread, sendMessage, and emitMarkThreadRead from socket hook
+  const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(studentId, handleNewMessage);
 
-  // Initialize socket with callbacks
-  const { joinThread, sendMessage } = useSocket(studentId, handleNewMessage);
-
-  // Join socket room on selected chat change
   useEffect(() => {
     if (selectedChat?.threadId) {
       joinThread(selectedChat.threadId);
-      console.log('Joined thread:', selectedChat.threadId);
+      console.log('Student joined thread:', selectedChat.threadId);
     }
   }, [selectedChat, joinThread]);
 
-  // Fetch conversations on mount / token or studentId change
   useEffect(() => {
     if (studentId && token && !hasFetchedRef.current) {
       fetchConversations();
     }
   }, [studentId, token, fetchConversations]);
 
-  // When dedupedConversations changes, validate selectedChat still exists
   useEffect(() => {
     if (dedupedConversations.length === 0) {
       if (selectedChat !== null) {
         setSelectedChat(null);
-        console.log('No conversations available, clearing selectedChat');
+        console.log('No conversations, cleared selectedChat');
       }
       return;
     }
@@ -133,6 +123,24 @@ export default function StudentMessengerPage() {
     }
   }, [dedupedConversations, selectedChat]);
 
+  // Reset unread count and notify server when selecting a chat
+  const handleSelectChat = (selected) => {
+    const full = conversations.find((c) => c.threadId === selected.threadId);
+    const finalSelection = full || selected;
+
+    if (!full) {
+      console.warn('Could not find full conversation for:', selected.threadId);
+    }
+
+    setSelectedChat(finalSelection);
+    dispatch(setCurrentThreadId(finalSelection.threadId));
+  dispatch(resetUnreadCount({ threadId: finalSelection.threadId }));  // Reset unread count locally
+
+    if (emitMarkThreadRead) {
+      emitMarkThreadRead(finalSelection.threadId); // Notify server/others that this thread is read
+    }
+  };
+
   if (loading) return <p className="p-4">Loading conversations...</p>;
   if (error) return <p className="p-4 text-red-600">Error: {error}</p>;
 
@@ -141,7 +149,7 @@ export default function StudentMessengerPage() {
       <ConversationList
         conversations={dedupedConversations}
         selectedChatId={selectedChat?.threadId}
-        onSelect={setSelectedChat}
+        onSelect={handleSelectChat}
         userId={studentId}
         isStudent={true}
       />

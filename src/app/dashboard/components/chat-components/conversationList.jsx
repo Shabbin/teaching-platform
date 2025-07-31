@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React from 'react';
 import { useSelector } from 'react-redux';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -7,7 +7,11 @@ export default function ConversationList({ conversations, selectedChatId, onSele
   const lastMessages = useSelector((state) => state.chat.lastMessagesByThread);
 
   return (
-    <aside className="w-1/3 border-r border-gray-200 p-4 bg-white overflow-y-auto relative">
+    <aside
+      className="w-1/3 border-r border-gray-200 p-4 bg-white overflow-y-auto relative"
+      role="list"
+      aria-label="Conversations"
+    >
       <h2 className="text-xl font-bold mb-4 select-none">Messages</h2>
       <ul className="space-y-2">
         {conversations.length === 0 && (
@@ -42,6 +46,9 @@ export default function ConversationList({ conversations, selectedChatId, onSele
           const threadKey = chat.threadId || chat.requestId || index;
           const isSelected = selectedChatId === threadKey;
 
+          // IMPORTANT: unreadCount should come from Redux state or be passed in props
+          const unreadCount = Number(chat.unreadCount) || 0;
+
           const lastMessageObj = lastMessages?.[threadKey];
           const lastMessageText = lastMessageObj?.text || chat.lastMessage || 'No messages yet';
 
@@ -53,7 +60,15 @@ export default function ConversationList({ conversations, selectedChatId, onSele
           return (
             <li
               key={threadKey}
+              role="listitem"
+              aria-selected={isSelected}
+              tabIndex={0}
               onClick={() => onSelect(chat)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  onSelect(chat);
+                }
+              }}
               className={`flex justify-between items-center p-3 rounded-lg cursor-pointer 
                 transition-transform transition-shadow duration-200
                 ${isSelected ? 'bg-blue-50 shadow-md' : 'hover:shadow-md hover:scale-[1.02]'}
@@ -66,12 +81,18 @@ export default function ConversationList({ conversations, selectedChatId, onSele
                   alt={displayName}
                   className={`w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 ${borderColorClass}`}
                 />
-                {chat.unreadCount > 0 && (
+                {/* Red dot indicator for unread */}
+                {unreadCount > 0 && (
                   <span className="absolute top-0 left-9 block h-3 w-3 rounded-full ring-2 ring-white bg-red-500" />
                 )}
                 <div className="min-w-0">
                   <div className="font-semibold text-lg truncate">{displayName}</div>
-                  <div className="text-sm text-gray-600 truncate line-clamp-2">
+                  <div
+                    className={`text-sm truncate line-clamp-2 ${
+                      unreadCount > 0 ? 'font-bold text-gray-900' : 'text-gray-600'
+                    }`}
+                    style={{ fontWeight: unreadCount > 0 ? '700' : '400' }}
+                  >
                     {status === 'pending' ? 'New tuition request' : lastMessageText}
                   </div>
                 </div>
@@ -87,9 +108,9 @@ export default function ConversationList({ conversations, selectedChatId, onSele
                 {timeAgo && (
                   <span className="text-xs text-gray-400 mt-1 select-none">{timeAgo}</span>
                 )}
-                {chat.unreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 mt-1 select-none">
-                    {chat.unreadCount > 5 ? '5+' : chat.unreadCount}
+                {unreadCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 mt-1 select-none font-semibold">
+                    {unreadCount > 5 ? '5+' : unreadCount}
                   </span>
                 )}
               </div>

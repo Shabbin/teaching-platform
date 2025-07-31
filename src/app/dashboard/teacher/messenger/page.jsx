@@ -6,9 +6,12 @@ import ConversationList from '../../components/chat-components/conversationList'
 import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
 import {
-  addOrUpdateConversation,
+  addMessageToThread,
   updateConversationStatus,
+  updateLastMessageInConversation,
   setConversations,
+  setCurrentThreadId,
+  resetUnreadCount,
 } from '../../../redux/chatSlice';
 import {
   fetchConversationsThunk,
@@ -66,19 +69,23 @@ export default function MessengerPage() {
       if (convos.length > 0) {
         if (!selectedChat) {
           setSelectedChat(convos[0]);
+          dispatch(setCurrentThreadId(convos[0].threadId)); // <-- sync on initial load
           console.log('Auto-selected first conversation:', convos[0]);
         } else {
           const updated = convos.find(c => c.threadId === selectedChat.threadId);
           if (updated) {
             setSelectedChat(updated);
+            dispatch(setCurrentThreadId(updated.threadId)); // <-- sync updated match
             console.log('Updated selectedChat with fresh data:', updated);
           } else {
             setSelectedChat(convos[0]);
+            dispatch(setCurrentThreadId(convos[0].threadId)); // <-- sync fallback
             console.log('Selected chat missing, switched to first conversation:', convos[0]);
           }
         }
       } else {
         setSelectedChat(null);
+        dispatch(setCurrentThreadId(null)); // <-- clear state when no chats
         console.log('No conversations found, cleared selection');
       }
     } catch (err) {
@@ -112,7 +119,6 @@ export default function MessengerPage() {
     }));
 
     dispatch(addMessageToThread({ threadId: message.threadId, message }));
-dispatch(updateLastMessageInConversation({ threadId: message.threadId, message }));
   };
 
   const handleRequestUpdate = async (updatedRequest) => {
@@ -128,7 +134,8 @@ dispatch(updateLastMessageInConversation({ threadId: message.threadId, message }
     }
   };
 
-  const { joinThread, sendMessage } = useSocket(teacherId, handleNewMessage, handleRequestUpdate);
+  // Get emitMarkThreadRead from useSocket
+  const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(teacherId, handleNewMessage, handleRequestUpdate);
 
   // Join selected chat thread on change (keep this)
   useEffect(() => {
@@ -215,12 +222,23 @@ dispatch(updateLastMessageInConversation({ threadId: message.threadId, message }
   if (loading) return <p className="p-4">Loading conversations...</p>;
   if (error) return <p className="p-4 text-red-600">Error: {error}</p>;
 
+  // On selecting a chat:
   const handleSelectChat = (selected) => {
     const full = conversations.find((c) => c.threadId === selected.threadId);
+    const finalSelection = full || selected;
+
     if (!full) {
       console.warn('Could not find full conversation for:', selected.threadId);
     }
-    setSelectedChat(full || selected);
+
+    setSelectedChat(finalSelection);
+    dispatch(setCurrentThreadId(finalSelection.threadId));
+   dispatch(resetUnreadCount({ threadId: finalSelection.threadId })); // reset unread count locally
+
+    // Notify server and other clients that this thread is read by this user
+    if (emitMarkThreadRead) {
+      emitMarkThreadRead(finalSelection.threadId);
+    }
   };
 
   return (
