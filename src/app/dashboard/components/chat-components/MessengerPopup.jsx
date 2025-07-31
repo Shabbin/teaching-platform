@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
-import { setLoading, setError } from '../../../redux/chatSlice';
+import { setLoading, setError, addOrUpdateConversation, updateLastMessageInConversation } from '../../../redux/chatSlice';
 import { fetchConversationsThunk, approveRequestThunk } from '../../../redux/chatThunks';
+import useSocket from '../../../hooks/useSocket';
 
 export default function MessengerPopup({ role: propRole }) {
   const user = useSelector((state) => state.user.userInfo);
@@ -19,27 +20,13 @@ export default function MessengerPopup({ role: propRole }) {
   const router = useRouter();
   const dispatch = useDispatch();
 
-  const userId = user?.id;
+  const userId = user?.id || user?._id;
   const role = propRole || user?.role || 'teacher';
 
   // Load token once
   useEffect(() => {
     setToken(localStorage.getItem('token'));
   }, []);
-
-  // Fetch conversations on mount if closed and no conversations
-  useEffect(() => {
-    if (!open && token && userId && conversations.length === 0) {
-      fetchConversations();
-    }
-  }, [open, token, userId, conversations.length]);
-
-  // Fetch conversations when popup opens
-  useEffect(() => {
-    if (open && token && userId) {
-      fetchConversations();
-    }
-  }, [open, token, userId]);
 
   // Fetch conversations using centralized thunk
   const fetchConversations = useCallback(async () => {
@@ -56,11 +43,58 @@ export default function MessengerPopup({ role: propRole }) {
     }
   }, [dispatch, token, userId, role]);
 
+  useEffect(() => {
+    if (!token || !userId) return;
+
+    if (open) {
+      fetchConversations();
+    } else if (conversations.length === 0) {
+      fetchConversations();
+    }
+  }, [open, token, userId, conversations.length, fetchConversations]);
+
+  // --- SOCKET HANDLERS ---
+
+  // Called when a new message arrives via socket
+  const handleNewMessage = (message) => {
+    // Update last message inside conversation in redux
+    dispatch(updateLastMessageInConversation({
+      threadId: message.threadId,
+      message: { text: message.text, timestamp: message.timestamp }
+    }));
+
+    // Update or add conversation with minimal info to update header immediately
+    dispatch(addOrUpdateConversation({
+      threadId: message.threadId,
+      lastMessage: message.text,
+      lastMessageTimestamp: message.timestamp,
+    }));
+  };
+
+  // Called when full thread update arrives (from 'conversation_list_updated' event)
+  const handleConversationListUpdate = (fullThread) => {
+    // Add or update conversation with full data from backend
+    dispatch(addOrUpdateConversation(fullThread));
+  };
+
+  // Initialize socket with the handlers
+  const { joinThread } = useSocket(userId, handleNewMessage, null, handleConversationListUpdate);
+
+  // Join all conversation threads to get real-time updates anywhere
+  useEffect(() => {
+    if (!userId) return;
+    conversations.forEach(convo => {
+      if (convo.threadId) {
+        joinThread(convo.threadId);
+      }
+    });
+  }, [conversations, joinThread, userId]);
+
   // Approve request handler
   const handleApprove = async (requestId) => {
     try {
       await dispatch(approveRequestThunk(requestId)).unwrap();
-      // After approve, refresh conversations to update UI
+      // Refresh conversations after approve
       fetchConversations();
     } catch (error) {
       console.error('Approve request failed:', error);
@@ -74,23 +108,23 @@ export default function MessengerPopup({ role: propRole }) {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      // After reject, refresh conversations to update UI
+      // Refresh conversations after reject
       fetchConversations();
     } catch (err) {
       console.error('Reject request failed:', err);
     }
   };
 
-  // Avatar helper unchanged
-const getAvatar = (conv) => {
-  if (conv.profileImage) return conv.profileImage;
-  if (conv.participantProfileImage) return conv.participantProfileImage;
-  if (conv.studentProfileImage) return conv.studentProfileImage;
-  if (conv.teacherProfileImage) return conv.teacherProfileImage;
+  // Avatar helper (your existing code)
+  const getAvatar = (conv) => {
+    if (conv.profileImage) return conv.profileImage;
+    if (conv.participantProfileImage) return conv.participantProfileImage;
+    if (conv.studentProfileImage) return conv.studentProfileImage;
+    if (conv.teacherProfileImage) return conv.teacherProfileImage;
 
-  const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
-  return `https://i.pravatar.cc/150?u=${fallbackId}`;
-};
+    const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
+    return `https://i.pravatar.cc/150?u=${fallbackId}`;
+  };
 
   // Filter conversations by search term
   const filteredConversations = conversations.filter((conv) => {

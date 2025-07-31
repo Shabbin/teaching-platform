@@ -30,9 +30,10 @@ export default function ConversationList({ conversations, selectedChatId, onSele
             rejected: 'bg-red-100 text-red-800',
             pending: 'bg-yellow-100 text-yellow-800',
           };
-          const statusClass = statusColors[chat.status] || 'bg-gray-100 text-gray-600';
+          const status = chat.status || 'pending';
+          const statusClass = statusColors[status] || 'bg-gray-100 text-gray-600';
 
-          const threadKey = chat.threadId || chat.requestId;
+          const threadKey = chat.threadId || chat.requestId || index;
           const isSelected = selectedChatId === threadKey;
 
           const lastMessageObj = lastMessages?.[threadKey]; // ✅ redux-driven last message
@@ -40,7 +41,7 @@ export default function ConversationList({ conversations, selectedChatId, onSele
 
           return (
             <li
-              key={threadKey || index}
+              key={threadKey}
               onClick={() => onSelect(chat)}
               className={`flex justify-between items-center p-2 rounded cursor-pointer hover:bg-gray-100 transition ${
                 isSelected ? 'bg-gray-100' : ''
@@ -59,9 +60,7 @@ export default function ConversationList({ conversations, selectedChatId, onSele
                 <div className="min-w-0">
                   <div className="font-semibold truncate">{displayName}</div>
                   <div className="text-sm text-gray-500 truncate">
-                    {chat.status === 'pending'
-                      ? 'New tuition request'
-                      : lastMessageText}
+                    {status === 'pending' ? 'New tuition request' : lastMessageText}
                   </div>
                 </div>
 
@@ -78,15 +77,9 @@ export default function ConversationList({ conversations, selectedChatId, onSele
                       <div>
                         <div className="font-semibold text-lg">{displayName}</div>
                         <div
-                          className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                            chat.status === 'approved'
-                              ? 'bg-green-100 text-green-800'
-                              : chat.status === 'rejected'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}
+                          className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${statusClass}`}
                         >
-                          {chat.status}
+                          {status}
                         </div>
                       </div>
                     </div>
@@ -103,7 +96,7 @@ export default function ConversationList({ conversations, selectedChatId, onSele
                 <span
                   className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${statusClass}`}
                 >
-                  {chat.status}
+                  {status}
                 </span>
 
                 {chat.unreadCount > 0 && (

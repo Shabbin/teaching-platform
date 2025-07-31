@@ -60,40 +60,60 @@ setConversations(state, action) {
   state.conversations = sortConversationsByLatest(normalized);
 },
 
-    addOrUpdateConversation(state, action) {
-      const convo = action.payload;
-      const id = convo.threadId || convo.requestId;
+addOrUpdateConversation(state, action) {
+  const convo = action.payload;
+  const id = convo.threadId || convo._id || convo.requestId;
 
-      let lastMessage = convo.lastMessage;
-      if (lastMessage && typeof lastMessage !== 'string') {
-        lastMessage = lastMessage.text || '';
-      }
+  let lastMessage = convo.lastMessage;
+  if (lastMessage && typeof lastMessage !== 'string') {
+    lastMessage = lastMessage.text || '';
+  }
 
-      const lastTimestamp =
-  convo.lastMessage?.timestamp ||
-  convo.lastMessage?.createdAt ||
-  convo.lastMessageTimestamp ||
-  convo.messages?.at(-1)?.timestamp ||
-  null;
+  const lastTimestampRaw =
+    convo.lastMessage?.timestamp ||
+    convo.lastMessage?.createdAt ||
+    convo.lastMessageTimestamp ||
+    convo.updatedAt ||
+    convo.messages?.at(-1)?.timestamp ||
+    null;
 
-      const normalizedConvo = {
-        ...convo,
-        lastMessage,
-        lastMessageTimestamp: lastTimestamp,
-      };
+  const lastMessageTimestamp = lastTimestampRaw ? new Date(lastTimestampRaw).toISOString() : null;
 
-      const index = state.conversations.findIndex(
-        (c) => (c.threadId || c.requestId) === id
-      );
+  const existingIndex = state.conversations.findIndex(
+    (c) => (c.threadId || c._id || c.requestId) === id
+  );
 
-      if (index === -1) {
-        state.conversations.push(normalizedConvo);
-      } else {
-        state.conversations[index] = normalizedConvo;
-      }
+  if (existingIndex === -1) {
+    // New conversation: add normalized
+    const normalizedConvo = {
+      ...convo,
+      threadId: id,
+      lastMessage,
+      lastMessageTimestamp,
+    };
+    state.conversations.push(normalizedConvo);
+  } else {
+    // Merge with care to not overwrite arrays (messages, participants)
+    const existingConvo = state.conversations[existingIndex];
 
-      state.conversations = sortConversationsByLatest(state.conversations);
-    },
+    const mergedConvo = {
+      ...existingConvo,
+      ...convo,
+      threadId: id,
+      lastMessage,
+      lastMessageTimestamp,
+      messages: convo.messages || existingConvo.messages,
+      participants: convo.participants || existingConvo.participants,
+      sessions: convo.sessions || existingConvo.sessions,
+    };
+
+    state.conversations[existingIndex] = mergedConvo;
+  }
+
+  state.conversations = sortConversationsByLatest(state.conversations);
+},
+
+
 
     setMessagesForThread(state, action) {
       const { threadId, messages } = action.payload;
@@ -117,20 +137,19 @@ setConversations(state, action) {
       }
     },
 
-    updateLastMessageInConversation(state, action) {
-      const { threadId, message } = action.payload;
+updateLastMessageInConversation: (state, action) => {
+  const { threadId, message } = action.payload;
+  const conversation = state.conversations.find(c => c.threadId === threadId);
+  if (conversation) {
+    conversation.lastMessage = message.text || '';
+    
+    // Normalize timestamp: ensure it's a valid Date or ISO string
+    const ts = message.timestamp || new Date().toISOString();
+    conversation.lastMessageTimestamp = new Date(ts).toISOString();
 
-      const convo = state.conversations.find(
-        (c) => c.threadId === threadId || c.requestId === threadId
-      );
-
-      if (convo) {
-        convo.lastMessage = message.text || message.content || '';
-        convo.lastMessageTimestamp = message.timestamp || message.createdAt || new Date().toISOString();
-      }
-
-      state.conversations = sortConversationsByLatest(state.conversations);
-    },
+    state.conversations = [...sortConversationsByLatest(state.conversations)];
+  }
+},
 
     updateConversationStatus(state, action) {
       const { requestId, status } = action.payload;

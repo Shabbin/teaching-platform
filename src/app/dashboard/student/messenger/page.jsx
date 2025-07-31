@@ -18,7 +18,18 @@ export default function StudentMessengerPage() {
   const studentId = user?.id || user?._id;
 
   // Use conversations from Redux chat slice
-  const conversations = useSelector((state) => state.chat.conversations);
+ const conversations = useSelector((state) => {
+  const baseConversations = state.chat.conversations || [];
+  const lastMessages = state.chat.lastMessagesByThread || {};
+  const statuses = state.chat.conversationStatusesById || {};
+
+  return baseConversations.map((conv) => ({
+    ...conv,
+    lastMessage: lastMessages[conv.threadId]?.text || conv.lastMessage,
+    status: statuses[conv.requestId] || conv.status,
+    // add other derived fields as needed, e.g. unread count
+  }));
+});
 
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);

@@ -13,7 +13,7 @@ import {
 
 } from '../../../redux/chatThunks';
 
-export default function ChatPanel({ chat, user, sendMessage, onApprove, onReject }) {
+export default function ChatPanel({ chat, user, onApprove, onReject }) {
   const dispatch = useDispatch();
   const messages = useSelector((state) => state.chat.messagesByThread[chat?.threadId] || []);
   const [newMessage, setNewMessage] = useState('');
