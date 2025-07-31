@@ -1,11 +1,10 @@
 'use client';
 import React, { useState } from 'react';
-import { useSelector } from 'react-redux'; // ✅ get latest messages from chatSlice
+import { useSelector } from 'react-redux';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function ConversationList({ conversations, selectedChatId, onSelect }) {
-  const [hoveredChatId, setHoveredChatId] = useState(null);
-
-  const lastMessages = useSelector((state) => state.chat.lastMessagesByThread); // ✅ mapping of threadId => lastMessage
+  const lastMessages = useSelector((state) => state.chat.lastMessagesByThread);
 
   return (
     <aside className="w-1/3 border-r border-gray-200 p-4 bg-white overflow-y-auto relative">
@@ -30,75 +29,64 @@ export default function ConversationList({ conversations, selectedChatId, onSele
             rejected: 'bg-red-100 text-red-800',
             pending: 'bg-yellow-100 text-yellow-800',
           };
+          const borderColors = {
+            approved: 'border-green-400',
+            rejected: 'border-red-400',
+            pending: 'border-yellow-400',
+          };
+
           const status = chat.status || 'pending';
           const statusClass = statusColors[status] || 'bg-gray-100 text-gray-600';
+          const borderColorClass = borderColors[status] || 'border-gray-300';
 
           const threadKey = chat.threadId || chat.requestId || index;
           const isSelected = selectedChatId === threadKey;
 
-          const lastMessageObj = lastMessages?.[threadKey]; // ✅ redux-driven last message
+          const lastMessageObj = lastMessages?.[threadKey];
           const lastMessageText = lastMessageObj?.text || chat.lastMessage || 'No messages yet';
+
+          const lastUpdated = chat.updatedAt || chat.requestedAt;
+          const timeAgo = lastUpdated
+            ? formatDistanceToNow(new Date(lastUpdated), { addSuffix: true })
+            : '';
 
           return (
             <li
               key={threadKey}
               onClick={() => onSelect(chat)}
-              className={`flex justify-between items-center p-2 rounded cursor-pointer hover:bg-gray-100 transition ${
-                isSelected ? 'bg-gray-100' : ''
-              }`}
-              onMouseEnter={() => setHoveredChatId(threadKey)}
-              onMouseLeave={() => setHoveredChatId(null)}
+              className={`flex justify-between items-center p-3 rounded-lg cursor-pointer 
+                transition-transform transition-shadow duration-200
+                ${isSelected ? 'bg-blue-50 shadow-md' : 'hover:shadow-md hover:scale-[1.02]'}
+              `}
             >
               {/* Left: avatar and details */}
-              <div className="flex items-center space-x-3 min-w-0 relative">
+              <div className="relative flex items-center space-x-3 min-w-0">
                 <img
                   src={avatarUrl}
                   alt={displayName}
-                  className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                  loading="lazy"
+                  className={`w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 ${borderColorClass}`}
                 />
+                {chat.unreadCount > 0 && (
+                  <span className="absolute top-0 left-9 block h-3 w-3 rounded-full ring-2 ring-white bg-red-500" />
+                )}
                 <div className="min-w-0">
-                  <div className="font-semibold truncate">{displayName}</div>
-                  <div className="text-sm text-gray-500 truncate">
+                  <div className="font-semibold text-lg truncate">{displayName}</div>
+                  <div className="text-sm text-gray-600 truncate line-clamp-2">
                     {status === 'pending' ? 'New tuition request' : lastMessageText}
                   </div>
                 </div>
-
-                {/* Hover tooltip */}
-                {hoveredChatId === threadKey && (
-                  <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-50 text-sm text-gray-700">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <img
-                        src={avatarUrl}
-                        alt={displayName}
-                        className="w-12 h-12 rounded-full object-cover"
-                        loading="lazy"
-                      />
-                      <div>
-                        <div className="font-semibold text-lg">{displayName}</div>
-                        <div
-                          className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${statusClass}`}
-                        >
-                          {status}
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-semibold mb-1">Last message:</div>
-                      <p className="truncate">{lastMessageText}</p>
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Right: status badge and unread count */}
-              <div className="flex flex-col items-end min-w-[48px]">
+              {/* Right: status badge, timestamp and unread count */}
+              <div className="flex flex-col items-end min-w-[64px] text-right">
                 <span
                   className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${statusClass}`}
                 >
                   {status}
                 </span>
-
+                {timeAgo && (
+                  <span className="text-xs text-gray-400 mt-1 select-none">{timeAgo}</span>
+                )}
                 {chat.unreadCount > 0 && (
                   <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5 mt-1 select-none">
                     {chat.unreadCount > 5 ? '5+' : chat.unreadCount}

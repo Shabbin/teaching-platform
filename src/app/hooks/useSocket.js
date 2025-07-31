@@ -13,7 +13,15 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
   const socketRef = useRef();
   const dispatch = useDispatch();
 
-  // For example, current open chat thread
+  // Knock sound audio ref added here
+  const knockAudioRef = useRef(null);
+
+  // Initialize knock audio once on mount
+  useEffect(() => {
+    knockAudioRef.current = new Audio('/knock.mp3');  // Your existing file inside public/
+  }, []);
+
+  // Current open thread from redux
   const currentThreadId = useSelector((state) => state.chat.currentThreadId);
 
   useEffect(() => {
@@ -28,26 +36,32 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
     });
 
     socketRef.current.on('new_message', (message) => {
-      const senderId = typeof message.senderId === 'string' ? message.senderId : message.senderId?._id;
-      const isMyMessage = senderId === userId;
-      const isCurrentThread = currentThreadId === message.threadId;
+      // Normalize senderId and userId to strings for safe comparison
+      const senderId = typeof message.senderId === 'string' ? message.senderId : message.senderId?._id?.toString();
+      const myUserId = userId?.toString();
 
-      const state = dispatch.getState?.() || {}; // or import your store and call store.getState()
-      // Check if message already exists, skip duplicates
-      // You can add a similar deduplication here if needed
+      const isMyMessage = senderId === myUserId;
+      const isCurrentThread = currentThreadId === message.threadId;
 
       dispatch(addMessageToThread({ threadId: message.threadId, message }));
       dispatch(updateLastMessageInConversation({ threadId: message.threadId, message }));
+
+      // Play knock sound if message from others and user NOT viewing that thread
+      if (!isMyMessage && !isCurrentThread) {
+        knockAudioRef.current.play().catch((e) => {
+          console.warn('Audio play prevented:', e);
+        });
+      }
 
       if (!isMyMessage && !isCurrentThread && onNewMessage) {
         onNewMessage(message);
       }
     });
 
-  socketRef.current.on('conversation_list_updated', (fullThread) => {
-  console.log('[socket] conversation_list_updated received:', fullThread);
-  dispatch(addOrUpdateConversation(fullThread));
-});
+    socketRef.current.on('conversation_list_updated', (fullThread) => {
+      console.log('[socket] conversation_list_updated received:', fullThread);
+      dispatch(addOrUpdateConversation(fullThread));
+    });
 
     socketRef.current.on('new_message_alert', (alert) => {
       console.log('[useSocket] new_message_alert:', alert);
