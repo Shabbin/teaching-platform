@@ -40,7 +40,7 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
     dispatch(fetchMessagesThunk(chat.threadId));
 
     // --- NEW: Mark thread read on load ---
-    dispatch(resetUnreadCount({ threadId: chat.threadId, userId: user?._id || user?.id }));
+    // dispatch(resetUnreadCount({ threadId: chat.threadId, userId: user?._id || user?.id }));
 
     // Also emit event via socket if socketRef available
     if (socketRef && socketRef.current) {

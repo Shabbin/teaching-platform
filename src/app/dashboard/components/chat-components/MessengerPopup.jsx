@@ -15,6 +15,7 @@ import {
   markThreadAsRead,
 } from '../../../redux/chatThunks'; // <-- import markThreadAsRead
 import useSocket from '../../../hooks/useSocket';
+import { FiMessageCircle } from 'react-icons/fi';
 
 export default function MessengerPopup({ role: propRole }) {
   const user = useSelector((state) => state.user.userInfo);
@@ -31,6 +32,18 @@ export default function MessengerPopup({ role: propRole }) {
 
   const userId = user?.id || user?._id;
   const role = propRole || user?.role || 'teacher';
+
+  // NEW: Calculate count of distinct users with unread messages
+  const totalUnreadUsers = conversations.reduce((userSet, convo) => {
+    if (convo.unreadCount > 0 && convo.participants && convo.participants.length) {
+      convo.participants.forEach((p) => {
+        if (p._id && p._id.toString() !== userId) {
+          userSet.add(p._id.toString());
+        }
+      });
+    }
+    return userSet;
+  }, new Set()).size;
 
   // Load token once
   useEffect(() => {
@@ -149,11 +162,21 @@ export default function MessengerPopup({ role: propRole }) {
     <>
       <button
         onClick={() => setOpen(!open)}
-        className="text-gray-600 hover:text-indigo-600 "
+        className="relative text-gray-600 hover:text-indigo-600 focus:outline-none"
         aria-label="Toggle Messenger"
         title="Messenger"
       >
-        💬
+        <FiMessageCircle className="w-6 h-6" />
+
+        {/* Updated badge: distinct users with unread */}
+        {totalUnreadUsers > 0 && (
+          <span
+            className="absolute -top-1 -right-1 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full"
+            style={{ minWidth: '18px', height: '18px' }}
+          >
+            {totalUnreadUsers > 99 ? '99+' : totalUnreadUsers}
+          </span>
+        )}
       </button>
 
       {open && (

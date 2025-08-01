@@ -11,6 +11,7 @@ import {
 import { fetchConversationsThunk } from '../../../redux/chatThunks';
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
+import { playKnock } from '../../../utils/knock';
 
 export default function StudentMessengerPage() {
   const dispatch = useDispatch();
@@ -35,6 +36,9 @@ export default function StudentMessengerPage() {
   const [error, setError] = useState(null);
 
   const hasFetchedRef = useRef(false);
+
+  // Ref to store last knock timestamp for debounce
+  const lastKnockTimeRef = useRef(0);
 
   const dedupedConversations = useMemo(() => {
     const map = new Map();
@@ -77,12 +81,25 @@ export default function StudentMessengerPage() {
     }
   }, [dispatch, token, studentId, selectedChat]);
 
+  // Debounced knock sound function
+  function playKnockDebounced() {
+    const now = Date.now();
+    if (now - lastKnockTimeRef.current > 3000) { // 3 seconds debounce
+      playKnock();
+      lastKnockTimeRef.current = now;
+    }
+  }
+
   // --- Socket logic ---
   const handleNewMessage = (message) => {
-    const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
+    const currentThreadId = selectedChat?.threadId ? String(selectedChat.threadId) : null;
+    const messageThreadId = String(message.threadId);
 
-    if (isCurrentThread) {
-      // Update selected chat messages and last message directly
+    const isCurrentThread = currentThreadId === messageThreadId;
+
+    if (!isCurrentThread) {
+      playKnockDebounced();
+    } else {
       setSelectedChat((prev) => ({
         ...prev,
         lastMessage: message.text,
@@ -94,12 +111,11 @@ export default function StudentMessengerPage() {
       threadId: message.threadId,
       lastMessage: message.text,
       lastMessageTimestamp: message.timestamp,
-      incrementUnread: !isCurrentThread,  // Increment unread only if NOT current open thread
+      incrementUnread: !isCurrentThread,
       messages: [message],
     }));
   };
 
-  // Get joinThread, sendMessage, and emitMarkThreadRead from socket hook
   const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(studentId, handleNewMessage);
 
   useEffect(() => {
@@ -130,6 +146,16 @@ export default function StudentMessengerPage() {
   }, [dedupedConversations, selectedChat]);
 
   // Reset unread count and notify server when selecting a chat
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
+
+    if (emitMarkThreadRead) {
+      emitMarkThreadRead(selectedChat.threadId);
+    }
+  }, [selectedChat, dispatch, emitMarkThreadRead]);
+
   const handleSelectChat = (selected) => {
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
@@ -140,11 +166,6 @@ export default function StudentMessengerPage() {
 
     setSelectedChat(finalSelection);
     dispatch(setCurrentThreadId(finalSelection.threadId));
-    dispatch(resetUnreadCount({ threadId: finalSelection.threadId }));  // Reset unread count locally
-
-    if (emitMarkThreadRead) {
-      emitMarkThreadRead(finalSelection.threadId); // Notify server/others that this thread is read
-    }
   };
 
   if (loading) return <p className="p-4">Loading conversations...</p>;

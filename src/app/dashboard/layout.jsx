@@ -99,11 +99,12 @@ export default function DashboardLayout({ children }) {
         </nav>
 
         <div className="flex items-center space-x-4 relative" ref={dropdownRef}>
+            <MessengerPopup user={userInfo} role={userInfo?.role} />
           <button className="text-gray-600 hover:text-indigo-600">
             <Bell className="w-5 h-5" />
           </button>
 
-        <MessengerPopup user={userInfo} role={userInfo?.role} />
+      
 
           <img
             src={

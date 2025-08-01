@@ -6,13 +6,13 @@ import ConversationList from '../../components/chat-components/conversationList'
 import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
 import {
+  resetUnreadCount,
+  setCurrentThreadId,
+  setConversations,
+  addOrUpdateConversation,
+  updateLastMessageInConversation,
   addMessageToThread,
   updateConversationStatus,
-  updateLastMessageInConversation,
-  setConversations,
-  setCurrentThreadId,
-  resetUnreadCount,
-  addOrUpdateConversation,
 } from '../../../redux/chatSlice';
 import {
   fetchConversationsThunk,
@@ -34,8 +34,9 @@ export default function MessengerPage() {
 
   const hasFetchedRef = useRef(false);
   const joinedThreadsRef = useRef(new Set());
+  const lastKnockTimeRef = useRef(0);
 
-  // Deduplicate conversations and add isUnread flag
+  // Deduplicate and add unread flag
   const dedupedConversations = useMemo(() => {
     const map = new Map();
     conversations.forEach((c) => {
@@ -47,15 +48,11 @@ export default function MessengerPage() {
     const deduped = Array.from(map.values());
 
     const withUnread = deduped.map((conv) => {
-      // Find session for current user
       const mySession = conv.sessions?.find(
         (s) => s.userId?.toString() === teacherId?.toString()
       );
-
       const lastSeen = mySession?.lastSeen ? new Date(mySession.lastSeen) : null;
       const lastMsgTime = new Date(conv.lastMessageTimestamp || 0);
-
-      // If no lastSeen, consider unread, else compare timestamps
       const isUnread = lastSeen ? lastSeen < lastMsgTime : true;
 
       return {
@@ -73,10 +70,6 @@ export default function MessengerPage() {
     return withUnread;
   }, [conversations, teacherId]);
 
-  useEffect(() => {
-    console.log('Deduped conversations:', dedupedConversations);
-  }, [dedupedConversations]);
-
   const fetchConversations = useCallback(async () => {
     if (!teacherId || !token) return;
     setLoading(true);
@@ -84,29 +77,24 @@ export default function MessengerPage() {
 
     try {
       const convos = await dispatch(fetchConversationsThunk({ role: user.role, userId: teacherId })).unwrap();
-      console.log('Fetched conversations:', convos);
 
       if (convos.length > 0) {
         if (!selectedChat) {
           setSelectedChat(convos[0]);
           dispatch(setCurrentThreadId(convos[0].threadId));
-          console.log('Auto-selected first conversation:', convos[0]);
         } else {
           const updated = convos.find(c => c.threadId === selectedChat.threadId);
           if (updated) {
             setSelectedChat(updated);
             dispatch(setCurrentThreadId(updated.threadId));
-            console.log('Updated selectedChat with fresh data:', updated);
           } else {
             setSelectedChat(convos[0]);
             dispatch(setCurrentThreadId(convos[0].threadId));
-            console.log('Selected chat missing, switched to first conversation:', convos[0]);
           }
         }
       } else {
         setSelectedChat(null);
         dispatch(setCurrentThreadId(null));
-        console.log('No conversations found, cleared selection');
       }
     } catch (err) {
       setError(err.message || 'Failed to fetch conversations');
@@ -115,13 +103,22 @@ export default function MessengerPage() {
     }
   }, [dispatch, token, teacherId, selectedChat, user?.role]);
 
+  // Debounced knock sound
+  function playKnockDebounced() {
+    const now = Date.now();
+    if (now - lastKnockTimeRef.current > 3000) { // 3 seconds debounce
+      playKnock();
+      lastKnockTimeRef.current = now;
+    }
+  }
+
   const handleNewMessage = (message) => {
     const myUserId = String(user._id || user.id);
     const isMyMessage = String(message.senderId) === myUserId;
     const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
 
     if (!isMyMessage && !isCurrentThread) {
-      playKnock();
+      playKnockDebounced();
 
       dispatch(addOrUpdateConversation({
         threadId: message.threadId,
@@ -174,7 +171,6 @@ export default function MessengerPage() {
       if (!joinedThreadsRef.current.has(selectedChat.threadId)) {
         joinThread(selectedChat.threadId);
         joinedThreadsRef.current.add(selectedChat.threadId);
-        console.log('Joined selected thread:', selectedChat.threadId);
       }
     }
   }, [selectedChat, joinThread]);
@@ -186,7 +182,6 @@ export default function MessengerPage() {
       if (convo.threadId && !joinedThreadsRef.current.has(convo.threadId)) {
         joinThread(convo.threadId);
         joinedThreadsRef.current.add(convo.threadId);
-        console.log('Joined thread from conversation list:', convo.threadId);
       }
     });
   }, [teacherId, dedupedConversations, joinThread]);
@@ -202,20 +197,28 @@ export default function MessengerPage() {
     if (dedupedConversations.length === 0) {
       if (selectedChat !== null) {
         setSelectedChat(null);
-        console.log('No conversations available, clearing selectedChat');
       }
       return;
     }
     if (!selectedChat || !dedupedConversations.find(c => c.threadId === selectedChat.threadId)) {
       setSelectedChat(dedupedConversations[0]);
-      console.log('Updated selectedChat to first deduped conversation');
     }
   }, [dedupedConversations, selectedChat]);
+
+  // Mark thread read on selectedChat change
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
+
+    if (emitMarkThreadRead) {
+      emitMarkThreadRead(selectedChat.threadId);
+    }
+  }, [selectedChat, dispatch, emitMarkThreadRead]);
 
   const handleApprove = async (requestId) => {
     try {
       const updatedConvo = await dispatch(approveRequestThunk(requestId)).unwrap();
-      console.log(updatedConvo, 'Updated Conversations');
 
       const filtered = conversations.filter(
         (c) => c.requestId !== updatedConvo.requestId
@@ -252,17 +255,9 @@ export default function MessengerPage() {
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
 
-    if (!full) {
-      console.warn('Could not find full conversation for:', selected.threadId);
-    }
-
     setSelectedChat(finalSelection);
     dispatch(setCurrentThreadId(finalSelection.threadId));
-    dispatch(resetUnreadCount({ threadId: finalSelection.threadId }));
-
-    if (emitMarkThreadRead) {
-      emitMarkThreadRead(finalSelection.threadId);
-    }
+    // resetUnreadCount and emitMarkThreadRead are now handled in useEffect above
   };
 
   return (
