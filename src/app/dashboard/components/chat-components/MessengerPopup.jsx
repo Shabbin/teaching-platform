@@ -242,7 +242,11 @@ export default function MessengerPopup({ role: propRole }) {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 truncate">
+                    <p
+                      className={`text-sm truncate ${
+                        chat.unreadCount > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'
+                      }`}
+                    >
                       {chat.lastMessage ||
                         (chat.status === 'pending' ? 'Pending approval...' : 'No messages yet')}
                     </p>

@@ -79,7 +79,10 @@ export default function StudentMessengerPage() {
 
   // --- Socket logic ---
   const handleNewMessage = (message) => {
-    if (selectedChat && message.threadId === selectedChat.threadId) {
+    const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
+
+    if (isCurrentThread) {
+      // Update selected chat messages and last message directly
       setSelectedChat((prev) => ({
         ...prev,
         lastMessage: message.text,
@@ -90,6 +93,9 @@ export default function StudentMessengerPage() {
     dispatch(addOrUpdateConversation({
       threadId: message.threadId,
       lastMessage: message.text,
+      lastMessageTimestamp: message.timestamp,
+      incrementUnread: !isCurrentThread,  // Increment unread only if NOT current open thread
+      messages: [message],
     }));
   };
 
@@ -134,7 +140,7 @@ export default function StudentMessengerPage() {
 
     setSelectedChat(finalSelection);
     dispatch(setCurrentThreadId(finalSelection.threadId));
-  dispatch(resetUnreadCount({ threadId: finalSelection.threadId }));  // Reset unread count locally
+    dispatch(resetUnreadCount({ threadId: finalSelection.threadId }));  // Reset unread count locally
 
     if (emitMarkThreadRead) {
       emitMarkThreadRead(finalSelection.threadId); // Notify server/others that this thread is read

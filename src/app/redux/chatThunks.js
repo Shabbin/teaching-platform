@@ -12,7 +12,7 @@ import axios from 'axios';
 const BACKEND_URL = 'http://localhost:5000'; // <-- Set your backend base URL here
 
 // 🔁 Fetch all conversations for current user (teacher or student)
-
+//src\app\redux\chatThunks.js
 export const fetchConversationsThunk = createAsyncThunk(
   'chat/fetchConversations',
   async ({ userId }, thunkAPI) => {
@@ -39,6 +39,7 @@ export const fetchConversationsThunk = createAsyncThunk(
           return {
             ...chat,
             threadId: chat.threadId || chat._id || chat.requestId,
+             unreadCount: chat.unreadCount || 0,
             lastMessage: chat.lastMessage || '',
             lastMessageTimestamp:
               chat.lastMessage?.timestamp ||
@@ -46,6 +47,7 @@ export const fetchConversationsThunk = createAsyncThunk(
               chat.updatedAt ||
               chat.createdAt ||
               null,
+              sessions: chat.sessions || [], 
             name: otherParticipant?.name || 'No Name',
             profileImage: otherParticipant?.profileImage || null,
           };

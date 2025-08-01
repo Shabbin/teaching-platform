@@ -46,7 +46,6 @@ export default function ConversationList({ conversations, selectedChatId, onSele
           const threadKey = chat.threadId || chat.requestId || index;
           const isSelected = selectedChatId === threadKey;
 
-          // IMPORTANT: unreadCount should come from Redux state or be passed in props
           const unreadCount = Number(chat.unreadCount) || 0;
 
           const lastMessageObj = lastMessages?.[threadKey];
