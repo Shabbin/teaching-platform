@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -50,6 +50,9 @@ export default function MessengerPopup({ role: propRole }) {
     setToken(localStorage.getItem('token'));
   }, []);
 
+  // Flag to track if conversations are already fetched
+  const hasFetchedRef = useRef(false);
+
   // Fetch conversations using centralized thunk
   const fetchConversations = useCallback(async () => {
     if (!token || !userId) return;
@@ -65,15 +68,15 @@ export default function MessengerPopup({ role: propRole }) {
     }
   }, [dispatch, token, userId, role]);
 
+  // Fetch conversations only once on mount or when token/userId changes
   useEffect(() => {
     if (!token || !userId) return;
 
-    if (open) {
+    if (!hasFetchedRef.current) {
       fetchConversations();
-    } else if (conversations.length === 0) {
-      fetchConversations();
+      hasFetchedRef.current = true;
     }
-  }, [open, token, userId, conversations.length, fetchConversations]);
+  }, [token, userId, fetchConversations]);
 
   // --- SOCKET HANDLERS ---
 

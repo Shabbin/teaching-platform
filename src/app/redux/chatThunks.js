@@ -3,7 +3,7 @@ import {
   setConversations,
   addOrUpdateConversation,
   setMessagesForThread,
-
+setConversationsLoaded,
   setLoading,
   setError,
 } from './chatSlice';
@@ -62,6 +62,7 @@ export const fetchConversationsThunk = createAsyncThunk(
       });
 
       thunkAPI.dispatch(setConversations(normalized));
+      thunkAPI.dispatch(setConversationsLoaded(true));
       return normalized;
     } catch (err) {
       thunkAPI.dispatch(setError(err.message));

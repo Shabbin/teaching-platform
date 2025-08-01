@@ -5,6 +5,7 @@ const initialState = {
   messagesByThread: {}, // threadId -> messages[]
   loading: false,
   error: null,
+  conversationsLoaded: false,
 };
 
 // Deduplicates messages by _id or fallback
@@ -78,7 +79,9 @@ const chatSlice = createSlice({
 
   state.conversations = sortConversationsByLatest(normalized);
 },
-
+setConversationsLoaded(state, action) {
+  state.conversationsLoaded = action.payload;
+},
 setCurrentThreadId(state, action) {
   state.currentThreadId = action.payload;
 },
@@ -275,6 +278,7 @@ export const {
   updateLastMessageInConversation,
     resetUnreadCount,
     setCurrentThreadId,
+    setConversationsLoaded,
   setLoading,
   setError,
 } = chatSlice.actions;

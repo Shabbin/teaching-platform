@@ -19,6 +19,8 @@ export default function StudentMessengerPage() {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const studentId = user?.id || user?._id;
 
+  const conversationsLoaded = useSelector((state) => state.chat.conversationsLoaded);
+
   const conversations = useSelector((state) => {
     const base = state.chat.conversations || [];
     const lastMessages = state.chat.lastMessagesByThread || {};
@@ -34,8 +36,6 @@ export default function StudentMessengerPage() {
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-  const hasFetchedRef = useRef(false);
 
   // Ref to store last knock timestamp for debounce
   const lastKnockTimeRef = useRef(0);
@@ -73,7 +73,8 @@ export default function StudentMessengerPage() {
         setSelectedChat(null);
       }
 
-      hasFetchedRef.current = true;
+      // Mark conversations as loaded in Redux to prevent refetch
+      dispatch({ type: 'chat/setConversationsLoaded', payload: true });
     } catch (err) {
       setError(err.message || 'Failed to fetch conversations');
     } finally {
@@ -118,6 +119,7 @@ export default function StudentMessengerPage() {
 
   const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(studentId, handleNewMessage);
 
+  // Join thread when selectedChat changes
   useEffect(() => {
     if (selectedChat?.threadId) {
       joinThread(selectedChat.threadId);
@@ -125,12 +127,14 @@ export default function StudentMessengerPage() {
     }
   }, [selectedChat, joinThread]);
 
+  // Fetch conversations only if not loaded yet
   useEffect(() => {
-    if (studentId && token && !hasFetchedRef.current) {
+    if (!conversationsLoaded && studentId && token) {
       fetchConversations();
     }
-  }, [studentId, token, fetchConversations]);
+  }, [conversationsLoaded, studentId, token, fetchConversations]);
 
+  // Update selectedChat if conversations change
   useEffect(() => {
     if (dedupedConversations.length === 0) {
       if (selectedChat !== null) {

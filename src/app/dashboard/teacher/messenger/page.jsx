@@ -13,6 +13,7 @@ import {
   updateLastMessageInConversation,
   addMessageToThread,
   updateConversationStatus,
+ 
 } from '../../../redux/chatSlice';
 import {
   fetchConversationsThunk,
@@ -28,11 +29,12 @@ export default function MessengerPage() {
   const teacherId = user?.id || user?._id;
 
   const conversations = useSelector((state) => state.chat.conversations);
+  const conversationsLoaded = useSelector((state) => state.chat.conversationsLoaded);
+
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const hasFetchedRef = useRef(false);
   const joinedThreadsRef = useRef(new Set());
   const lastKnockTimeRef = useRef(0);
 
@@ -102,6 +104,13 @@ export default function MessengerPage() {
       setLoading(false);
     }
   }, [dispatch, token, teacherId, selectedChat, user?.role]);
+
+  // New useEffect: fetch conversations ONLY if not loaded yet
+  useEffect(() => {
+    if (!conversationsLoaded && teacherId && token) {
+      fetchConversations();
+    }
+  }, [conversationsLoaded, teacherId, token, fetchConversations]);
 
   // Debounced knock sound
   function playKnockDebounced() {
@@ -185,13 +194,6 @@ export default function MessengerPage() {
       }
     });
   }, [teacherId, dedupedConversations, joinThread]);
-
-  useEffect(() => {
-    if (teacherId && token && !hasFetchedRef.current) {
-      fetchConversations();
-      hasFetchedRef.current = true;
-    }
-  }, [teacherId, token, fetchConversations]);
 
   useEffect(() => {
     if (dedupedConversations.length === 0) {
