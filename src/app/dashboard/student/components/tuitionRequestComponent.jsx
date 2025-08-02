@@ -2,9 +2,11 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { sendTuitionRequest, clearMessages } from '../../../redux/requestSlice';
+import { fetchConversationsThunk } from '../../../redux/chatThunks'; // <-- Import this thunk
 
 export default function TuitionRequestModal({ teacherId, postId, onClose, onSuccess }) {
   const dispatch = useDispatch();
+  const user = useSelector((state) => state.user.userInfo);
   const { loading, error, successMessage } = useSelector((state) => state.requests);
 
   const [message, setMessage] = useState('');
@@ -21,6 +23,15 @@ export default function TuitionRequestModal({ teacherId, postId, onClose, onSucc
     if (sendTuitionRequest.fulfilled.match(result)) {
       dispatch(clearMessages());
       setMessage('');
+
+      // Fetch updated conversations so messenger updates immediately
+      dispatch(
+        fetchConversationsThunk({
+          userId: user?.id || user?._id,
+          role: user?.role || 'student',
+        })
+      );
+
       onSuccess();
     }
   };
@@ -37,6 +48,7 @@ export default function TuitionRequestModal({ teacherId, postId, onClose, onSucc
         <button
           onClick={handleClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition"
+          aria-label="Close request modal"
         >
           ✕
         </button>

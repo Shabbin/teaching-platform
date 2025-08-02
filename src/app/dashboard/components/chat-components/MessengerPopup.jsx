@@ -1,4 +1,3 @@
-// MessengerPopup.jsx
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -27,6 +26,7 @@ export default function MessengerPopup({ role: propRole }) {
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [needsRefresh, setNeedsRefresh] = useState(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -55,10 +55,6 @@ export default function MessengerPopup({ role: propRole }) {
   }, [totalUnreadUsers]);
 
   useEffect(() => {
-    console.log('[MessengerPopup] badgeCount:', badgeCount);
-  }, [badgeCount]);
-
-  useEffect(() => {
     setToken(localStorage.getItem('token'));
   }, []);
 
@@ -78,6 +74,7 @@ export default function MessengerPopup({ role: propRole }) {
     }
   }, [dispatch, token, userId, role]);
 
+  // Initial fetch on mount - optional, keeps existing logic
   useEffect(() => {
     if (!token || !userId) return;
     if (!hasFetchedRef.current) {
@@ -85,6 +82,21 @@ export default function MessengerPopup({ role: propRole }) {
       hasFetchedRef.current = true;
     }
   }, [token, userId, fetchConversations]);
+
+  // Effect to fetch conversations when popup opens and needsRefresh is true
+  useEffect(() => {
+    if (open && needsRefresh && token && userId) {
+      fetchConversations();
+      setNeedsRefresh(false);
+    }
+  }, [open, needsRefresh, token, userId, fetchConversations]);
+
+  // Mark needsRefresh true when navigating away from messenger page
+  useEffect(() => {
+    if (!pathname.includes('/messenger')) {
+      setNeedsRefresh(true);
+    }
+  }, [pathname]);
 
   const handleNewMessage = (message) => {
     dispatch(updateLastMessageInConversation({
@@ -103,7 +115,23 @@ export default function MessengerPopup({ role: propRole }) {
     dispatch(addOrUpdateConversation(fullThread));
   };
 
-  const { joinThread } = useSocket(userId, handleNewMessage, null, handleConversationListUpdate);
+  // Instead of fetching immediately on new tuition request, just mark refresh needed
+  const handleNewTuitionRequest = useCallback(
+    (data) => {
+      if (data?.type === 'new') {
+        console.log('[MessengerPopup] New tuition request received:', data);
+        setNeedsRefresh(true);
+      }
+    },
+    []
+  );
+
+  const { joinThread } = useSocket(
+    userId,
+    handleNewMessage,
+    handleNewTuitionRequest,
+    handleConversationListUpdate
+  );
 
   useEffect(() => {
     if (!userId) return;
@@ -116,16 +144,12 @@ export default function MessengerPopup({ role: propRole }) {
 
   useEffect(() => {
     if (pathname.includes('/messenger') && open) {
-      console.log('[MessengerPopup] Auto-closing popup while inside Messenger page');
       setOpen(false);
     }
   }, [pathname]);
 
   const handleMessengerClick = () => {
-    if (pathname.includes('/messenger')) {
-      console.log('[MessengerPopup] Skipping popup open: already on Messenger page');
-      return;
-    }
+    if (pathname.includes('/messenger')) return;
     setOpen((prev) => !prev);
   };
 
@@ -284,8 +308,7 @@ export default function MessengerPopup({ role: propRole }) {
                     <div className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${
                       chat.status === 'approved' ? 'bg-green-100 text-green-800' :
                       chat.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'}`}
-                    >
+                      'bg-yellow-100 text-yellow-800'}`}>
                       {chat.status}
                     </div>
                   )}

@@ -115,32 +115,37 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
         <h2 className="text-lg font-semibold">{chatName}</h2>
 
         <div className="space-y-2 mt-2 max-h-[70vh] overflow-y-auto">
-          {chat.status === 'pending' ? (
-            <>
-              <p className="text-gray-600 mb-2">Request: {chat.topic || 'Tuition Request'}</p>
+         {chat.status === 'pending' ? (
+  <>
+    <p className="text-gray-600 mb-2">Request: {chat.topic || 'Tuition Request'}</p>
 
-              {user?.role === 'student' ? (
-                <p className="italic text-gray-700">
-                  You: {chat.topic || 'Tuition Request'} (Pending approval)
-                </p>
-              ) : (
-                <div className="space-x-4">
-                  <button
-                    onClick={() => onApprove(chat.requestId)}
-                    className="px-4 py-1 bg-green-500 text-white rounded"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => onReject(chat.requestId)}
-                    className="px-4 py-1 bg-red-500 text-white rounded"
-                  >
-                    Reject
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
+    {/* Show the actual last message or fallback */}
+    <p className="italic text-gray-700 mb-4">
+      {chat.lastMessage || 'No message provided'}
+    </p>
+
+    {user?.role === 'student' ? (
+      <p className="italic text-gray-700">
+        You: {chat.topic || 'Tuition Request'} (Pending approval)
+      </p>
+    ) : (
+      <div className="space-x-4">
+        <button
+          onClick={() => onApprove(chat.requestId)}
+          className="px-4 py-1 bg-green-500 text-white rounded"
+        >
+          Approve
+        </button>
+        <button
+          onClick={() => onReject(chat.requestId)}
+          className="px-4 py-1 bg-red-500 text-white rounded"
+        >
+          Reject
+        </button>
+      </div>
+    )}
+  </>
+) : (
             messages.map((msg, i) => (
               <MessageBubble
                 key={msg._id || `${msg.timestamp}-${i}`}

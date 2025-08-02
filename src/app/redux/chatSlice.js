@@ -87,17 +87,14 @@ setCurrentThreadId(state, action) {
 },
 addOrUpdateConversation(state, action) {
   const convo = action.payload;
-
-  // Normalize the thread ID (could be threadId, _id, or requestId)
+  console.log('[addOrUpdateConversation] convo payload:', convo);
   const id = convo.threadId || convo._id || convo.requestId;
 
-  // Normalize the lastMessage text
   let lastMessage = convo.lastMessage;
   if (lastMessage && typeof lastMessage !== 'string') {
     lastMessage = lastMessage.text || '';
   }
 
-  // Try various fallbacks to extract last message timestamp
   const lastTimestampRaw =
     convo.lastMessage?.timestamp ||
     convo.lastMessage?.createdAt ||
@@ -110,49 +107,64 @@ addOrUpdateConversation(state, action) {
     ? new Date(lastTimestampRaw).toISOString()
     : null;
 
-  // Look for existing conversation index
+  // Extract names with fallbacks
+  const studentName =
+    convo.studentName ||
+    convo.request?.studentName ||
+    (convo.participants && convo.participants.find(p => p.role === 'student')?.name) ||
+    'No Name';
+
+  const teacherName =
+    convo.teacherName ||
+    convo.request?.teacherName ||
+    (convo.participants && convo.participants.find(p => p.role === 'teacher')?.name) ||
+    'No Name';
+
   const existingIndex = state.conversations.findIndex(
     (c) => (c.threadId || c._id || c.requestId) === id
   );
 
-if (existingIndex === -1) {
-  const normalizedConvo = {
-    ...convo,
-    threadId: id,
-    lastMessage,
-    lastMessageTimestamp,
-    unreadCount: convo.incrementUnread ? 1 : (convo.unreadCount ?? 0),
-  };
-  state.conversations.push(normalizedConvo);
-} else {
-  const existingConvo = state.conversations[existingIndex];
+  if (existingIndex === -1) {
+    const normalizedConvo = {
+      ...convo,
+      threadId: id,
+      lastMessage,
+      lastMessageTimestamp,
+      unreadCount: convo.incrementUnread ? 1 : (convo.unreadCount ?? 0),
+      studentName,
+      teacherName,
+    };
+    state.conversations.push(normalizedConvo);
+  } else {
+    const existingConvo = state.conversations[existingIndex];
 
-  const mergedConvo = {
-    ...existingConvo,
-    ...convo,
-    threadId: id,
-    lastMessage,
-    lastMessageTimestamp,
-    unreadCount:
-      convo.unreadCount !== undefined
-        ? convo.unreadCount
-        : existingConvo.unreadCount ?? 0,
-    messages: convo.messages || existingConvo.messages,
-    participants: convo.participants || existingConvo.participants,
-    sessions: convo.sessions || existingConvo.sessions,
-  };
+    const mergedConvo = {
+      ...existingConvo,
+      ...convo,
+      threadId: id,
+      lastMessage,
+      lastMessageTimestamp,
+      unreadCount:
+        convo.unreadCount !== undefined
+          ? convo.unreadCount
+          : existingConvo.unreadCount ?? 0,
+      messages: convo.messages || existingConvo.messages,
+      participants: convo.participants || existingConvo.participants,
+      sessions: convo.sessions || existingConvo.sessions,
+      studentName,
+      teacherName,
+    };
 
-  // 🔼 Increment unread if flagged
-  if (convo.incrementUnread) {
-    mergedConvo.unreadCount = (existingConvo.unreadCount || 0) + 1;
+    if (convo.incrementUnread) {
+      mergedConvo.unreadCount = (existingConvo.unreadCount || 0) + 1;
+    }
+
+    state.conversations[existingIndex] = mergedConvo;
   }
 
-  state.conversations[existingIndex] = mergedConvo;
-}
-
-  // Always keep the conversation list sorted by recent activity
   state.conversations = sortConversationsByLatest(state.conversations);
 },
+
 
 
 

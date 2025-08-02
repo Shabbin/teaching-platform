@@ -173,7 +173,7 @@ export const approveRequestThunk = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
 
-      // 1. Approve the request
+      // Approve the request first
       await axios.post(
         `${BACKEND_URL}/api/teacher-requests/${requestId}/approve`,
         {},
@@ -182,41 +182,44 @@ export const approveRequestThunk = createAsyncThunk(
         }
       );
 
-      // 2. Get ChatThread by requestId
+      // Then fetch the full thread by requestId with populated participants
       const threadRes = await axios.get(
         `${BACKEND_URL}/api/chat/thread/${requestId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+
       const threadData = threadRes.data;
-
-      // 3. Get messages using threadId
-      const messagesRes = await axios.get(
-        `${BACKEND_URL}/api/chat/messages/${threadData._id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-      const messages = messagesRes.data;
-
-      // 4. Normalize and dispatch
       const state = thunkAPI.getState();
       const userId = state.user.userInfo.id;
-      const otherParticipant = threadData.participants.find(p => p._id !== userId);
 
+      // Find the other participant (not the current user)
+      const otherParticipant = threadData.participants.find(
+        (p) => p._id !== userId
+      );
+
+      // Find latest session status or fallback to 'approved'
       const latestSession = threadData.sessions?.[threadData.sessions.length - 1];
       const status = latestSession?.status || 'approved';
+
+      // Last message: use threadData.lastMessage if you store it, or fallback to last message in array
+      const lastMsg =
+        threadData.lastMessage?.text ||
+        (threadData.messages.length > 0
+          ? threadData.messages[threadData.messages.length - 1].text
+          : '');
 
       const normalizedConvo = {
         threadId: threadData._id,
         requestId: threadData.requestId || requestId,
-        messages,
-        lastMessage: messages.at(-1)?.text || '',
+        messages: threadData.messages || [],
+        lastMessage: lastMsg,
         unreadCount: 0,
         status,
         teacherId: otherParticipant?._id,
-        teacherName: otherParticipant?.name,
+        teacherName: otherParticipant?.name || 'Unknown',
+        teacherImage: otherParticipant?.profileImage || '',
       };
 
       thunkAPI.dispatch(addOrUpdateConversation(normalizedConvo));

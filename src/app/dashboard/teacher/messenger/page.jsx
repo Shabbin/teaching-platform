@@ -5,6 +5,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
+
 import {
   resetUnreadCount,
   setCurrentThreadId,
@@ -13,13 +14,13 @@ import {
   updateLastMessageInConversation,
   addMessageToThread,
   updateConversationStatus,
- 
 } from '../../../redux/chatSlice';
+
 import {
   fetchConversationsThunk,
-  refreshConversationThunk,
   approveRequestThunk,
 } from '../../../redux/chatThunks';
+
 import { playKnock } from '../../../utils/knock';
 
 export default function MessengerPage() {
@@ -38,7 +39,6 @@ export default function MessengerPage() {
   const joinedThreadsRef = useRef(new Set());
   const lastKnockTimeRef = useRef(0);
 
-  // Deduplicate and add unread flag
   const dedupedConversations = useMemo(() => {
     const map = new Map();
     conversations.forEach((c) => {
@@ -105,17 +105,15 @@ export default function MessengerPage() {
     }
   }, [dispatch, token, teacherId, selectedChat, user?.role]);
 
-  // New useEffect: fetch conversations ONLY if not loaded yet
   useEffect(() => {
     if (!conversationsLoaded && teacherId && token) {
       fetchConversations();
     }
   }, [conversationsLoaded, teacherId, token, fetchConversations]);
 
-  // Debounced knock sound
   function playKnockDebounced() {
     const now = Date.now();
-    if (now - lastKnockTimeRef.current > 3000) { // 3 seconds debounce
+    if (now - lastKnockTimeRef.current > 3000) {
       playKnock();
       lastKnockTimeRef.current = now;
     }
@@ -128,7 +126,6 @@ export default function MessengerPage() {
 
     if (!isMyMessage && !isCurrentThread) {
       playKnockDebounced();
-
       dispatch(addOrUpdateConversation({
         threadId: message.threadId,
         lastMessage: message.text,
@@ -160,27 +157,37 @@ export default function MessengerPage() {
     dispatch(addMessageToThread({ threadId: message.threadId, message }));
   };
 
-  const handleRequestUpdate = async (updatedRequest) => {
-    dispatch(updateConversationStatus({ requestId: updatedRequest._id, status: updatedRequest.status }));
+const handleRequestUpdate = async (requestId, status) => {
+  try {
+    let updatedThread;
 
-    try {
-      const fullUpdatedConvo = await dispatch(refreshConversationThunk(updatedRequest._id)).unwrap();
-      if (selectedChat && selectedChat.requestId === updatedRequest._id) {
-        setSelectedChat(fullUpdatedConvo);
-      }
-    } catch (err) {
-      console.error('Failed to refresh conversation after status update', err);
+    if (status === 'approved') {
+      updatedThread = await dispatch(approveRequestThunk(requestId)).unwrap();
+    } else if (status === 'rejected') {
+      updatedThread = await dispatch(rejectRequestThunk(requestId)).unwrap();
     }
-  };
 
-  const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(teacherId, handleNewMessage, handleRequestUpdate);
+    // 🧠 Update just this conversation
+    if (updatedThread) {
+      dispatch(addOrUpdateConversation(updatedThread));
+    }
+
+  } catch (err) {
+    console.error('Failed to update request status:', err);
+  }
+};
+
+
+  const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(
+    teacherId,
+    handleNewMessage,
+    handleRequestUpdate
+  );
 
   useEffect(() => {
-    if (selectedChat?.threadId) {
-      if (!joinedThreadsRef.current.has(selectedChat.threadId)) {
-        joinThread(selectedChat.threadId);
-        joinedThreadsRef.current.add(selectedChat.threadId);
-      }
+    if (selectedChat?.threadId && !joinedThreadsRef.current.has(selectedChat.threadId)) {
+      joinThread(selectedChat.threadId);
+      joinedThreadsRef.current.add(selectedChat.threadId);
     }
   }, [selectedChat, joinThread]);
 
@@ -196,10 +203,8 @@ export default function MessengerPage() {
   }, [teacherId, dedupedConversations, joinThread]);
 
   useEffect(() => {
-    if (dedupedConversations.length === 0) {
-      if (selectedChat !== null) {
-        setSelectedChat(null);
-      }
+    if (dedupedConversations.length === 0 && selectedChat !== null) {
+      setSelectedChat(null);
       return;
     }
     if (!selectedChat || !dedupedConversations.find(c => c.threadId === selectedChat.threadId)) {
@@ -207,7 +212,6 @@ export default function MessengerPage() {
     }
   }, [dedupedConversations, selectedChat]);
 
-  // Mark thread read on selectedChat change
   useEffect(() => {
     if (!selectedChat) return;
 
@@ -220,19 +224,8 @@ export default function MessengerPage() {
 
   const handleApprove = async (requestId) => {
     try {
-      const updatedConvo = await dispatch(approveRequestThunk(requestId)).unwrap();
-
-      const filtered = conversations.filter(
-        (c) => c.requestId !== updatedConvo.requestId
-      );
-
-      const updatedList = [...filtered, updatedConvo].sort((a, b) =>
-        new Date(b.lastMessage?.timestamp || b.createdAt) - new Date(a.lastMessage?.timestamp || a.createdAt)
-      );
-
-      dispatch(setConversations(updatedList));
-
-      setSelectedChat(updatedConvo);
+      await dispatch(approveRequestThunk(requestId)).unwrap();
+      await fetchConversations(); // ✅ Full refresh after approval
     } catch (error) {
       console.error('Approve request failed:', error);
     }
@@ -244,14 +237,11 @@ export default function MessengerPage() {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
-      await fetchConversations();
+      await fetchConversations(); // ✅ Full refresh after rejection
     } catch (err) {
       console.error('Reject request failed:', err);
     }
   };
-
-  if (loading) return <p className="p-4">Loading conversations...</p>;
-  if (error) return <p className="p-4 text-red-600">Error: {error}</p>;
 
   const handleSelectChat = (selected) => {
     const full = conversations.find((c) => c.threadId === selected.threadId);
@@ -259,8 +249,10 @@ export default function MessengerPage() {
 
     setSelectedChat(finalSelection);
     dispatch(setCurrentThreadId(finalSelection.threadId));
-    // resetUnreadCount and emitMarkThreadRead are now handled in useEffect above
   };
+
+  if (loading) return <p className="p-4">Loading conversations...</p>;
+  if (error) return <p className="p-4 text-red-600">Error: {error}</p>;
 
   return (
     <div className="flex h-[calc(100vh-4rem)]">

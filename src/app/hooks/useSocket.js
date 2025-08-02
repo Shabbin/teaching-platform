@@ -72,6 +72,61 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
         onRequestUpdate(data);
       }
     });
+socketRef.current.on('new_tuition_request', (data) => {
+  console.log('[socket] new_tuition_request received:', data);
+
+  // Use real last message text & timestamp from payload, fallback to placeholder if missing
+  const lastMsgText = data.lastMessageText && data.lastMessageText.trim() !== '' 
+    ? data.lastMessageText 
+    : 'New tuition request received';
+
+  const lastMsgTimestamp = data.lastMessageTimestamp || new Date().toISOString();
+
+  const realMessage = {
+    _id: `tuition-${Date.now()}`, // unique temp ID
+    text: lastMsgText,
+    senderId: data.studentId,
+    senderName: data.studentName || 'Student',
+    threadId: data.threadId,
+    timestamp: lastMsgTimestamp,
+    isSystemMessage: true,
+  };
+
+  dispatch(addMessageToThread({ threadId: data.threadId, message: realMessage }));
+  dispatch(updateLastMessageInConversation({ threadId: data.threadId, message: realMessage }));
+  dispatch(incrementUnreadCount({ threadId: data.threadId }));
+
+  dispatch(
+    addOrUpdateConversation({
+      threadId: data.threadId,
+      requestId: data.request?._id,
+      studentId: data.studentId,
+      teacherId: data.teacherId,
+      studentName: data.studentName,
+      teacherName: data.teacherName,
+      name: userId === data.studentId ? data.teacherName : data.studentName,
+      participants: data.participants,
+      lastMessage: lastMsgText,
+      lastMessageTimestamp: lastMsgTimestamp,
+      messages: [realMessage],
+      status: 'pending',
+    })
+  );
+
+  knockAudioRef.current.play().catch((e) => {
+    console.warn('Audio play prevented:', e);
+  });
+
+  if (typeof onNewMessage === 'function') {
+    onNewMessage(realMessage);
+  }
+
+  if (typeof onRequestUpdate === 'function') {
+    onRequestUpdate({ type: 'new', ...data });
+  }
+});
+
+
 
     socketRef.current.on('mark_thread_read', ({ threadId, userId: senderUserId }) => {
       const myUserId = userId?.toString();

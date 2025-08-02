@@ -18,11 +18,12 @@ export default function ConversationList({ conversations, selectedChatId, onSele
           <p className="text-sm text-gray-500">No conversations yet.</p>
         )}
         {conversations.map((chat, index) => {
-          const isTeacher = !!chat.student;
-          const otherUser = isTeacher ? chat.student : chat.teacher;
+          // Since this is teacher's MessengerPage,
+          // show the student as the "other user"
+          const otherUser = chat.student || chat.teacher || null;
 
           const displayName =
-            otherUser?.name || chat.teacherName || chat.studentName || chat.name || 'No Name';
+            otherUser?.name || chat.studentName || chat.teacherName || chat.name || 'No Name';
 
           const avatarUrl =
             otherUser?.profileImage ||
@@ -92,7 +93,11 @@ export default function ConversationList({ conversations, selectedChatId, onSele
                     }`}
                     style={{ fontWeight: unreadCount > 0 ? '700' : '400' }}
                   >
-                    {status === 'pending' ? 'New tuition request' : lastMessageText}
+                    {status === 'pending'
+                      ? (lastMessageText && lastMessageText !== 'No messages yet'
+                          ? lastMessageText
+                          : 'New tuition request')
+                      : lastMessageText}
                   </div>
                 </div>
               </div>
