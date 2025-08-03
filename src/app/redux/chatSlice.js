@@ -6,6 +6,7 @@ const initialState = {
   loading: false,
   error: null,
   conversationsLoaded: false,
+    onlineUserIds: [],
 };
 
 // Deduplicates messages by _id or fallback
@@ -172,7 +173,9 @@ addOrUpdateConversation(state, action) {
 },
 
 
-
+setOnlineUserIds(state, action) {
+  state.onlineUserIds = action.payload;
+},
 
     // New reducer to increment unread count for a conversation by threadId
     incrementUnreadCount(state, action) {
@@ -299,6 +302,7 @@ export const {
     setConversationsLoaded,
   setLoading,
   setError,
+  setOnlineUserIds,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

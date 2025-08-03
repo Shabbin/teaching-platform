@@ -31,7 +31,7 @@ export default function MessengerPage() {
   const user = useSelector((state) => state.user.userInfo);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const currentUserId = (user?.id || user?._id)?.toString();
-
+  const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
   const conversations = useSelector((state) => state.chat.conversations);
   const conversationsLoaded = useSelector((state) => state.chat.conversationsLoaded);
 
@@ -41,6 +41,9 @@ export default function MessengerPage() {
 
   const joinedThreadsRef = useRef(new Set());
   const lastKnockTimeRef = useRef(0);
+
+  // *** NEW: track if user manually selected a chat recently ***
+  const userSelectedChatRef = useRef(false);
 
   // Deduplicate conversations and prepare display info: show *other participant* info
   const dedupedConversations = useMemo(() => {
@@ -118,29 +121,41 @@ export default function MessengerPage() {
     setError(null);
 
     try {
+      console.log('[fetchConversations] Fetching conversations...');
       const convos = await dispatch(
         fetchConversationsThunk({ role: user.role, userId: currentUserId })
       ).unwrap();
 
+      console.log('[fetchConversations] Conversations fetched:', convos.length);
+
       if (convos.length > 0) {
         if (!selectedChat) {
+          console.log('[fetchConversations] No selected chat, selecting first');
           setSelectedChat(convos[0]);
           dispatch(setCurrentThreadId(convos[0].threadId));
         } else {
           const updated = convos.find((c) => c.threadId === selectedChat.threadId);
           if (updated) {
+            console.log('[fetchConversations] Keeping selected chat:', selectedChat.threadId);
             setSelectedChat(updated);
             dispatch(setCurrentThreadId(updated.threadId));
           } else {
+            console.log('[fetchConversations] Selected chat not found, selecting first');
             setSelectedChat(convos[0]);
             dispatch(setCurrentThreadId(convos[0].threadId));
           }
         }
       } else {
+        console.log('[fetchConversations] No conversations found');
         setSelectedChat(null);
         dispatch(setCurrentThreadId(null));
       }
+
+      // *** Reset user selection flag after fetch sets selection ***
+      userSelectedChatRef.current = false;
+
     } catch (err) {
+      console.error('[fetchConversations] Failed to fetch conversations:', err);
       setError(err.message || 'Failed to fetch conversations');
     } finally {
       setLoading(false);
@@ -262,6 +277,7 @@ export default function MessengerPage() {
       selectedChat?.threadId &&
       !joinedThreadsRef.current.has(selectedChat.threadId)
     ) {
+      console.log('[Socket] Joining selected thread:', selectedChat.threadId);
       joinThread(selectedChat.threadId);
       joinedThreadsRef.current.add(selectedChat.threadId);
     }
@@ -273,6 +289,7 @@ export default function MessengerPage() {
 
     dedupedConversations.forEach((convo) => {
       if (convo.threadId && !joinedThreadsRef.current.has(convo.threadId)) {
+        console.log('[Socket] Joining thread from deduped list:', convo.threadId);
         joinThread(convo.threadId);
         joinedThreadsRef.current.add(convo.threadId);
       }
@@ -281,15 +298,39 @@ export default function MessengerPage() {
 
   // Update selected chat when conversations change
   useEffect(() => {
+    console.log('[selectedChat effect] Running with selectedChat:', selectedChat?.threadId);
+    console.log('[selectedChat effect] Conversations count:', dedupedConversations.length);
+
     if (dedupedConversations.length === 0 && selectedChat !== null) {
+      console.log('[selectedChat effect] No conversations, clearing selectedChat');
       setSelectedChat(null);
       return;
     }
-    if (
-      !selectedChat ||
-      !dedupedConversations.find((c) => c.threadId === selectedChat.threadId)
-    ) {
+
+    if (!selectedChat) {
+      console.log('[selectedChat effect] No selectedChat, setting to first conversation');
       setSelectedChat(dedupedConversations[0]);
+      return;
+    }
+
+    // *** NEW: Skip update if user just manually selected chat ***
+    if (userSelectedChatRef.current) {
+      console.log('[selectedChat effect] Skipping update due to recent user selection');
+      return;
+    }
+
+    // Check if current selectedChat still exists in conversations
+    const stillExists = dedupedConversations.some(
+      (c) => c.threadId === selectedChat.threadId
+    );
+
+    if (!stillExists) {
+      console.log(
+        `[selectedChat effect] Selected chat ${selectedChat.threadId} no longer exists, switching to first conversation`
+      );
+      setSelectedChat(dedupedConversations[0]);
+    } else {
+      console.log('[selectedChat effect] Selected chat still exists, no change');
     }
   }, [dedupedConversations, selectedChat]);
 
@@ -297,9 +338,11 @@ export default function MessengerPage() {
   useEffect(() => {
     if (!selectedChat) return;
 
+    console.log('[UnreadReset] Resetting unread count for:', selectedChat.threadId);
     dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
 
     if (emitMarkThreadRead) {
+      console.log('[UnreadReset] Emitting mark thread read for:', selectedChat.threadId);
       emitMarkThreadRead(selectedChat.threadId);
     }
   }, [selectedChat, dispatch, emitMarkThreadRead]);
@@ -332,8 +375,12 @@ export default function MessengerPage() {
 
   // When user selects a conversation
   const handleSelectChat = (selected) => {
+    console.log('[User Action] Selecting chat:', selected.threadId);
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
+
+    // *** NEW: mark user selection so effect does not override ***
+    userSelectedChatRef.current = true;
 
     setSelectedChat(finalSelection);
     dispatch(setCurrentThreadId(finalSelection.threadId));
@@ -348,6 +395,7 @@ export default function MessengerPage() {
         conversations={dedupedConversations}
         selectedChatId={selectedChat?.threadId}
         onSelect={handleSelectChat}
+        onlineUserIds={onlineUserIds}
       />
       <ChatPanel
         chat={selectedChat}

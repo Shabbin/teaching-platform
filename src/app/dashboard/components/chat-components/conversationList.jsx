@@ -3,12 +3,13 @@ import React from 'react';
 import { useSelector } from 'react-redux';
 import { formatDistanceToNow } from 'date-fns';
 
-export default function ConversationList({ conversations, selectedChatId, onSelect }) {
+export default function ConversationList({ conversations, selectedChatId, onSelect, onlineUserIds = [] }) {
   const lastMessages = useSelector((state) => state.chat.lastMessagesByThread);
   const currentUserId = useSelector((state) => state.user.userInfo?.id);
 
-console.log(conversations,"conversations in ConversationList")
-console.log(currentUserId,"dfsgdfsgdfgherh")
+  console.log(conversations, "conversations in ConversationList");
+  console.log(currentUserId, "currentUserId");
+
   return (
     <aside
       className="w-1/3 border-r border-gray-200 p-4 bg-white overflow-y-auto relative"
@@ -22,15 +23,15 @@ console.log(currentUserId,"dfsgdfsgdfgherh")
         )}
         {conversations.map((chat, index) => {
           // Determine the "other user"
-        let otherUser = null;
+          let otherUser = null;
 
-if (Array.isArray(chat.participants)) {
-  otherUser = chat.participants.find(
-    (p) => p && p._id !== currentUserId
-  );
-} else {
+          if (Array.isArray(chat.participants)) {
+            otherUser = chat.participants.find(
+              (p) => p && p._id !== currentUserId
+            );
+          } else {
             otherUser = chat.student || chat.teacher || null;
-            console.log("othersss??????????????????????",otherUser)
+            console.log("othersss??????????????????????", otherUser);
           }
 
           const displayName =
@@ -39,6 +40,7 @@ if (Array.isArray(chat.participants)) {
             chat.teacherName ||
             chat.name ||
             'Unnamed User';
+
           const avatarUrl =
             otherUser?.profileImage ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&color=fff`;
@@ -53,8 +55,9 @@ if (Array.isArray(chat.participants)) {
             rejected: 'border-red-400',
             pending: 'border-yellow-400',
           };
-console.log(avatarUrl,"urllllllllllllllllllllllllll")
-console.log(displayName,"nameeeeeeeeeeeeeeeeeeeeeeeeeee")
+          console.log(avatarUrl, "avatarUrl");
+          console.log(displayName, "displayName");
+
           const status = chat.status || 'pending';
           const statusClass = statusColors[status] || 'bg-gray-100 text-gray-600';
           const borderColorClass = borderColors[status] || 'border-gray-300';
@@ -71,6 +74,10 @@ console.log(displayName,"nameeeeeeeeeeeeeeeeeeeeeeeeeee")
           const timeAgo = lastUpdated
             ? formatDistanceToNow(new Date(lastUpdated), { addSuffix: true })
             : '';
+
+          // Online indicator logic:
+          const otherUserId = otherUser?._id?.toString() || null;
+          const isOnline = otherUserId ? onlineUserIds.includes(otherUserId) : false;
 
           return (
             <li
@@ -95,6 +102,12 @@ console.log(displayName,"nameeeeeeeeeeeeeeeeeeeeeeeeeee")
                   src={avatarUrl}
                   alt={displayName}
                   className={`w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 ${borderColorClass}`}
+                />
+                {/* Online indicator - green or gray dot */}
+                <span
+                  className={`absolute bottom-0 left-9 block h-3 w-3 rounded-full ring-2 ring-white ${
+                    isOnline ? 'bg-green-400' : 'bg-gray-400'
+                  }`}
                 />
                 {/* Red dot indicator for unread */}
                 {unreadCount > 0 && (

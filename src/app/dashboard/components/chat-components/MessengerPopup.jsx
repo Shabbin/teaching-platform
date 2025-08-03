@@ -8,6 +8,7 @@ import {
   setError,
   addOrUpdateConversation,
   updateLastMessageInConversation,
+  incrementUnreadCount,
 } from '../../../redux/chatSlice';
 import {
   fetchConversationsThunk,
@@ -22,6 +23,9 @@ export default function MessengerPopup({ role: propRole }) {
   const conversations = useSelector((state) => state.chat.conversations);
   const loading = useSelector((state) => state.chat.loading);
   const error = useSelector((state) => state.chat.error);
+
+  // <-- NEW: onlineUserIds from redux for online indicator
+  const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
 
   const [open, setOpen] = useState(false);
   const [token, setToken] = useState(null);
@@ -109,6 +113,13 @@ export default function MessengerPopup({ role: propRole }) {
       lastMessage: message.text,
       lastMessageTimestamp: message.timestamp,
     }));
+
+    const isOwnMessage = message.senderId === userId;
+    const isOnMessengerPage = pathname.includes('/messenger');
+
+    if (!isOwnMessage && !isOnMessengerPage) {
+      dispatch(incrementUnreadCount({ threadId: message.threadId }));
+    }
   };
 
   const handleConversationListUpdate = (fullThread) => {
@@ -116,15 +127,58 @@ export default function MessengerPopup({ role: propRole }) {
   };
 
   // Instead of fetching immediately on new tuition request, just mark refresh needed
-  const handleNewTuitionRequest = useCallback(
-    (data) => {
-      if (data?.type === 'new') {
-        console.log('[MessengerPopup] New tuition request received:', data);
-        setNeedsRefresh(true);
-      }
-    },
-    []
-  );
+const handleNewTuitionRequest = useCallback(
+  (data) => {
+    if (data?.type === 'new') {
+      console.log('[MessengerPopup] New tuition request received:', data);
+
+      // Build realMessage here or receive from socket:
+      const lastMsgText = data.lastMessageText?.trim() || 'New tuition request received';
+      const lastMsgTimestamp = data.lastMessageTimestamp || new Date().toISOString();
+
+      const realMessage = {
+        _id: `tuition-${Date.now()}`,
+        text: lastMsgText,
+        senderId: data.studentId,
+        senderName: data.studentName || 'Student',
+        threadId: data.threadId,
+        timestamp: lastMsgTimestamp,
+        isSystemMessage: true,
+      };
+
+      dispatch(addMessageToThread({ threadId: data.threadId, message: realMessage }));
+      dispatch(updateLastMessageInConversation({ threadId: data.threadId, message: realMessage }));
+      dispatch(incrementUnreadCount({ threadId: data.threadId }));
+
+      const isCurrentUserStudent = userId === data.studentId;
+      const otherName = isCurrentUserStudent ? data.teacherName : data.studentName;
+      const otherImage = isCurrentUserStudent ? data.teacherProfileImage : data.studentProfileImage;
+
+      dispatch(
+        addOrUpdateConversation({
+          threadId: data.threadId,
+          requestId: data.request?._id,
+          studentId: data.studentId,
+          teacherId: data.teacherId,
+          studentName: data.studentName,
+          teacherName: data.teacherName,
+          name: otherName,
+          profileImage: otherImage,
+          participants: data.participants,
+          lastMessage: lastMsgText,
+          lastMessageTimestamp: lastMsgTimestamp,
+          messages: [realMessage],
+          status: 'pending',
+          unreadCount: 1, // set explicitly for clarity
+        })
+      );
+
+      playKnock();
+    }
+  },
+  [dispatch, userId]
+);
+
 
   const { joinThread } = useSocket(
     userId,
@@ -174,16 +228,28 @@ export default function MessengerPopup({ role: propRole }) {
     }
   };
 
-  const getAvatar = (conv) => {
-    if (conv.profileImage) return conv.profileImage;
-    if (conv.participantProfileImage) return conv.participantProfileImage;
-    if (conv.studentProfileImage) return conv.studentProfileImage;
-    if (conv.teacherProfileImage) return conv.teacherProfileImage;
+const getAvatar = (conv) => {
+  if (conv.profileImage) return conv.profileImage;
 
-    const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
-    return `https://i.pravatar.cc/150?u=${fallbackId}`;
+  if (conv.participants && conv.participants.length) {
+    // Find participant other than current user
+    const other = conv.participants.find(p => p._id.toString() !== userId);
+    if (other && other.profileImage) return other.profileImage;
+  }
+
+  // Fallback
+  const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
+  return `https://i.pravatar.cc/150?u=${fallbackId}`;
+};
+
+
+  // NEW: helper to find the other participant's userId string for online check
+  const getOtherParticipantId = (conv) => {
+    if (!conv.participants || !userId) return null;
+    return conv.participants.find(p => p._id.toString() !== userId)?._id.toString() || null;
   };
 
+  // Filtered conversations as before
   const filteredConversations = conversations.filter((conv) => {
     const displayName = conv.name || conv.teacherName || conv.studentName || '';
     const lastMessage = conv.lastMessage || '';
@@ -247,73 +313,96 @@ export default function MessengerPopup({ role: propRole }) {
             ) : filteredConversations.length === 0 ? (
               <p className="text-sm text-gray-500 text-center mt-8">No conversations found.</p>
             ) : (
-              filteredConversations.map((chat, index) => (
-                <div
-                  key={chat.threadId || chat.requestId || index}
-                  className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100 transition"
-                  onClick={async () => {
-                    setOpen(false);
-                    if (chat.threadId && userId) {
-                      try {
-                        await dispatch(markThreadAsRead({ threadId: chat.threadId, userId }));
-                      } catch (err) {
-                        console.error('Failed to mark thread as read:', err);
+              filteredConversations.map((chat, index) => {
+                const otherUserId = getOtherParticipantId(chat);
+                const isOnline = otherUserId && onlineUserIds.includes(otherUserId);
+                return (
+                  <div
+                    key={chat.threadId || chat.requestId || index}
+                    className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100 transition"
+                    onClick={async () => {
+                      setOpen(false);
+                      if (chat.threadId && userId) {
+                        try {
+                          await dispatch(markThreadAsRead({ threadId: chat.threadId, userId }));
+                        } catch (err) {
+                          console.error('Failed to mark thread as read:', err);
+                        }
                       }
-                    }
-                    router.push(
-                      role === 'teacher'
-                        ? `/dashboard/${role}/messenger/${chat.threadId || chat.requestId}`
-                        : `/dashboard/${role}/messenger/${chat.threadId}`
-                    );
-                  }}
-                >
-                  <img src={getAvatar(chat)} alt={chat.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" loading="lazy" />
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-semibold text-gray-900 truncate">{chat.name}</h3>
-                      {chat.unreadCount > 0 && (
-                        <span className="text-xs bg-indigo-600 text-white rounded-full px-2 py-0.5">
-                          {chat.unreadCount}
-                        </span>
-                      )}
+                      router.push(
+                        role === 'teacher'
+                          ? `/dashboard/${role}/messenger/${chat.threadId || chat.requestId}`
+                          : `/dashboard/${role}/messenger/${chat.threadId}`
+                      );
+                    }}
+                  >
+                    <div className="relative">
+                      <img
+                        src={getAvatar(chat)}
+                        alt={chat.name}
+                        className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                        loading="lazy"
+                      />
+                      {/* Online indicator: green if online, gray if offline */}
+                      <span
+                        title={isOnline ? "Online" : "Offline"}
+                        className={`absolute bottom-0 right-0 block w-3 h-3 rounded-full ring-2 ring-white ${
+                          isOnline ? 'bg-green-500' : 'bg-gray-400'
+                        }`}
+                      />
                     </div>
-                    <p className={`text-sm truncate ${chat.unreadCount > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
-                      {chat.lastMessage || (chat.status === 'pending' ? 'Pending approval...' : 'No messages yet')}
-                    </p>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between items-center">
+                        <h3 className="font-semibold text-gray-900 truncate">{chat.name}</h3>
+                        {chat.unreadCount > 0 && (
+                          <span className="text-xs bg-red-600 text-white rounded-full px-2 py-0.5">
+                            {chat.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-sm truncate ${chat.unreadCount > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
+                        {chat.lastMessage || (chat.status === 'pending' ? 'Pending approval...' : 'No messages yet')}
+                      </p>
+                    </div>
+
+                    {role === 'teacher' && chat.status === 'pending' ? (
+                      <div className="flex space-x-2 ml-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApprove(chat.requestId);
+                          }}
+                          className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReject(chat.requestId);
+                          }}
+                          className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${
+                          chat.status === 'approved'
+                            ? 'bg-green-100 text-green-800'
+                            : chat.status === 'rejected'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
+                        {chat.status}
+                      </div>
+                    )}
                   </div>
-
-                  {role === 'teacher' && chat.status === 'pending' ? (
-                    <div className="flex space-x-2 ml-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleApprove(chat.requestId);
-                        }}
-                        className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 transition"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleReject(chat.requestId);
-                        }}
-                        className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 transition"
-                      >
-                        Reject
-                      </button>
-                    </div>
-                  ) : (
-                    <div className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${
-                      chat.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      chat.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                      'bg-yellow-100 text-yellow-800'}`}>
-                      {chat.status}
-                    </div>
-                  )}
-                </div>
-              ))
+                );
+              })
             )}
           </div>
 

@@ -18,7 +18,7 @@ export default function StudentMessengerPage() {
   const user = useSelector((state) => state.user.userInfo);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const studentId = user?.id || user?._id;
-
+const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
   const conversationsLoaded = useSelector((state) => state.chat.conversationsLoaded);
 
   const conversations = useSelector((state) => {
@@ -135,19 +135,27 @@ export default function StudentMessengerPage() {
   }, [conversationsLoaded, studentId, token, fetchConversations]);
 
   // Update selectedChat if conversations change
-  useEffect(() => {
-    if (dedupedConversations.length === 0) {
-      if (selectedChat !== null) {
-        setSelectedChat(null);
-        console.log('No conversations, cleared selectedChat');
-      }
-      return;
+useEffect(() => {
+  if (dedupedConversations.length === 0) {
+    if (selectedChat !== null) {
+      console.log('[useEffect] dedupedConversations empty, clearing selectedChat');
+      setSelectedChat(null);
     }
-    if (!selectedChat || !dedupedConversations.find(c => c.threadId === selectedChat.threadId)) {
-      setSelectedChat(dedupedConversations[0]);
-      console.log('Updated selectedChat to first deduped conversation');
-    }
-  }, [dedupedConversations, selectedChat]);
+    return;
+  }
+
+  // Check if current selected chat exists in deduped conversations
+  const exists = dedupedConversations.some(
+    (c) => c.threadId === selectedChat?.threadId
+  );
+
+  if (!exists) {
+    console.log('[useEffect] selectedChat no longer exists, setting to first conversation');
+    setSelectedChat(dedupedConversations[0]);
+  } else {
+    console.log('[useEffect] selectedChat exists, keeping current selection');
+  }
+}, [dedupedConversations, selectedChat]);
 
   // Reset unread count and notify server when selecting a chat
   useEffect(() => {
@@ -183,6 +191,7 @@ export default function StudentMessengerPage() {
         onSelect={handleSelectChat}
         userId={studentId}
         isStudent={true}
+           onlineUserIds={onlineUserIds}
       />
       <ChatPanel
         chat={selectedChat}
