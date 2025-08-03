@@ -87,9 +87,13 @@ setCurrentThreadId(state, action) {
 },
 addOrUpdateConversation(state, action) {
   const convo = action.payload;
-  console.log('[addOrUpdateConversation] convo payload:', convo);
+  console.log('[addOrUpdateConversation] payload:', convo);
+
   const id = convo.threadId || convo._id || convo.requestId;
 
+  const currentUserId = state.currentUserId; // ⚠️ Must be set before reducer is used
+
+  // Normalize lastMessage
   let lastMessage = convo.lastMessage;
   if (lastMessage && typeof lastMessage !== 'string') {
     lastMessage = lastMessage.text || '';
@@ -107,59 +111,61 @@ addOrUpdateConversation(state, action) {
     ? new Date(lastTimestampRaw).toISOString()
     : null;
 
-  // Extract names with fallbacks
-  const studentName =
+  // 🧠 Prefer using participants for display
+  let otherParticipant = null;
+  if (Array.isArray(convo.participants) && currentUserId) {
+    otherParticipant = convo.participants.find(p => p._id !== currentUserId);
+  }
+
+  const otherName =
+    otherParticipant?.name ||
     convo.studentName ||
-    convo.request?.studentName ||
-    (convo.participants && convo.participants.find(p => p.role === 'student')?.name) ||
+    convo.teacherName ||
     'No Name';
 
-  const teacherName =
-    convo.teacherName ||
-    convo.request?.teacherName ||
-    (convo.participants && convo.participants.find(p => p.role === 'teacher')?.name) ||
-    'No Name';
+  const otherImage =
+    otherParticipant?.profileImage ||
+    convo.profileImage ||
+    '';
 
   const existingIndex = state.conversations.findIndex(
     (c) => (c.threadId || c._id || c.requestId) === id
   );
 
+  const baseData = {
+    ...convo,
+    threadId: id,
+    lastMessage,
+    lastMessageTimestamp,
+    displayName: otherName,
+    displayProfileImage: otherImage,
+    unreadCount: convo.incrementUnread ? 1 : (convo.unreadCount ?? 0),
+  };
+
   if (existingIndex === -1) {
-    const normalizedConvo = {
-      ...convo,
-      threadId: id,
-      lastMessage,
-      lastMessageTimestamp,
-      unreadCount: convo.incrementUnread ? 1 : (convo.unreadCount ?? 0),
-      studentName,
-      teacherName,
-    };
-    state.conversations.push(normalizedConvo);
+    state.conversations.push(baseData);
   } else {
     const existingConvo = state.conversations[existingIndex];
 
-    const mergedConvo = {
+    const merged = {
       ...existingConvo,
       ...convo,
       threadId: id,
       lastMessage,
       lastMessageTimestamp,
-      unreadCount:
-        convo.unreadCount !== undefined
-          ? convo.unreadCount
-          : existingConvo.unreadCount ?? 0,
-      messages: convo.messages || existingConvo.messages,
       participants: convo.participants || existingConvo.participants,
+      messages: convo.messages || existingConvo.messages,
       sessions: convo.sessions || existingConvo.sessions,
-      studentName,
-      teacherName,
+      sender: convo.sender || existingConvo.sender,
+      displayName: otherName,
+      displayProfileImage: otherImage,
+      unreadCount:
+        convo.incrementUnread
+          ? (existingConvo.unreadCount || 0) + 1
+          : (convo.unreadCount ?? existingConvo.unreadCount ?? 0),
     };
 
-    if (convo.incrementUnread) {
-      mergedConvo.unreadCount = (existingConvo.unreadCount || 0) + 1;
-    }
-
-    state.conversations[existingIndex] = mergedConvo;
+    state.conversations[existingIndex] = merged;
   }
 
   state.conversations = sortConversationsByLatest(state.conversations);

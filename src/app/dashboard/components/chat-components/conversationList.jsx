@@ -5,7 +5,10 @@ import { formatDistanceToNow } from 'date-fns';
 
 export default function ConversationList({ conversations, selectedChatId, onSelect }) {
   const lastMessages = useSelector((state) => state.chat.lastMessagesByThread);
+  const currentUserId = useSelector((state) => state.user.userInfo?.id);
 
+console.log(conversations,"conversations in ConversationList")
+console.log(currentUserId,"dfsgdfsgdfgherh")
   return (
     <aside
       className="w-1/3 border-r border-gray-200 p-4 bg-white overflow-y-auto relative"
@@ -18,13 +21,24 @@ export default function ConversationList({ conversations, selectedChatId, onSele
           <p className="text-sm text-gray-500">No conversations yet.</p>
         )}
         {conversations.map((chat, index) => {
-          // Since this is teacher's MessengerPage,
-          // show the student as the "other user"
-          const otherUser = chat.student || chat.teacher || null;
+          // Determine the "other user"
+        let otherUser = null;
+
+if (Array.isArray(chat.participants)) {
+  otherUser = chat.participants.find(
+    (p) => p && p._id !== currentUserId
+  );
+} else {
+            otherUser = chat.student || chat.teacher || null;
+            console.log("othersss??????????????????????",otherUser)
+          }
 
           const displayName =
-            otherUser?.name || chat.studentName || chat.teacherName || chat.name || 'No Name';
-
+            otherUser?.name ||
+            chat.studentName ||
+            chat.teacherName ||
+            chat.name ||
+            'Unnamed User';
           const avatarUrl =
             otherUser?.profileImage ||
             `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random&color=fff`;
@@ -39,7 +53,8 @@ export default function ConversationList({ conversations, selectedChatId, onSele
             rejected: 'border-red-400',
             pending: 'border-yellow-400',
           };
-
+console.log(avatarUrl,"urllllllllllllllllllllllllll")
+console.log(displayName,"nameeeeeeeeeeeeeeeeeeeeeeeeeee")
           const status = chat.status || 'pending';
           const statusClass = statusColors[status] || 'bg-gray-100 text-gray-600';
           const borderColorClass = borderColors[status] || 'border-gray-300';
@@ -94,9 +109,9 @@ export default function ConversationList({ conversations, selectedChatId, onSele
                     style={{ fontWeight: unreadCount > 0 ? '700' : '400' }}
                   >
                     {status === 'pending'
-                      ? (lastMessageText && lastMessageText !== 'No messages yet'
-                          ? lastMessageText
-                          : 'New tuition request')
+                      ? lastMessageText && lastMessageText !== 'No messages yet'
+                        ? lastMessageText
+                        : 'New tuition request'
                       : lastMessageText}
                   </div>
                 </div>

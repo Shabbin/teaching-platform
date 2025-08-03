@@ -8,7 +8,7 @@ import {
   incrementUnreadCount,
   resetUnreadCount,
 } from '../redux/chatSlice';
-
+import { normalizeMessage } from '../redux/chatThunks';
 const SOCKET_URL = 'http://localhost:5000';
 
 export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessageAlert) {
@@ -34,27 +34,47 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
       console.log('[useSocket] connected:', socketRef.current.id);
     });
 
-    socketRef.current.on('new_message', (message) => {
-      const senderId = typeof message.senderId === 'string' ? message.senderId : message.senderId?._id?.toString();
-      const myUserId = userId?.toString();
+socketRef.current.on('new_message', (message) => {
+  const normalizedMessage = normalizeMessage(message);
+  if (!normalizedMessage) return;
 
-      const isMyMessage = senderId === myUserId;
-      const isCurrentThread = currentThreadId === message.threadId;
+  const senderId = normalizedMessage.sender?._id?.toString() || normalizedMessage.senderId;
+  const myUserId = userId?.toString();
 
-      dispatch(addMessageToThread({ threadId: message.threadId, message }));
-      dispatch(updateLastMessageInConversation({ threadId: message.threadId, message }));
+  const isMyMessage = senderId === myUserId;
+  const isCurrentThread = currentThreadId === normalizedMessage.threadId;
 
-      if (!isMyMessage && !isCurrentThread) {
-        dispatch(incrementUnreadCount({ threadId: message.threadId }));
-        knockAudioRef.current.play().catch((e) => {
-          console.warn('Audio play prevented:', e);
-        });
-      }
+  dispatch(addMessageToThread({
+    threadId: normalizedMessage.threadId,
+    message: normalizedMessage,
+  }));
 
-      if (!isMyMessage && !isCurrentThread && onNewMessage) {
-        onNewMessage(message);
-      }
+  dispatch(updateLastMessageInConversation({
+    threadId: normalizedMessage.threadId,
+    message: normalizedMessage,
+  }));
+
+  dispatch(addOrUpdateConversation({
+    threadId: normalizedMessage.threadId,
+    lastMessage: normalizedMessage.text,
+    lastMessageTimestamp: normalizedMessage.timestamp,
+    sender: normalizedMessage.sender,
+  }));
+
+  if (!isMyMessage && !isCurrentThread) {
+    dispatch(incrementUnreadCount({ threadId: normalizedMessage.threadId }));
+    knockAudioRef.current.play().catch((e) => {
+      console.warn('Audio play prevented:', e);
     });
+  }
+
+  if (!isMyMessage && !isCurrentThread && typeof onNewMessage === 'function') {
+    onNewMessage(normalizedMessage);
+  }
+});
+
+
+
 
     socketRef.current.on('conversation_list_updated', (fullThread) => {
       console.log('[socket] conversation_list_updated received:', fullThread);
@@ -75,15 +95,15 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
 socketRef.current.on('new_tuition_request', (data) => {
   console.log('[socket] new_tuition_request received:', data);
 
-  // Use real last message text & timestamp from payload, fallback to placeholder if missing
-  const lastMsgText = data.lastMessageText && data.lastMessageText.trim() !== '' 
-    ? data.lastMessageText 
-    : 'New tuition request received';
+  const lastMsgText =
+    data.lastMessageText && data.lastMessageText.trim() !== ''
+      ? data.lastMessageText
+      : 'New tuition request received';
 
   const lastMsgTimestamp = data.lastMessageTimestamp || new Date().toISOString();
 
   const realMessage = {
-    _id: `tuition-${Date.now()}`, // unique temp ID
+    _id: `tuition-${Date.now()}`,
     text: lastMsgText,
     senderId: data.studentId,
     senderName: data.studentName || 'Student',
@@ -96,6 +116,11 @@ socketRef.current.on('new_tuition_request', (data) => {
   dispatch(updateLastMessageInConversation({ threadId: data.threadId, message: realMessage }));
   dispatch(incrementUnreadCount({ threadId: data.threadId }));
 
+  // Determine the other participant to show in the conversation list
+  const isCurrentUserStudent = userId === data.studentId;
+  const otherName = isCurrentUserStudent ? data.teacherName : data.studentName;
+  const otherImage = isCurrentUserStudent ? data.teacherProfileImage : data.studentProfileImage;
+
   dispatch(
     addOrUpdateConversation({
       threadId: data.threadId,
@@ -104,7 +129,8 @@ socketRef.current.on('new_tuition_request', (data) => {
       teacherId: data.teacherId,
       studentName: data.studentName,
       teacherName: data.teacherName,
-      name: userId === data.studentId ? data.teacherName : data.studentName,
+      name: otherName,
+      profileImage: otherImage,
       participants: data.participants,
       lastMessage: lastMsgText,
       lastMessageTimestamp: lastMsgTimestamp,
@@ -125,6 +151,7 @@ socketRef.current.on('new_tuition_request', (data) => {
     onRequestUpdate({ type: 'new', ...data });
   }
 });
+
 
 
 

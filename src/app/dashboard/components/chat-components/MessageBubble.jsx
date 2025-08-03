@@ -5,13 +5,20 @@ import { formatDistanceToNowStrict } from 'date-fns';
 
 export default function MessageBubble({ message, currentUserId, avatar }) {
   const [relativeTime, setRelativeTime] = useState('');
-
+// console.log('[MessageBubble]', {
+//     messageId: message._id,
+//     senderId: message.senderId,
+//     currentUserId,
+//     avatar,
+//     text: message.text,
+//   });
+  
   const senderId =
     typeof message.senderId === 'string'
       ? message.senderId
       : message.senderId?._id;
   const isMine = senderId === currentUserId;
-
+// console.log("SenderID and isMine",senderId, isMine)
   useEffect(() => {
     const updateTime = () => {
       if (message.timestamp) {

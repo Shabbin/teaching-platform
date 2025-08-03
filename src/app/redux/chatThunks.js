@@ -82,14 +82,43 @@ export const fetchConversationsThunk = createAsyncThunk(
 // 💬 Load messages for a given threadId
 // chatThunks.js
 
+export function normalizeMessage(msg) {
+  let senderObj = msg.sender || msg.senderId;
+
+  // If senderId is an object, extract _id
+  const senderId =
+    typeof senderObj === 'object' && senderObj !== null
+      ? senderObj._id
+      : senderObj;
+
+  // Always return both senderId and sender object
+  return {
+    ...msg,
+    senderId: senderId,
+    sender: typeof senderObj === 'object'
+      ? senderObj
+      : {
+          _id: senderId,
+          name: 'Unknown',
+          profileImage: `https://i.pravatar.cc/150?u=${senderId}`,
+          role: null,
+        },
+  };
+} //will move this to utility
+
+
 export const fetchMessagesThunk = createAsyncThunk(
   'chat/fetchMessages',
   async (threadId, thunkAPI) => {
     try {
       thunkAPI.dispatch(setLoading(true));
       const res = await axios.get(`${BACKEND_URL}/api/chat/messages/${threadId}`);
-      
-      const fetchedMessages = res.data;
+
+      let fetchedMessages = res.data;
+
+      // Normalize messages here before filtering
+      fetchedMessages = fetchedMessages.map(normalizeMessage);
+
       const state = thunkAPI.getState();
       const existingMessages = state.chat.messagesByThread[threadId] || [];
 
@@ -115,6 +144,7 @@ export const fetchMessagesThunk = createAsyncThunk(
     }
   }
 );
+
 
 
 // 📨 Send a message (POST to backend and update Redux)

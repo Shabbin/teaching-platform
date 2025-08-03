@@ -10,7 +10,6 @@ import {
 } from '../../../redux/chatSlice';
 import {
   fetchMessagesThunk,
-    // << import thunk here
 } from '../../../redux/chatThunks';
 
 export default function ChatPanel({ chat, user, onApprove, onReject }) {
@@ -18,18 +17,20 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
   const messages = useSelector((state) => state.chat.messagesByThread[chat?.threadId] || []);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef();
-  const { sendMessage: socketSendMessage, joinThread, socketRef } = useSocket(chat?.threadId); 
-  // ^-- added socketRef here, adjust your hook export if needed (see note below)
+  const { sendMessage: socketSendMessage, joinThread, socketRef } = useSocket(chat?.threadId);
 
+  // Keep latest messages reference for possible use
   const latestMessagesRef = useRef(messages);
   useEffect(() => {
     latestMessagesRef.current = messages;
   }, [messages]);
 
+  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Fetch messages and clear on thread change or status change
   useEffect(() => {
     if (!chat?.threadId || chat.status !== 'approved') {
       if (chat?.threadId) dispatch(clearMessagesAction(chat.threadId));
@@ -39,10 +40,6 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
     dispatch(clearMessagesAction(chat.threadId));
     dispatch(fetchMessagesThunk(chat.threadId));
 
-    // --- NEW: Mark thread read on load ---
-    // dispatch(resetUnreadCount({ threadId: chat.threadId, userId: user?._id || user?.id }));
-
-    // Also emit event via socket if socketRef available
     if (socketRef && socketRef.current) {
       socketRef.current.emit('mark_thread_read', {
         threadId: chat.threadId,
@@ -51,12 +48,14 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
     }
   }, [chat?.threadId, chat?.status, dispatch, user, socketRef]);
 
+  // Join socket room for this thread
   useEffect(() => {
     if (chat?.threadId && joinThread) {
       joinThread(chat.threadId);
     }
   }, [chat?.threadId, joinThread]);
 
+  // Send new message handler
   const handleSend = async () => {
     if (!newMessage.trim() || !chat?.threadId || !socketSendMessage) return;
 
@@ -68,12 +67,11 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
       text: newMessage.trim(),
       timestamp: new Date().toISOString(),
     };
-
+console.log('Sending message with senderId:', user?._id || user?.id);
     try {
       socketSendMessage(messageData);
       setNewMessage('');
 
-      // --- NEW: Mark thread read on send message ---
       dispatch(resetUnreadCount({ threadId: chat.threadId, userId: user?._id || user?.id }));
 
       if (socketRef && socketRef.current) {
@@ -87,11 +85,13 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
     }
   };
 
+  // Helper to get avatar URL for message sender
   const getAvatar = (msg) => {
+  // console.log("MESAAGEEE",msg.sender._id)
+    // console.log('getAvatar for message sender:', msg.sender?.profileImage, msg.senderId);
     return (
-      msg.senderProfileImage ||
-      msg.senderId?.profileImage ||
-      `https://i.pravatar.cc/150?u=${msg.senderId?._id || msg.senderId}`
+      msg.sender?.profileImage ||
+      `https://i.pravatar.cc/150?u=${msg.sender?._id || msg.senderId}`
     );
   };
 
@@ -100,7 +100,7 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
   }
 
   const currentUserId = user?._id || user?.id;
-
+console.log("currentUserID",currentUserId)
   const chatName =
     chat.name ||
     chat.participantName ||
@@ -115,37 +115,35 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
         <h2 className="text-lg font-semibold">{chatName}</h2>
 
         <div className="space-y-2 mt-2 max-h-[70vh] overflow-y-auto">
-         {chat.status === 'pending' ? (
-  <>
-    <p className="text-gray-600 mb-2">Request: {chat.topic || 'Tuition Request'}</p>
+          {chat.status === 'pending' ? (
+            <>
+              <p className="text-gray-600 mb-2">Request: {chat.topic || 'Tuition Request'}</p>
+              <p className="italic text-gray-700 mb-4">
+                {chat.lastMessage || 'No message provided'}
+              </p>
 
-    {/* Show the actual last message or fallback */}
-    <p className="italic text-gray-700 mb-4">
-      {chat.lastMessage || 'No message provided'}
-    </p>
-
-    {user?.role === 'student' ? (
-      <p className="italic text-gray-700">
-        You: {chat.topic || 'Tuition Request'} (Pending approval)
-      </p>
-    ) : (
-      <div className="space-x-4">
-        <button
-          onClick={() => onApprove(chat.requestId)}
-          className="px-4 py-1 bg-green-500 text-white rounded"
-        >
-          Approve
-        </button>
-        <button
-          onClick={() => onReject(chat.requestId)}
-          className="px-4 py-1 bg-red-500 text-white rounded"
-        >
-          Reject
-        </button>
-      </div>
-    )}
-  </>
-) : (
+              {user?.role === 'student' ? (
+                <p className="italic text-gray-700">
+                  You: {chat.topic || 'Tuition Request'} (Pending approval)
+                </p>
+              ) : (
+                <div className="space-x-4">
+                  <button
+                    onClick={() => onApprove(chat.requestId)}
+                    className="px-4 py-1 bg-green-500 text-white rounded"
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => onReject(chat.requestId)}
+                    className="px-4 py-1 bg-red-500 text-white rounded"
+                  >
+                    Reject
+                  </button>
+                </div>
+              )}
+            </>
+          ) : (
             messages.map((msg, i) => (
               <MessageBubble
                 key={msg._id || `${msg.timestamp}-${i}`}
