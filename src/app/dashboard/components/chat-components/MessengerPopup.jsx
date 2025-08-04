@@ -9,6 +9,7 @@ import {
   addOrUpdateConversation,
   updateLastMessageInConversation,
   incrementUnreadCount,
+  addMessageToThread
 } from '../../../redux/chatSlice';
 import {
   fetchConversationsThunk,
@@ -173,7 +174,7 @@ const handleNewTuitionRequest = useCallback(
         })
       );
 
-      playKnock();
+      // playKnock();
     }
   },
   [dispatch, userId]
