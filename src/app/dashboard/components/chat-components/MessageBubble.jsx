@@ -61,15 +61,14 @@ export default function MessageBubble({ message, currentUserId, avatar }) {
       )}
 
       <div className="flex flex-col space-y-1">
-        <div
-          className={`px-4 py-2 rounded-2xl text-sm shadow-sm break-words ${
-            isMine
-              ? 'bg-blue-600 text-white rounded-br-none'
-              : 'bg-gray-100 text-gray-900 rounded-bl-none'
-          }`}
-        >
-          {message.text}
-        </div>
+      <div
+  className={`px-4 py-2 rounded-2xl text-sm shadow-sm
+  whitespace-pre-wrap break-words max-w-xs sm:max-w-sm md:max-w-md 
+  overflow-hidden break-all
+  ${isMine ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-100 text-gray-900 rounded-bl-none'}`}
+>
+  {message.text}
+</div>
         <span
           className={`text-xs text-gray-400 select-none ${
             isMine ? 'text-right pr-1' : 'text-left pl-1'

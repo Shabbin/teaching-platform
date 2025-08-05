@@ -7,6 +7,9 @@ import "./globals.css";
 import { Provider } from "react-redux";
 import { store } from "../app/redux/store";
 import UserRehydrator from "../app/components/UserRehydrator";
+
+import usePerformanceLogger from './hooks/usePerformanceLogger';  // <-- import the hook
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -18,6 +21,8 @@ const geistMono = Geist_Mono({
 });
 
 export default function RootLayout({ children }) {
+    // usePerformanceLogger();  // <-- call it here to start tracking performance
+
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>

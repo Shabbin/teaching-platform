@@ -344,21 +344,20 @@ export default function MessengerPage() {
   }, [dedupedConversations, selectedChat]);
 
   // Reset unread count when selected chat changes
-  useEffect(() => {
-    if (!selectedChat) return;
+ useEffect(() => {
+  if (!selectedChat) return;
 
-    if (lastResetThreadIdRef.current === selectedChat.threadId) return;
+  // Remove or comment out the guard for testing:
+  // if (lastResetThreadIdRef.current === selectedChat.threadId) return;
 
-    console.log('[UnreadReset] Resetting unread count for:', selectedChat.threadId);
-    dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
+  dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
 
-    if (emitMarkThreadRead) {
-      console.log('[UnreadReset] Emitting mark thread read for:', selectedChat.threadId);
-      emitMarkThreadRead(selectedChat.threadId);
-    }
+  if (emitMarkThreadRead) {
+    emitMarkThreadRead(selectedChat.threadId);
+  }
 
-    lastResetThreadIdRef.current = selectedChat.threadId;
-  }, [selectedChat, dispatch, emitMarkThreadRead]);
+  lastResetThreadIdRef.current = selectedChat.threadId;
+}, [selectedChat, dispatch, emitMarkThreadRead]);
 
   // Approve request handler
   const handleApprove = async (requestId) => {
