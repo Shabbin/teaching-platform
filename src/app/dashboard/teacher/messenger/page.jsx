@@ -12,7 +12,6 @@ import {
   addOrUpdateConversation,
   updateLastMessageInConversation,
   addMessageToThread,
-  
 } from '../../../redux/chatSlice';
 
 import {
@@ -43,8 +42,11 @@ export default function MessengerPage() {
   const joinedThreadsRef = useRef(new Set());
   const lastKnockTimeRef = useRef(0);
 
-  // *** NEW: track if user manually selected a chat recently ***
+  // Track if user manually selected a chat recently
   const userSelectedChatRef = useRef(false);
+
+  // Track last threadId for which unread was reset
+  const lastResetThreadIdRef = useRef(null);
 
   // Deduplicate conversations and prepare display info: show *other participant* info
   const dedupedConversations = useMemo(() => {
@@ -152,7 +154,7 @@ export default function MessengerPage() {
         dispatch(setCurrentThreadId(null));
       }
 
-      // *** Reset user selection flag after fetch sets selection ***
+      // Reset user selection flag after fetch sets selection
       userSelectedChatRef.current = false;
 
     } catch (err) {
@@ -161,7 +163,7 @@ export default function MessengerPage() {
     } finally {
       setLoading(false);
     }
-  }, [dispatch, token, currentUserId, selectedChat, user?.role]);
+  }, [dispatch, token, currentUserId, user?.role, selectedChat]);
 
   useEffect(() => {
     if (!conversationsLoaded && currentUserId && token) {
@@ -309,12 +311,18 @@ export default function MessengerPage() {
     }
 
     if (!selectedChat) {
-      console.log('[selectedChat effect] No selectedChat, setting to first conversation');
-      setSelectedChat(dedupedConversations[0]);
+      // Only update if first conversation is different from current selectedChat
+      if (
+        dedupedConversations.length > 0 &&
+        dedupedConversations[0].threadId !== selectedChat?.threadId
+      ) {
+        console.log('[selectedChat effect] No selectedChat, setting to first conversation');
+        setSelectedChat(dedupedConversations[0]);
+      }
       return;
     }
 
-    // *** NEW: Skip update if user just manually selected chat ***
+    // Skip update if user manually selected a chat recently
     if (userSelectedChatRef.current) {
       console.log('[selectedChat effect] Skipping update due to recent user selection');
       return;
@@ -339,6 +347,8 @@ export default function MessengerPage() {
   useEffect(() => {
     if (!selectedChat) return;
 
+    if (lastResetThreadIdRef.current === selectedChat.threadId) return;
+
     console.log('[UnreadReset] Resetting unread count for:', selectedChat.threadId);
     dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
 
@@ -346,6 +356,8 @@ export default function MessengerPage() {
       console.log('[UnreadReset] Emitting mark thread read for:', selectedChat.threadId);
       emitMarkThreadRead(selectedChat.threadId);
     }
+
+    lastResetThreadIdRef.current = selectedChat.threadId;
   }, [selectedChat, dispatch, emitMarkThreadRead]);
 
   // Approve request handler
@@ -380,7 +392,7 @@ export default function MessengerPage() {
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
 
-    // *** NEW: mark user selection so effect does not override ***
+    // Mark user selection so effect does not override
     userSelectedChatRef.current = true;
 
     setSelectedChat(finalSelection);

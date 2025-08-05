@@ -6,11 +6,12 @@ import MessageBubble from './MessageBubble';
 import useSocket from '../../../hooks/useSocket';
 import {
   clearMessagesForThread as clearMessagesAction,
-  addMessageToThread as resetUnreadCount
+  addMessageToThread as resetUnreadCount,
 } from '../../../redux/chatSlice';
 import {
   fetchMessagesThunk,
 } from '../../../redux/chatThunks';
+import { CheckCircle, XCircle } from 'lucide-react';
 
 export default function ChatPanel({ chat, user, onApprove, onReject }) {
   const dispatch = useDispatch();
@@ -19,18 +20,15 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
   const messagesEndRef = useRef();
   const { sendMessage: socketSendMessage, joinThread, socketRef } = useSocket(chat?.threadId);
 
-  // Keep latest messages reference for possible use
   const latestMessagesRef = useRef(messages);
   useEffect(() => {
     latestMessagesRef.current = messages;
   }, [messages]);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Fetch messages and clear on thread change or status change
   useEffect(() => {
     if (!chat?.threadId || chat.status !== 'approved') {
       if (chat?.threadId) dispatch(clearMessagesAction(chat.threadId));
@@ -48,14 +46,12 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
     }
   }, [chat?.threadId, chat?.status, dispatch, user, socketRef]);
 
-  // Join socket room for this thread
   useEffect(() => {
     if (chat?.threadId && joinThread) {
       joinThread(chat.threadId);
     }
   }, [chat?.threadId, joinThread]);
 
-  // Send new message handler
   const handleSend = async () => {
     if (!newMessage.trim() || !chat?.threadId || !socketSendMessage) return;
 
@@ -67,7 +63,7 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
       text: newMessage.trim(),
       timestamp: new Date().toISOString(),
     };
-console.log('Sending message with senderId:', user?._id || user?.id);
+
     try {
       socketSendMessage(messageData);
       setNewMessage('');
@@ -85,10 +81,7 @@ console.log('Sending message with senderId:', user?._id || user?.id);
     }
   };
 
-  // Helper to get avatar URL for message sender
   const getAvatar = (msg) => {
-  // console.log("MESAAGEEE",msg.sender._id)
-    // console.log('getAvatar for message sender:', msg.sender?.profileImage, msg.senderId);
     return (
       msg.sender?.profileImage ||
       `https://i.pravatar.cc/150?u=${msg.sender?._id || msg.senderId}`
@@ -100,7 +93,6 @@ console.log('Sending message with senderId:', user?._id || user?.id);
   }
 
   const currentUserId = user?._id || user?.id;
-console.log("currentUserID",currentUserId)
   const chatName =
     chat.name ||
     chat.participantName ||
@@ -116,9 +108,11 @@ console.log("currentUserID",currentUserId)
 
         <div className="space-y-2 mt-2 max-h-[70vh] overflow-y-auto">
           {chat.status === 'pending' ? (
-            <>
-              <p className="text-gray-600 mb-2">Request: {chat.topic || 'Tuition Request'}</p>
-              <p className="italic text-gray-700 mb-4">
+            <div className="bg-white p-4 rounded-xl shadow border border-gray-200">
+              <p className="text-gray-600 mb-2 font-medium">
+                Request: {chat.topic || 'Tuition Request'}
+              </p>
+              <p className="text-gray-800 whitespace-pre-wrap break-words mb-4 leading-relaxed">
                 {chat.lastMessage || 'No message provided'}
               </p>
 
@@ -127,22 +121,24 @@ console.log("currentUserID",currentUserId)
                   You: {chat.topic || 'Tuition Request'} (Pending approval)
                 </p>
               ) : (
-                <div className="space-x-4">
+                <div className="flex gap-3 justify-end flex-wrap">
                   <button
                     onClick={() => onApprove(chat.requestId)}
-                    className="px-4 py-1 bg-green-500 text-white rounded"
+                    className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition"
                   >
-                    Approve
+                    <CheckCircle className="w-5 h-5" />
+                    <span>Approve</span>
                   </button>
                   <button
                     onClick={() => onReject(chat.requestId)}
-                    className="px-4 py-1 bg-red-500 text-white rounded"
+                    className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition"
                   >
-                    Reject
+                    <XCircle className="w-5 h-5" />
+                    <span>Reject</span>
                   </button>
                 </div>
               )}
-            </>
+            </div>
           ) : (
             messages.map((msg, i) => (
               <MessageBubble
