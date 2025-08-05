@@ -102,11 +102,7 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
       }
     });
 
-    socketRef.current.on('request_update', (data) => {
-      if (typeof onRequestUpdate === 'function') {
-        onRequestUpdate(data);
-      }
-    });
+
 
     socketRef.current.on('new_tuition_request', (data) => {
       console.log('[socket] new_tuition_request received:', data);
@@ -160,6 +156,50 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
         onRequestUpdate({ type: 'new', ...data });
       }
     });
+    socketRef.current.on('request_update', (data) => {
+      if (data.type === 'approved' && data.studentId === userId) {
+    // Dispatch Redux to set current thread ID to this approved thread
+    dispatch(setCurrentThreadId(data.threadId));
+  }
+    });
+socketRef.current.on('request_approved', (data) => {
+  console.log('[socket] request_approved received:', data);
+
+  const { threadId, requestId, timestamp } = data;
+
+  const approvalMessage = {
+    _id: `approval-${Date.now()}`,
+    text: 'Your tuition request was approved!',
+    senderId: 'system',
+    threadId,
+    timestamp,
+    isSystemMessage: true,
+  };
+
+  dispatch(addMessageToThread({ threadId, message: approvalMessage }));
+  dispatch(updateLastMessageInConversation({ threadId, message: approvalMessage }));
+  dispatch(resetUnreadCount({ threadId }));
+
+  dispatch(
+    addOrUpdateConversation({
+      threadId,
+      requestId,
+      lastMessage: approvalMessage.text,
+      lastMessageTimestamp: approvalMessage.timestamp,
+      status: 'approved',
+    })
+  );
+
+  // Optional: Notify parent component
+  if (typeof onRequestUpdate === 'function') {
+    onRequestUpdate({ type: 'approved', threadId, requestId, timestamp });
+  }
+
+  playKnock(); // optional audio cue
+});
+
+
+
 
     socketRef.current.on('mark_thread_read', ({ threadId, userId: senderUserId }) => {
       const myUserId = userId?.toString();

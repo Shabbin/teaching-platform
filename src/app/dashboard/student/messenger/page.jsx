@@ -7,38 +7,35 @@ import {
   addOrUpdateConversation,
   setCurrentThreadId,
   resetUnreadCount,
+  updateLastMessageInConversation,
+  addMessageToThread,
 } from '../../../redux/chatSlice';
 import { fetchConversationsThunk } from '../../../redux/chatThunks';
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
 import { playKnock } from '../../../utils/knock';
 
+function getFallbackAvatar(userId) {
+  return `https://i.pravatar.cc/150?u=${userId}`;
+}
+
 export default function StudentMessengerPage() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.user.userInfo);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const studentId = user?.id || user?._id;
-const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
+  const currentUserId = studentId?.toString();
+  const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
+  const conversations = useSelector((state) => state.chat.conversations);
   const conversationsLoaded = useSelector((state) => state.chat.conversationsLoaded);
-
-  const conversations = useSelector((state) => {
-    const base = state.chat.conversations || [];
-    const lastMessages = state.chat.lastMessagesByThread || {};
-    const statuses = state.chat.conversationStatusesById || {};
-
-    return base.map((conv) => ({
-      ...conv,
-      lastMessage: lastMessages[conv.threadId]?.text || conv.lastMessage,
-      status: statuses[conv.requestId] || conv.status,
-    }));
-  });
-
+  const currentThreadId = useSelector((state) => state.chat.currentThreadId);
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Ref to store last knock timestamp for debounce
+  const joinedThreadsRef = useRef(new Set());
   const lastKnockTimeRef = useRef(0);
+  const userSelectedChatRef = useRef(false);
 
   const dedupedConversations = useMemo(() => {
     const map = new Map();
@@ -47,60 +44,133 @@ const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
         map.set(c.threadId, c);
       }
     });
-    return Array.from(map.values());
-  }, [conversations]);
+
+    const deduped = Array.from(map.values());
+
+    const withUnreadAndDisplay = deduped.map((conv) => {
+      const mySession = conv.sessions?.find(
+        (s) => s.userId?.toString() === currentUserId
+      );
+      const lastSeen = mySession?.lastSeen ? new Date(mySession.lastSeen) : null;
+      const lastMsgTime = new Date(conv.lastMessageTimestamp || 0);
+      const isUnread = lastSeen ? lastSeen < lastMsgTime : true;
+
+      const studentId = conv.studentId?.toString();
+      const teacherId = conv.teacherId?.toString();
+
+      let displayName = conv.name;
+      let displayImage = conv.profileImage;
+
+      if (currentUserId === studentId) {
+        displayName = conv.teacherName || 'Teacher';
+        const teacherParticipant = conv.participants?.find(
+          (p) => p._id.toString() === teacherId
+        );
+        displayImage =
+          conv.teacherProfileImage ||
+          teacherParticipant?.profileImage ||
+          getFallbackAvatar(teacherId);
+      }
+
+      return {
+        ...conv,
+        isUnread,
+        name: displayName,
+        profileImage: displayImage,
+      };
+    });
+
+    withUnreadAndDisplay.sort((a, b) => {
+      const timeA = new Date(a.lastMessageTimestamp || 0);
+      const timeB = new Date(b.lastMessageTimestamp || 0);
+      return timeB - timeA;
+    });
+
+    return withUnreadAndDisplay;
+  }, [conversations, currentUserId]);
 
   const fetchConversations = useCallback(async () => {
-    if (!studentId || !token) return;
+    if (!currentUserId || !token) return;
     setLoading(true);
     setError(null);
 
     try {
-      const convos = await dispatch(fetchConversationsThunk({ role: 'student', userId: studentId })).unwrap();
+      const convos = await dispatch(fetchConversationsThunk({ role: 'student', userId: currentUserId })).unwrap();
 
       if (convos.length > 0) {
         if (!selectedChat) {
           setSelectedChat(convos[0]);
+          dispatch(setCurrentThreadId(convos[0].threadId));
         } else {
           const updated = convos.find(c => c.threadId === selectedChat.threadId);
           if (updated) {
             setSelectedChat(updated);
+            dispatch(setCurrentThreadId(updated.threadId));
           } else {
             setSelectedChat(convos[0]);
+            dispatch(setCurrentThreadId(convos[0].threadId));
           }
         }
       } else {
         setSelectedChat(null);
+        dispatch(setCurrentThreadId(null));
       }
 
-      // Mark conversations as loaded in Redux to prevent refetch
-      dispatch({ type: 'chat/setConversationsLoaded', payload: true });
+      userSelectedChatRef.current = false;
     } catch (err) {
       setError(err.message || 'Failed to fetch conversations');
     } finally {
       setLoading(false);
     }
-  }, [dispatch, token, studentId, selectedChat]);
+  }, [dispatch, token, currentUserId, selectedChat]);
 
-  // Debounced knock sound function
+  useEffect(() => {
+    if (!conversationsLoaded && currentUserId && token) {
+      fetchConversations();
+    }
+  }, [conversationsLoaded, currentUserId, token, fetchConversations]);
+
   function playKnockDebounced() {
     const now = Date.now();
-    if (now - lastKnockTimeRef.current > 3000) { // 3 seconds debounce
+    if (now - lastKnockTimeRef.current > 3000) {
       playKnock();
       lastKnockTimeRef.current = now;
     }
   }
 
-  // --- Socket logic ---
   const handleNewMessage = (message) => {
-    const currentThreadId = selectedChat?.threadId ? String(selectedChat.threadId) : null;
-    const messageThreadId = String(message.threadId);
+    const isMyMessage = String(message.senderId) === currentUserId;
+    const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
 
-    const isCurrentThread = currentThreadId === messageThreadId;
+    let sender = null;
+    if (message.sender) {
+      sender = message.sender;
+    } else if (message.participants && Array.isArray(message.participants)) {
+      sender = message.participants.find((p) => String(p._id) === String(message.senderId));
+    }
 
-    if (!isCurrentThread) {
+    sender = {
+      _id: message.senderId,
+      name: sender?.name || message.senderName || 'Unknown',
+      profileImage: sender?.profileImage || getFallbackAvatar(message.senderId),
+      role: sender?.role || null,
+    };
+
+    if (!isMyMessage && !isCurrentThread) {
       playKnockDebounced();
-    } else {
+    }
+
+    dispatch(
+      addOrUpdateConversation({
+        threadId: message.threadId,
+        lastMessage: message.text,
+        incrementUnread: !isCurrentThread,
+        messages: [message],
+        sender,
+      })
+    );
+
+    if (isCurrentThread) {
       setSelectedChat((prev) => ({
         ...prev,
         lastMessage: message.text,
@@ -108,56 +178,115 @@ const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
       }));
     }
 
-    dispatch(addOrUpdateConversation({
-      threadId: message.threadId,
-      lastMessage: message.text,
-      lastMessageTimestamp: message.timestamp,
-      incrementUnread: !isCurrentThread,
-      messages: [message],
-    }));
+    dispatch(
+      updateLastMessageInConversation({
+        threadId: message.threadId,
+        message: { text: message.text, timestamp: message.timestamp },
+      })
+    );
+
+    dispatch(addMessageToThread({ threadId: message.threadId, message }));
   };
 
-  const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(studentId, handleNewMessage);
+  // Handle tuition request approval updates from socket
+  const handleRequestUpdate = useCallback(
+    async (data) => {
+      if (data.type === 'approved') {
+        try {
+          // Fetch fresh conversations list
+          const updatedConvos = await dispatch(fetchConversationsThunk({ userId: currentUserId })).unwrap();
 
-  // Join thread when selectedChat changes
+          // Find the updated conversation by threadId or requestId
+          const approvedConvo = updatedConvos.find(
+            (convo) => convo.threadId === data.threadId || convo.requestId === data.requestId
+          );
+
+          if (approvedConvo) {
+            // Update Redux conversations with latest approved convo
+            dispatch(addOrUpdateConversation(approvedConvo));
+
+            // Update local selectedChat if it's the same thread to trigger re-render
+            setSelectedChat((prevSelected) => {
+              if (prevSelected?.threadId === approvedConvo.threadId) {
+                return { ...approvedConvo }; // new object to force update
+              }
+              return prevSelected;
+            });
+
+            // Update current thread ID
+            dispatch(setCurrentThreadId(approvedConvo.threadId));
+
+            // Mark user selected to prevent auto overrides
+            userSelectedChatRef.current = true;
+          } else {
+            console.warn('Approved conversation not found after refresh');
+          }
+        } catch (err) {
+          console.error('Error refetching conversations after approval:', err);
+        }
+      }
+    },
+    [dispatch, currentUserId]
+  );
+
+  // Sync selectedChat to always reflect latest conversation data from Redux
   useEffect(() => {
-    if (selectedChat?.threadId) {
+    if (!selectedChat) return;
+
+    const updatedConvo = conversations.find(c => c.threadId === selectedChat.threadId);
+    if (updatedConvo && updatedConvo !== selectedChat) {
+      setSelectedChat(updatedConvo);
+    }
+  }, [conversations, selectedChat]);
+
+  const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(
+    currentUserId,
+    handleNewMessage,
+    handleRequestUpdate // Pass it here
+  );
+
+  useEffect(() => {
+    if (
+      selectedChat?.threadId &&
+      !joinedThreadsRef.current.has(selectedChat.threadId)
+    ) {
       joinThread(selectedChat.threadId);
-      console.log('Student joined thread:', selectedChat.threadId);
+      joinedThreadsRef.current.add(selectedChat.threadId);
     }
   }, [selectedChat, joinThread]);
 
-  // Fetch conversations only if not loaded yet
   useEffect(() => {
-    if (!conversationsLoaded && studentId && token) {
-      fetchConversations();
-    }
-  }, [conversationsLoaded, studentId, token, fetchConversations]);
+    if (!currentUserId || dedupedConversations.length === 0) return;
+    dedupedConversations.forEach((convo) => {
+      if (convo.threadId && !joinedThreadsRef.current.has(convo.threadId)) {
+        joinThread(convo.threadId);
+        joinedThreadsRef.current.add(convo.threadId);
+      }
+    });
+  }, [currentUserId, dedupedConversations, joinThread]);
 
-  // Update selectedChat if conversations change
-useEffect(() => {
-  if (dedupedConversations.length === 0) {
-    if (selectedChat !== null) {
-      console.log('[useEffect] dedupedConversations empty, clearing selectedChat');
+  useEffect(() => {
+    if (dedupedConversations.length === 0 && selectedChat !== null) {
       setSelectedChat(null);
+      return;
     }
-    return;
-  }
 
-  // Check if current selected chat exists in deduped conversations
-  const exists = dedupedConversations.some(
-    (c) => c.threadId === selectedChat?.threadId
-  );
+    if (!selectedChat) {
+      setSelectedChat(dedupedConversations[0]);
+      return;
+    }
 
-  if (!exists) {
-    console.log('[useEffect] selectedChat no longer exists, setting to first conversation');
-    setSelectedChat(dedupedConversations[0]);
-  } else {
-    console.log('[useEffect] selectedChat exists, keeping current selection');
-  }
-}, [dedupedConversations, selectedChat]);
+    if (userSelectedChatRef.current) return;
 
-  // Reset unread count and notify server when selecting a chat
+    const stillExists = dedupedConversations.some(
+      (c) => c.threadId === selectedChat.threadId
+    );
+
+    if (!stillExists) {
+      setSelectedChat(dedupedConversations[0]);
+    }
+  }, [dedupedConversations, selectedChat]);
+
   useEffect(() => {
     if (!selectedChat) return;
 
@@ -172,10 +301,7 @@ useEffect(() => {
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
 
-    if (!full) {
-      console.warn('Could not find full conversation for:', selected.threadId);
-    }
-
+    userSelectedChatRef.current = true;
     setSelectedChat(finalSelection);
     dispatch(setCurrentThreadId(finalSelection.threadId));
   };
@@ -189,9 +315,9 @@ useEffect(() => {
         conversations={dedupedConversations}
         selectedChatId={selectedChat?.threadId}
         onSelect={handleSelectChat}
+        onlineUserIds={onlineUserIds}
         userId={studentId}
         isStudent={true}
-           onlineUserIds={onlineUserIds}
       />
       <ChatPanel
         chat={selectedChat}
