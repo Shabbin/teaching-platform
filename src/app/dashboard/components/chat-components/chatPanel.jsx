@@ -107,39 +107,39 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
         <h2 className="text-lg font-semibold">{chatName}</h2>
 
         <div className="space-y-2 mt-2 max-h-[70vh] overflow-y-auto">
-          {chat.status === 'pending' ? (
-            <div className="bg-white p-4 rounded-xl shadow border border-gray-200">
-              <p className="text-gray-600 mb-2 font-medium">
-                Request: {chat.topic || 'Tuition Request'}
-              </p>
-              <p className="text-gray-800 whitespace-pre-wrap break-words mb-4 leading-relaxed">
-                {chat.lastMessage || 'No message provided'}
-              </p>
+         {chat.status === 'pending' ? (
+  <div className="bg-white p-4 rounded-xl shadow border border-gray-200 max-w-[90%] w-full break-words">
+    <p className="text-gray-600 mb-2 font-medium">
+      Request: {chat.topic || 'Tuition Request'}
+    </p>
+    <p className="text-gray-800 whitespace-pre-wrap break-words break-all mb-4 leading-relaxed w-full">
+      {chat.lastMessage || 'No message provided'}
+    </p>
 
-              {user?.role === 'student' ? (
-                <p className="italic text-gray-700">
-                  You: {chat.topic || 'Tuition Request'} (Pending approval)
-                </p>
-              ) : (
-                <div className="flex gap-3 justify-end flex-wrap">
-                  <button
-                    onClick={() => onApprove(chat.requestId)}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition"
-                  >
-                    <CheckCircle className="w-5 h-5" />
-                    <span>Approve</span>
-                  </button>
-                  <button
-                    onClick={() => onReject(chat.requestId)}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition"
-                  >
-                    <XCircle className="w-5 h-5" />
-                    <span>Reject</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
+    {user?.role === 'student' ? (
+      <p className="italic text-gray-700">
+        You: {chat.topic || 'Tuition Request'} (Pending approval)
+      </p>
+    ) : (
+      <div className="flex gap-3 justify-end flex-wrap">
+        <button
+          onClick={() => onApprove(chat.requestId)}
+          className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition"
+        >
+          <CheckCircle className="w-5 h-5" />
+          <span>Approve</span>
+        </button>
+        <button
+          onClick={() => onReject(chat.requestId)}
+          className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition"
+        >
+          <XCircle className="w-5 h-5" />
+          <span>Reject</span>
+        </button>
+      </div>
+    )}
+  </div>
+)  : (
             messages.map((msg, i) => (
               <MessageBubble
                 key={msg._id || `${msg.timestamp}-${i}`}
