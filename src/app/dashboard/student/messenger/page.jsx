@@ -23,12 +23,11 @@ export default function StudentMessengerPage() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.user.userInfo);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const studentId = user?.id || user?._id;
-  const currentUserId = studentId?.toString();
+  const currentUserId = (user?.id || user?._id)?.toString();
   const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
   const conversations = useSelector((state) => state.chat.conversations);
   const conversationsLoaded = useSelector((state) => state.chat.conversationsLoaded);
-  const currentThreadId = useSelector((state) => state.chat.currentThreadId);
+
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -36,7 +35,9 @@ export default function StudentMessengerPage() {
   const joinedThreadsRef = useRef(new Set());
   const lastKnockTimeRef = useRef(0);
   const userSelectedChatRef = useRef(false);
+  const lastResetThreadIdRef = useRef(null);
 
+  // Deduplicate and prepare conversations: show teacher info for student
   const dedupedConversations = useMemo(() => {
     const map = new Map();
     conversations.forEach((c) => {
@@ -44,7 +45,6 @@ export default function StudentMessengerPage() {
         map.set(c.threadId, c);
       }
     });
-
     const deduped = Array.from(map.values());
 
     const withUnreadAndDisplay = deduped.map((conv) => {
@@ -62,6 +62,7 @@ export default function StudentMessengerPage() {
       let displayImage = conv.profileImage;
 
       if (currentUserId === studentId) {
+        // show teacher info for student
         displayName = conv.teacherName || 'Teacher';
         const teacherParticipant = conv.participants?.find(
           (p) => p._id.toString() === teacherId
@@ -89,6 +90,7 @@ export default function StudentMessengerPage() {
     return withUnreadAndDisplay;
   }, [conversations, currentUserId]);
 
+  // Fetch conversations without selectedChat in deps to avoid loop
   const fetchConversations = useCallback(async () => {
     if (!currentUserId || !token) return;
     setLoading(true);
@@ -122,14 +124,16 @@ export default function StudentMessengerPage() {
     } finally {
       setLoading(false);
     }
-  }, [dispatch, token, currentUserId, selectedChat]);
+  }, [dispatch, token, currentUserId]); // selectedChat removed here
 
+  // Fetch on initial load or when needed
   useEffect(() => {
     if (!conversationsLoaded && currentUserId && token) {
       fetchConversations();
     }
   }, [conversationsLoaded, currentUserId, token, fetchConversations]);
 
+  // Debounced knock sound
   function playKnockDebounced() {
     const now = Date.now();
     if (now - lastKnockTimeRef.current > 3000) {
@@ -138,6 +142,7 @@ export default function StudentMessengerPage() {
     }
   }
 
+  // Handle incoming messages from socket
   const handleNewMessage = (message) => {
     const isMyMessage = String(message.senderId) === currentUserId;
     const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
@@ -188,35 +193,26 @@ export default function StudentMessengerPage() {
     dispatch(addMessageToThread({ threadId: message.threadId, message }));
   };
 
-  // Handle tuition request approval updates from socket
+  // Handle request approval notifications from socket
   const handleRequestUpdate = useCallback(
     async (data) => {
       if (data.type === 'approved') {
         try {
-          // Fetch fresh conversations list
-          const updatedConvos = await dispatch(fetchConversationsThunk({ userId: currentUserId })).unwrap();
+          const updatedConvos = await dispatch(fetchConversationsThunk({ role: 'student', userId: currentUserId })).unwrap();
 
-          // Find the updated conversation by threadId or requestId
           const approvedConvo = updatedConvos.find(
             (convo) => convo.threadId === data.threadId || convo.requestId === data.requestId
           );
 
           if (approvedConvo) {
-            // Update Redux conversations with latest approved convo
             dispatch(addOrUpdateConversation(approvedConvo));
-
-            // Update local selectedChat if it's the same thread to trigger re-render
             setSelectedChat((prevSelected) => {
               if (prevSelected?.threadId === approvedConvo.threadId) {
-                return { ...approvedConvo }; // new object to force update
+                return { ...approvedConvo };
               }
               return prevSelected;
             });
-
-            // Update current thread ID
             dispatch(setCurrentThreadId(approvedConvo.threadId));
-
-            // Mark user selected to prevent auto overrides
             userSelectedChatRef.current = true;
           } else {
             console.warn('Approved conversation not found after refresh');
@@ -229,34 +225,43 @@ export default function StudentMessengerPage() {
     [dispatch, currentUserId]
   );
 
-  // Sync selectedChat to always reflect latest conversation data from Redux
+  // Sync selected chat with conversations updates safely checking important fields
   useEffect(() => {
     if (!selectedChat) return;
 
     const updatedConvo = conversations.find(c => c.threadId === selectedChat.threadId);
-    if (updatedConvo && updatedConvo !== selectedChat) {
+    if (!updatedConvo) return;
+
+    // Compare important fields to decide if update is needed
+    const hasChanged =
+      updatedConvo.unreadCount !== selectedChat.unreadCount ||
+      updatedConvo.lastMessageTimestamp !== selectedChat.lastMessageTimestamp ||
+      updatedConvo.lastMessage !== selectedChat.lastMessage;
+
+    if (hasChanged) {
       setSelectedChat(updatedConvo);
     }
   }, [conversations, selectedChat]);
 
+  // Setup socket hooks
   const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(
     currentUserId,
     handleNewMessage,
-    handleRequestUpdate // Pass it here
+    handleRequestUpdate
   );
 
+  // Join selected thread's socket room
   useEffect(() => {
-    if (
-      selectedChat?.threadId &&
-      !joinedThreadsRef.current.has(selectedChat.threadId)
-    ) {
+    if (selectedChat?.threadId && !joinedThreadsRef.current.has(selectedChat.threadId)) {
       joinThread(selectedChat.threadId);
       joinedThreadsRef.current.add(selectedChat.threadId);
     }
   }, [selectedChat, joinThread]);
 
+  // Join all conversation threads on socket
   useEffect(() => {
     if (!currentUserId || dedupedConversations.length === 0) return;
+
     dedupedConversations.forEach((convo) => {
       if (convo.threadId && !joinedThreadsRef.current.has(convo.threadId)) {
         joinThread(convo.threadId);
@@ -265,38 +270,39 @@ export default function StudentMessengerPage() {
     });
   }, [currentUserId, dedupedConversations, joinThread]);
 
+  // Manage selectedChat updates when conversations change
   useEffect(() => {
     if (dedupedConversations.length === 0 && selectedChat !== null) {
       setSelectedChat(null);
       return;
     }
 
-    if (!selectedChat) {
+    if (!selectedChat && dedupedConversations.length > 0) {
       setSelectedChat(dedupedConversations[0]);
       return;
     }
 
     if (userSelectedChatRef.current) return;
 
-    const stillExists = dedupedConversations.some(
-      (c) => c.threadId === selectedChat.threadId
-    );
-
-    if (!stillExists) {
+    const stillExists = dedupedConversations.some((c) => c.threadId === selectedChat?.threadId);
+    if (!stillExists && dedupedConversations.length > 0) {
       setSelectedChat(dedupedConversations[0]);
     }
   }, [dedupedConversations, selectedChat]);
 
-  useEffect(() => {
-    if (!selectedChat) return;
+  // Reset unread count when selected chat changes, but only once per thread
+ useEffect(() => {
+  if (!selectedChat) return;
 
-    dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
+  dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
 
-    if (emitMarkThreadRead) {
-      emitMarkThreadRead(selectedChat.threadId);
-    }
-  }, [selectedChat, dispatch, emitMarkThreadRead]);
+  if (emitMarkThreadRead) {
+    emitMarkThreadRead(selectedChat.threadId);
+  }
+}, [selectedChat, dispatch, emitMarkThreadRead]);
 
+
+  // Handle manual chat selection by user
   const handleSelectChat = (selected) => {
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
@@ -316,7 +322,7 @@ export default function StudentMessengerPage() {
         selectedChatId={selectedChat?.threadId}
         onSelect={handleSelectChat}
         onlineUserIds={onlineUserIds}
-        userId={studentId}
+        userId={currentUserId}
         isStudent={true}
       />
       <ChatPanel

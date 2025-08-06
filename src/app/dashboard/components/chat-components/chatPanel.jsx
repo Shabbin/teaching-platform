@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import MessageBubble from './MessageBubble';
 import useSocket from '../../../hooks/useSocket';
@@ -8,14 +8,19 @@ import {
   clearMessagesForThread as clearMessagesAction,
   addMessageToThread as resetUnreadCount,
 } from '../../../redux/chatSlice';
-import {
-  fetchMessagesThunk,
-} from '../../../redux/chatThunks';
+import { fetchMessagesThunk } from '../../../redux/chatThunks';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { makeSelectMessagesByThread } from '../../../redux/chatSelectors';
 
 export default function ChatPanel({ chat, user, onApprove, onReject }) {
   const dispatch = useDispatch();
-  const messages = useSelector((state) => state.chat.messagesByThread[chat?.threadId] || []);
+
+  const selectMessages = useMemo(
+    () => makeSelectMessagesByThread(chat?.threadId),
+    [chat?.threadId]
+  );
+  const messages = useSelector(selectMessages);
+
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef();
   const { sendMessage: socketSendMessage, joinThread, socketRef } = useSocket(chat?.threadId);
@@ -107,39 +112,39 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
         <h2 className="text-lg font-semibold">{chatName}</h2>
 
         <div className="space-y-2 mt-2 max-h-[70vh] overflow-y-auto">
-         {chat.status === 'pending' ? (
-  <div className="bg-white p-4 rounded-xl shadow border border-gray-200 max-w-[90%] w-full break-words">
-    <p className="text-gray-600 mb-2 font-medium">
-      Request: {chat.topic || 'Tuition Request'}
-    </p>
-    <p className="text-gray-800 whitespace-pre-wrap break-words break-all mb-4 leading-relaxed w-full">
-      {chat.lastMessage || 'No message provided'}
-    </p>
+          {chat.status === 'pending' ? (
+            <div className="bg-white p-4 rounded-xl shadow border border-gray-200 max-w-[90%] w-full break-words">
+              <p className="text-gray-600 mb-2 font-medium">
+                Request: {chat.topic || 'Tuition Request'}
+              </p>
+              <p className="text-gray-800 whitespace-pre-wrap break-words break-all mb-4 leading-relaxed w-full">
+                {chat.lastMessage || 'No message provided'}
+              </p>
 
-    {user?.role === 'student' ? (
-      <p className="italic text-gray-700">
-        You: {chat.topic || 'Tuition Request'} (Pending approval)
-      </p>
-    ) : (
-      <div className="flex gap-3 justify-end flex-wrap">
-        <button
-          onClick={() => onApprove(chat.requestId)}
-          className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition"
-        >
-          <CheckCircle className="w-5 h-5" />
-          <span>Approve</span>
-        </button>
-        <button
-          onClick={() => onReject(chat.requestId)}
-          className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition"
-        >
-          <XCircle className="w-5 h-5" />
-          <span>Reject</span>
-        </button>
-      </div>
-    )}
-  </div>
-)  : (
+              {user?.role === 'student' ? (
+                <p className="italic text-gray-700">
+                  You: {chat.topic || 'Tuition Request'} (Pending approval)
+                </p>
+              ) : (
+                <div className="flex gap-3 justify-end flex-wrap">
+                  <button
+                    onClick={() => onApprove(chat.requestId)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-full hover:bg-green-200 transition"
+                  >
+                    <CheckCircle className="w-5 h-5" />
+                    <span>Approve</span>
+                  </button>
+                  <button
+                    onClick={() => onReject(chat.requestId)}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-full hover:bg-red-200 transition"
+                  >
+                    <XCircle className="w-5 h-5" />
+                    <span>Reject</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
             messages.map((msg, i) => (
               <MessageBubble
                 key={msg._id || `${msg.timestamp}-${i}`}
