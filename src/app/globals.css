@@ -1,6 +1,17 @@
+html, body, #__next {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+}
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 @import "tailwindcss";
 @plugin "daisyui";
 globals.css
+
 @keyframes comicPop {
   0% {
     transform: scale(0.6);
@@ -23,3 +34,4 @@ globals.css
 .font-comicSans {
   font-family: "Comic Sans MS", cursive, sans-serif;
 }
+

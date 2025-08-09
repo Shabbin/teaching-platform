@@ -11,10 +11,13 @@ import Link from 'next/link';
 const StudentDashboard = () => {
   const dispatch = useDispatch();
   const { studentDashboard, loading, error } = useSelector((state) => state.user);
-
-  useEffect(() => {
+console.log(studentDashboard ,"gswderfgdsfg")
+useEffect(() => {
+  if (!studentDashboard) {
+    console.log('Dispatching getStudentDashboard');
     dispatch(getStudentDashboard());
-  }, [dispatch]);
+  }
+}, [dispatch, studentDashboard]);
 
   return (
     <ProtectedRoute allowedRole="student">

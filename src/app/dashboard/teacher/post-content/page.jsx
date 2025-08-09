@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import axios from 'axios';
 import CreatePostWizard from '../components/formComponents/CreatePostWizard'; // Adjust path if needed
 
 const PostContentPage = () => {
@@ -20,30 +21,23 @@ const PostContentPage = () => {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-
-    if (!token) {
-      setLoading(false);
-      setError('You must be logged in to view posts.');
-      return;
-    }
-
     const fetchPosts = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
-        const res = await fetch('http://localhost:5000/api/posts/mine', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        // Use axios with credentials (cookies)
+        const res = await axios.get('http://localhost:5000/api/posts/mine', {
+          withCredentials: true,
         });
-
-        if (!res.ok) {
-          throw new Error('Failed to fetch posts');
-        }
-
-        const data = await res.json();
-        setPosts(data);
+        setPosts(res.data);
       } catch (err) {
-        setError(err.message || 'Error fetching posts');
+        // If 401 Unauthorized, user is probably not logged in
+        if (err.response?.status === 401) {
+          setError('You must be logged in to view posts.');
+        } else {
+          setError(err.message || 'Error fetching posts');
+        }
       } finally {
         setLoading(false);
       }
@@ -56,26 +50,19 @@ const PostContentPage = () => {
     const confirmed = confirm('Are you sure you want to delete this post?');
     if (!confirmed) return;
 
-    const token = localStorage.getItem('token');
-    if (!token) {
-      alert('You must be logged in to delete posts.');
-      return;
-    }
-
     setDeleting(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/posts/${id}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      await axios.delete(`http://localhost:5000/api/posts/${id}`, {
+        withCredentials: true,
       });
-
-      if (!res.ok) throw new Error('Failed to delete post');
 
       setPosts((prev) => prev.filter((post) => post._id !== id));
     } catch (err) {
-      alert(err.message || 'Error deleting post');
+      if (err.response?.status === 401) {
+        alert('You must be logged in to delete posts.');
+      } else {
+        alert(err.message || 'Error deleting post');
+      }
     } finally {
       setDeleting(false);
     }

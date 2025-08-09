@@ -1,14 +1,9 @@
-'use client';
-
+// app/layout.js (server component, no 'use client')
 import { Geist } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-import { Provider } from "react-redux";
-import { store } from "../app/redux/store";
-import UserRehydrator from "../app/components/UserRehydrator";
-
-import usePerformanceLogger from './hooks/usePerformanceLogger';  // <-- import the hook
+import ReduxProviderWrapper from '../app/redux/ReduxProviderWrapper'; // your client wrapper component
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -21,15 +16,10 @@ const geistMono = Geist_Mono({
 });
 
 export default function RootLayout({ children }) {
-    // usePerformanceLogger();  // <-- call it here to start tracking performance
-
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>
-        <Provider store={store}>
-          <UserRehydrator />
-          {children}
-        </Provider>
+      <body className="m-0 p-0 min-h-screen w-screen h-screen">
+        <ReduxProviderWrapper>{children}</ReduxProviderWrapper>
       </body>
     </html>
   );

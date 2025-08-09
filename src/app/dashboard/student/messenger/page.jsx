@@ -22,7 +22,7 @@ function getFallbackAvatar(userId) {
 export default function StudentMessengerPage() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.user.userInfo);
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
   const currentUserId = (user?.id || user?._id)?.toString();
   const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
   const conversations = useSelector((state) => state.chat.conversations);
@@ -35,7 +35,6 @@ export default function StudentMessengerPage() {
   const joinedThreadsRef = useRef(new Set());
   const lastKnockTimeRef = useRef(0);
   const userSelectedChatRef = useRef(false);
-  const lastResetThreadIdRef = useRef(null);
 
   // Deduplicate and prepare conversations: show teacher info for student
   const dedupedConversations = useMemo(() => {
@@ -47,52 +46,48 @@ export default function StudentMessengerPage() {
     });
     const deduped = Array.from(map.values());
 
-    const withUnreadAndDisplay = deduped.map((conv) => {
-      const mySession = conv.sessions?.find(
-        (s) => s.userId?.toString() === currentUserId
-      );
-      const lastSeen = mySession?.lastSeen ? new Date(mySession.lastSeen) : null;
-      const lastMsgTime = new Date(conv.lastMessageTimestamp || 0);
-      const isUnread = lastSeen ? lastSeen < lastMsgTime : true;
-
-      const studentId = conv.studentId?.toString();
-      const teacherId = conv.teacherId?.toString();
-
-      let displayName = conv.name;
-      let displayImage = conv.profileImage;
-
-      if (currentUserId === studentId) {
-        // show teacher info for student
-        displayName = conv.teacherName || 'Teacher';
-        const teacherParticipant = conv.participants?.find(
-          (p) => p._id.toString() === teacherId
+    return deduped
+      .map((conv) => {
+        const mySession = conv.sessions?.find(
+          (s) => s.userId?.toString() === currentUserId
         );
-        displayImage =
-          conv.teacherProfileImage ||
-          teacherParticipant?.profileImage ||
-          getFallbackAvatar(teacherId);
-      }
+        const lastSeen = mySession?.lastSeen ? new Date(mySession.lastSeen) : null;
+        const lastMsgTime = new Date(conv.lastMessageTimestamp || 0);
+        const isUnread = lastSeen ? lastSeen < lastMsgTime : true;
 
-      return {
-        ...conv,
-        isUnread,
-        name: displayName,
-        profileImage: displayImage,
-      };
-    });
+        const studentId = conv.studentId?.toString();
+        const teacherId = conv.teacherId?.toString();
 
-    withUnreadAndDisplay.sort((a, b) => {
-      const timeA = new Date(a.lastMessageTimestamp || 0);
-      const timeB = new Date(b.lastMessageTimestamp || 0);
-      return timeB - timeA;
-    });
+        let displayName = conv.name;
+        let displayImage = conv.profileImage;
 
-    return withUnreadAndDisplay;
+        if (currentUserId === studentId) {
+          // Show teacher info for student
+          displayName = conv.teacherName || 'Teacher';
+          const teacherParticipant = conv.participants?.find(
+            (p) => p._id.toString() === teacherId
+          );
+          displayImage =
+            conv.teacherProfileImage ||
+            teacherParticipant?.profileImage ||
+            getFallbackAvatar(teacherId);
+        }
+
+        return {
+          ...conv,
+          isUnread,
+          name: displayName,
+          profileImage: displayImage,
+        };
+      })
+      .sort((a, b) => {
+        return new Date(b.lastMessageTimestamp || 0) - new Date(a.lastMessageTimestamp || 0);
+      });
   }, [conversations, currentUserId]);
 
-  // Fetch conversations without selectedChat in deps to avoid loop
+  // Fetch conversations
   const fetchConversations = useCallback(async () => {
-    if (!currentUserId || !token) return;
+    if (!currentUserId) return;
     setLoading(true);
     setError(null);
 
@@ -124,14 +119,13 @@ export default function StudentMessengerPage() {
     } finally {
       setLoading(false);
     }
-  }, [dispatch, token, currentUserId]); // selectedChat removed here
+  }, [dispatch, currentUserId, selectedChat]);
 
-  // Fetch on initial load or when needed
-  useEffect(() => {
-    if (!conversationsLoaded && currentUserId && token) {
-      fetchConversations();
-    }
-  }, [conversationsLoaded, currentUserId, token, fetchConversations]);
+useEffect(() => {
+  if (!conversationsLoaded && currentUserId) {
+    dispatch(fetchConversationsThunk({ userId: currentUserId }));
+  }
+}, [conversationsLoaded, currentUserId, dispatch]);
 
   // Debounced knock sound
   function playKnockDebounced() {
@@ -142,7 +136,7 @@ export default function StudentMessengerPage() {
     }
   }
 
-  // Handle incoming messages from socket
+  // Handle incoming messages
   const handleNewMessage = (message) => {
     const isMyMessage = String(message.senderId) === currentUserId;
     const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
@@ -193,7 +187,7 @@ export default function StudentMessengerPage() {
     dispatch(addMessageToThread({ threadId: message.threadId, message }));
   };
 
-  // Handle request approval notifications from socket
+  // Handle request approval notifications
   const handleRequestUpdate = useCallback(
     async (data) => {
       if (data.type === 'approved') {
@@ -225,14 +219,13 @@ export default function StudentMessengerPage() {
     [dispatch, currentUserId]
   );
 
-  // Sync selected chat with conversations updates safely checking important fields
+  // Sync selectedChat with conversations updates
   useEffect(() => {
     if (!selectedChat) return;
 
     const updatedConvo = conversations.find(c => c.threadId === selectedChat.threadId);
     if (!updatedConvo) return;
 
-    // Compare important fields to decide if update is needed
     const hasChanged =
       updatedConvo.unreadCount !== selectedChat.unreadCount ||
       updatedConvo.lastMessageTimestamp !== selectedChat.lastMessageTimestamp ||
@@ -250,7 +243,7 @@ export default function StudentMessengerPage() {
     handleRequestUpdate
   );
 
-  // Join selected thread's socket room
+  // Join selected thread room
   useEffect(() => {
     if (selectedChat?.threadId && !joinedThreadsRef.current.has(selectedChat.threadId)) {
       joinThread(selectedChat.threadId);
@@ -258,7 +251,7 @@ export default function StudentMessengerPage() {
     }
   }, [selectedChat, joinThread]);
 
-  // Join all conversation threads on socket
+  // Join all conversation threads
   useEffect(() => {
     if (!currentUserId || dedupedConversations.length === 0) return;
 
@@ -290,19 +283,18 @@ export default function StudentMessengerPage() {
     }
   }, [dedupedConversations, selectedChat]);
 
-  // Reset unread count when selected chat changes, but only once per thread
- useEffect(() => {
-  if (!selectedChat) return;
+  // Reset unread count on selected chat change
+  useEffect(() => {
+    if (!selectedChat) return;
 
-  dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
+    dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
 
-  if (emitMarkThreadRead) {
-    emitMarkThreadRead(selectedChat.threadId);
-  }
-}, [selectedChat, dispatch, emitMarkThreadRead]);
+    if (emitMarkThreadRead) {
+      emitMarkThreadRead(selectedChat.threadId);
+    }
+  }, [selectedChat, dispatch, emitMarkThreadRead]);
 
-
-  // Handle manual chat selection by user
+  // Handle user selecting a chat
   const handleSelectChat = (selected) => {
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
@@ -325,12 +317,7 @@ export default function StudentMessengerPage() {
         userId={currentUserId}
         isStudent={true}
       />
-      <ChatPanel
-        chat={selectedChat}
-        user={user}
-        token={token}
-        sendMessage={sendMessage}
-      />
+      <ChatPanel chat={selectedChat} user={user} sendMessage={sendMessage} />
     </div>
   );
 }

@@ -5,7 +5,8 @@ import { formatDistanceToNow } from 'date-fns';
 
 export default function ConversationList({ conversations, selectedChatId, onSelect, onlineUserIds = [] }) {
   const lastMessages = useSelector((state) => state.chat.lastMessagesByThread);
-  const currentUserId = useSelector((state) => state.user.userInfo?.id);
+const currentUserId = useSelector((state) => state.user.userInfo?._id || state.user.userInfo?.id || null);
+
 
   console.log(conversations, "conversations in ConversationList");
   console.log(currentUserId, "currentUserId");
@@ -26,6 +27,8 @@ export default function ConversationList({ conversations, selectedChatId, onSele
   let otherUser = null;
 
   if (Array.isArray(chat.participants)) {
+    console.log('currentUserId:', currentUserId, typeof currentUserId);
+console.log('participants:', chat.participants.map(p => ({ id: p?._id, idType: typeof p?._id })));
     otherUser = chat.participants.find(
       (p) => p && p._id !== currentUserId
     );

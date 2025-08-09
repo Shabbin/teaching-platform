@@ -8,6 +8,7 @@ import {
   incrementUnreadCount,
   resetUnreadCount,
   setOnlineUserIds,
+  setCurrentThreadId, // ✅ needed for request_update handler
 } from '../redux/chatSlice';
 import { normalizeMessage } from '../redux/chatThunks';
 
@@ -22,7 +23,7 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
 
   const currentThreadId = useSelector((state) => state.chat.currentThreadId);
 
-  // Load audio
+  // Load knock audio
   useEffect(() => {
     knockAudioRef.current = new Audio('/knock.mp3');
   }, []);
@@ -42,8 +43,9 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
   useEffect(() => {
     if (!userId) return;
 
+    // ✅ Cookie-based auth version
     socketRef.current = io(SOCKET_URL, {
-      query: { userId },
+      withCredentials: true, // Send cookies along with requests
     });
 
     socketRef.current.on('connect', () => {
@@ -102,8 +104,6 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
       }
     });
 
-
-
     socketRef.current.on('new_tuition_request', (data) => {
       console.log('[socket] new_tuition_request received:', data);
 
@@ -156,50 +156,47 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
         onRequestUpdate({ type: 'new', ...data });
       }
     });
+
     socketRef.current.on('request_update', (data) => {
       if (data.type === 'approved' && data.studentId === userId) {
-    // Dispatch Redux to set current thread ID to this approved thread
-    dispatch(setCurrentThreadId(data.threadId));
-  }
+        dispatch(setCurrentThreadId(data.threadId));
+      }
     });
-socketRef.current.on('request_approved', (data) => {
-  console.log('[socket] request_approved received:', data);
 
-  const { threadId, requestId, timestamp } = data;
+    socketRef.current.on('request_approved', (data) => {
+      console.log('[socket] request_approved received:', data);
 
-  const approvalMessage = {
-    _id: `approval-${Date.now()}`,
-    text: 'Your tuition request was approved!',
-    senderId: 'system',
-    threadId,
-    timestamp,
-    isSystemMessage: true,
-  };
+      const { threadId, requestId, timestamp } = data;
 
-  dispatch(addMessageToThread({ threadId, message: approvalMessage }));
-  dispatch(updateLastMessageInConversation({ threadId, message: approvalMessage }));
-  dispatch(resetUnreadCount({ threadId }));
+      const approvalMessage = {
+        _id: `approval-${Date.now()}`,
+        text: 'Your tuition request was approved!',
+        senderId: 'system',
+        threadId,
+        timestamp,
+        isSystemMessage: true,
+      };
 
-  dispatch(
-    addOrUpdateConversation({
-      threadId,
-      requestId,
-      lastMessage: approvalMessage.text,
-      lastMessageTimestamp: approvalMessage.timestamp,
-      status: 'approved',
-    })
-  );
+      dispatch(addMessageToThread({ threadId, message: approvalMessage }));
+      dispatch(updateLastMessageInConversation({ threadId, message: approvalMessage }));
+      dispatch(resetUnreadCount({ threadId }));
 
-  // Optional: Notify parent component
-  if (typeof onRequestUpdate === 'function') {
-    onRequestUpdate({ type: 'approved', threadId, requestId, timestamp });
-  }
+      dispatch(
+        addOrUpdateConversation({
+          threadId,
+          requestId,
+          lastMessage: approvalMessage.text,
+          lastMessageTimestamp: approvalMessage.timestamp,
+          status: 'approved',
+        })
+      );
 
-  playKnock(); // optional audio cue
-});
+      if (typeof onRequestUpdate === 'function') {
+        onRequestUpdate({ type: 'approved', threadId, requestId, timestamp });
+      }
 
-
-
+      playKnock();
+    });
 
     socketRef.current.on('mark_thread_read', ({ threadId, userId: senderUserId }) => {
       const myUserId = userId?.toString();
@@ -213,7 +210,7 @@ socketRef.current.on('request_approved', (data) => {
       console.log('[useSocket] disconnected:', reason);
     });
 
-    // ✅ CLEANUP FUNCTION
+    // Cleanup
     return () => {
       if (socketRef.current) {
         socketRef.current.off('online_users');

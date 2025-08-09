@@ -3,43 +3,41 @@ import {
   setConversations,
   addOrUpdateConversation,
   setMessagesForThread,
-setConversationsLoaded,
+  setConversationsLoaded,
   setLoading,
+  setCurrentUserId,
   setError,
 } from './chatSlice';
 import axios from 'axios';
 
-const BACKEND_URL = 'http://localhost:5000'; // <-- Set your backend base URL here
+const BACKEND_URL = 'http://localhost:5000';
 
 // 🔁 Fetch all conversations for current user (teacher or student)
-//src\app\redux\chatThunks.js
 export const fetchConversationsThunk = createAsyncThunk(
   'chat/fetchConversations',
   async ({ userId }, thunkAPI) => {
     try {
       thunkAPI.dispatch(setLoading(true));
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No auth token found');
+      if (!userId) throw new Error('No userId found');
+
+      thunkAPI.dispatch(setCurrentUserId(userId)); // <-- Set currentUserId here
 
       const endpoint = `${BACKEND_URL}/api/chat/conversations/${userId}`;
       const res = await axios.get(endpoint, {
-        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true,
       });
 
       const data = res.data;
 
       const normalized = data
-        .filter(chat => chat)
-        .map(chat => {
-          // Get the other participant
-          const otherParticipant = chat.participants?.find(
-            (p) => p._id !== userId
-          );
-
+        .filter(Boolean)
+        .map((chat) => {
+          // We do NOT assign 'name' or 'profileImage' here since
+          // addOrUpdateConversation will do that with currentUserId context
           return {
             ...chat,
             threadId: chat.threadId || chat._id || chat.requestId,
-             unreadCount: chat.unreadCount || 0,
+            unreadCount: chat.unreadCount || 0,
             lastMessage: chat.lastMessage || '',
             lastMessageTimestamp:
               chat.lastMessage?.timestamp ||
@@ -47,19 +45,10 @@ export const fetchConversationsThunk = createAsyncThunk(
               chat.updatedAt ||
               chat.createdAt ||
               null,
-              sessions: chat.sessions || [], 
-            name: otherParticipant?.name || 'No Name',
-            profileImage: otherParticipant?.profileImage || null,
+            sessions: chat.sessions || [],
           };
         })
-        .filter(chat => chat.threadId);
-
-      // Sort by latest message
-      normalized.sort((a, b) => {
-        const timeA = new Date(a.lastMessageTimestamp || 0);
-        const timeB = new Date(b.lastMessageTimestamp || 0);
-        return timeB - timeA;
-      });
+        .filter((chat) => chat.threadId);
 
       thunkAPI.dispatch(setConversations(normalized));
       thunkAPI.dispatch(setConversationsLoaded(true));
@@ -74,57 +63,49 @@ export const fetchConversationsThunk = createAsyncThunk(
 );
 
 
-
-
-
-
-
 // 💬 Load messages for a given threadId
-// chatThunks.js
-
 export function normalizeMessage(msg) {
   let senderObj = msg.sender || msg.senderId;
 
-  // If senderId is an object, extract _id
   const senderId =
     typeof senderObj === 'object' && senderObj !== null
       ? senderObj._id
       : senderObj;
 
-  // Always return both senderId and sender object
   return {
     ...msg,
     senderId: senderId,
-    sender: typeof senderObj === 'object'
-      ? senderObj
-      : {
-          _id: senderId,
-          name: 'Unknown',
-          profileImage: `https://i.pravatar.cc/150?u=${senderId}`,
-          role: null,
-        },
+    sender:
+      typeof senderObj === 'object'
+        ? senderObj
+        : {
+            _id: senderId,
+            name: 'Unknown',
+            profileImage: `https://i.pravatar.cc/150?u=${senderId}`,
+            role: null,
+          },
   };
-} //will move this to utility
-
+}
 
 export const fetchMessagesThunk = createAsyncThunk(
   'chat/fetchMessages',
   async (threadId, thunkAPI) => {
     try {
       thunkAPI.dispatch(setLoading(true));
-      const res = await axios.get(`${BACKEND_URL}/api/chat/messages/${threadId}`);
+      const res = await axios.get(`${BACKEND_URL}/api/chat/messages/${threadId}`, {
+        withCredentials: true,
+      });
 
       let fetchedMessages = res.data;
 
-      // Normalize messages here before filtering
       fetchedMessages = fetchedMessages.map(normalizeMessage);
 
       const state = thunkAPI.getState();
       const existingMessages = state.chat.messagesByThread[threadId] || [];
 
-      const uniqueMessages = fetchedMessages.filter(msg => {
+      const uniqueMessages = fetchedMessages.filter((msg) => {
         const id = msg._id || `${msg.text}-${msg.timestamp}`;
-        return !existingMessages.some(existing => {
+        return !existingMessages.some((existing) => {
           const existingId = existing._id || `${existing.text}-${existing.timestamp}`;
           return existingId === id;
         });
@@ -145,16 +126,16 @@ export const fetchMessagesThunk = createAsyncThunk(
   }
 );
 
-
-
-// 📨 Send a message (POST to backend and update Redux)
+// 📨 Send a message
 export const sendMessageThunk = createAsyncThunk(
   'chat/sendMessage',
   async ({ threadId, messageData }, thunkAPI) => {
     try {
-      const res = await axios.post(`${BACKEND_URL}/api/chat/messages`, messageData);
-      // DO NOT dispatch addMessageToThread here, socket will handle adding message to Redux
-      // thunkAPI.dispatch(addMessageToThread({ threadId, message: res.data }));
+      const res = await axios.post(`${BACKEND_URL}/api/chat/messages`, messageData, {
+        withCredentials: true,
+      });
+
+      // Socket will handle adding message to Redux
       return res.data;
     } catch (err) {
       thunkAPI.dispatch(setError(err.message));
@@ -163,18 +144,20 @@ export const sendMessageThunk = createAsyncThunk(
   }
 );
 
-// 🔁 Optional: refresh a single conversation after approval/update
+// 🔁 Refresh single conversation after approval/update
 export const refreshConversationThunk = createAsyncThunk(
   'chat/refreshConversation',
   async (requestId, thunkAPI) => {
     try {
-      const res = await axios.get(`${BACKEND_URL}/api/teacher-requests/request/${requestId}`);
+      const res = await axios.get(`${BACKEND_URL}/api/teacher-requests/request/${requestId}`, {
+        withCredentials: true,
+      });
       const data = res.data;
-console.log(res,"dataa")
-      const state = thunkAPI.getState();
-      const userId = state.user.userInfo.id;
 
-      const otherParticipant = data.participants.find(p => p._id !== userId);
+      const state = thunkAPI.getState();
+      const userId = state.user.userInfo.id || state.user.userInfo._id;
+
+      const otherParticipant = data.participants.find((p) => p._id !== userId);
       const latestSession = data.sessions?.[data.sessions.length - 1];
       const status = latestSession?.status || 'approved';
 
@@ -197,43 +180,31 @@ console.log(res,"dataa")
     }
   }
 );
+
 export const approveRequestThunk = createAsyncThunk(
   'chat/approveRequest',
   async (requestId, thunkAPI) => {
     try {
-      const token = localStorage.getItem('token');
-
-      // Approve the request first
+      // Use PUT instead of POST to match backend updateRequestStatus route
       await axios.post(
         `${BACKEND_URL}/api/teacher-requests/${requestId}/approve`,
         {},
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { withCredentials: true }
       );
 
-      // Then fetch the full thread by requestId with populated participants
-      const threadRes = await axios.get(
-        `${BACKEND_URL}/api/chat/thread/${requestId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      // Fetch the full thread after approval
+      const threadRes = await axios.get(`${BACKEND_URL}/api/chat/thread/${requestId}`, {
+        withCredentials: true,
+      });
 
       const threadData = threadRes.data;
       const state = thunkAPI.getState();
-      const userId = state.user.userInfo.id;
+      const userId = state.user.userInfo.id || state.user.userInfo._id;
 
-      // Find the other participant (not the current user)
-      const otherParticipant = threadData.participants.find(
-        (p) => p._id !== userId
-      );
-
-      // Find latest session status or fallback to 'approved'
+      const otherParticipant = threadData.participants.find((p) => p._id !== userId);
       const latestSession = threadData.sessions?.[threadData.sessions.length - 1];
       const status = latestSession?.status || 'approved';
 
-      // Last message: use threadData.lastMessage if you store it, or fallback to last message in array
       const lastMsg =
         threadData.lastMessage?.text ||
         (threadData.messages.length > 0

@@ -5,37 +5,25 @@ import { useRouter } from 'next/navigation';
 import { logout } from './../../redux/userSlice';
 
 export default function ProtectedRoute({ children, allowedRole }) {
-  const { userInfo } = useSelector((state) => state.user);
+  const { userInfo, isFetched, loading } = useSelector((state) => state.user);
   const dispatch = useDispatch();
   const router = useRouter();
 
-  // 🧠 Token Check Logic
   useEffect(() => {
-    const checkAuth = () => {
-      const token = localStorage.getItem('token');
-      if (!token || !userInfo || userInfo.role !== allowedRole) {
+    // Only check auth after rehydration and loading complete
+    if (isFetched && !loading) {
+      if (!userInfo || userInfo.role !== allowedRole) {
         dispatch(logout());
         router.push('/login');
       }
-    };
+    }
+  }, [userInfo, allowedRole, dispatch, router, isFetched, loading]);
 
-    checkAuth();
+  // Don't render or redirect until user data is loaded and ready
+  if (!isFetched || loading) return null;
 
-    // 🧠 Listen to manual changes (even across tabs)
-    const handleStorageChange = (event) => {
-      if (event.key === 'token' && event.newValue === null) {
-        console.warn('Token manually removed. Logging out...');
-        dispatch(logout());
-        router.push('/login');
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [userInfo, allowedRole, dispatch, router]);
-
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  if (!token || !userInfo || userInfo.role !== allowedRole) return null;
+  // If user not allowed, don't render children
+  if (!userInfo || userInfo.role !== allowedRole) return null;
 
   return children;
 }

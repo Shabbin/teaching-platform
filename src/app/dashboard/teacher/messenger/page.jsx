@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import axios from 'axios';
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
@@ -29,7 +30,6 @@ function getFallbackAvatar(userId) {
 export default function MessengerPage() {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.user.userInfo);
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const currentUserId = (user?.id || user?._id)?.toString();
   const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
   const conversations = useSelector((state) => state.chat.conversations);
@@ -41,11 +41,7 @@ export default function MessengerPage() {
 
   const joinedThreadsRef = useRef(new Set());
   const lastKnockTimeRef = useRef(0);
-
-  // Track if user manually selected a chat recently
   const userSelectedChatRef = useRef(false);
-
-  // Track last threadId for which unread was reset
   const lastResetThreadIdRef = useRef(null);
 
   // Deduplicate conversations and prepare display info: show *other participant* info
@@ -59,9 +55,7 @@ export default function MessengerPage() {
 
     const deduped = Array.from(map.values());
 
-    // Add isUnread flag and correct display name/image to show opposite participant
     const withUnreadAndDisplay = deduped.map((conv) => {
-      // Find current user session lastSeen time
       const mySession = conv.sessions?.find(
         (s) => s.userId?.toString() === currentUserId
       );
@@ -69,7 +63,6 @@ export default function MessengerPage() {
       const lastMsgTime = new Date(conv.lastMessageTimestamp || 0);
       const isUnread = lastSeen ? lastSeen < lastMsgTime : true;
 
-      // Determine opposite participant to display
       const studentId = conv.studentId?.toString();
       const teacherId = conv.teacherId?.toString();
 
@@ -77,9 +70,7 @@ export default function MessengerPage() {
       let displayImage = conv.profileImage;
 
       if (currentUserId === teacherId) {
-        // Current user is teacher, show student info
         displayName = conv.studentName || 'Student';
-        // Try to find participant profileImage
         const studentParticipant = conv.participants?.find(
           (p) => p._id.toString() === studentId
         );
@@ -88,7 +79,6 @@ export default function MessengerPage() {
           studentParticipant?.profileImage ||
           getFallbackAvatar(studentId);
       } else if (currentUserId === studentId) {
-        // Current user is student, show teacher info
         displayName = conv.teacherName || 'Teacher';
         const teacherParticipant = conv.participants?.find(
           (p) => p._id.toString() === teacherId
@@ -107,7 +97,6 @@ export default function MessengerPage() {
       };
     });
 
-    // Sort by last message timestamp descending
     withUnreadAndDisplay.sort((a, b) => {
       const timeA = new Date(a.lastMessageTimestamp || 0);
       const timeB = new Date(b.lastMessageTimestamp || 0);
@@ -119,7 +108,7 @@ export default function MessengerPage() {
 
   // Fetch conversations from server
   const fetchConversations = useCallback(async () => {
-    if (!currentUserId || !token) return;
+    if (!currentUserId) return;
     setLoading(true);
     setError(null);
 
@@ -154,22 +143,20 @@ export default function MessengerPage() {
         dispatch(setCurrentThreadId(null));
       }
 
-      // Reset user selection flag after fetch sets selection
       userSelectedChatRef.current = false;
-
     } catch (err) {
       console.error('[fetchConversations] Failed to fetch conversations:', err);
       setError(err.message || 'Failed to fetch conversations');
     } finally {
       setLoading(false);
     }
-  }, [dispatch, token, currentUserId, user?.role, selectedChat]);
+  }, [dispatch, currentUserId, user?.role, selectedChat]);
 
   useEffect(() => {
-    if (!conversationsLoaded && currentUserId && token) {
+    if (!conversationsLoaded && currentUserId) {
       fetchConversations();
     }
-  }, [conversationsLoaded, currentUserId, token, fetchConversations]);
+  }, [conversationsLoaded, currentUserId, fetchConversations]);
 
   function playKnockDebounced() {
     const now = Date.now();
@@ -179,13 +166,11 @@ export default function MessengerPage() {
     }
   }
 
-  // Handle new incoming message
   const handleNewMessage = (message) => {
     const myUserId = currentUserId;
     const isMyMessage = String(message.senderId) === myUserId;
     const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
 
-    // Try to find sender info from message or participants
     let sender = null;
     if (message.sender) {
       sender = message.sender;
@@ -249,7 +234,6 @@ export default function MessengerPage() {
     dispatch(addMessageToThread({ threadId: message.threadId, message }));
   };
 
-  // Handle request status update (approve/reject)
   const handleRequestUpdate = async (requestId, status) => {
     try {
       let updatedThread;
@@ -257,6 +241,7 @@ export default function MessengerPage() {
       if (status === 'approved') {
         updatedThread = await dispatch(approveRequestThunk(requestId)).unwrap();
       } else if (status === 'rejected') {
+        // You need to implement rejectRequestThunk similarly to approveRequestThunk
         updatedThread = await dispatch(rejectRequestThunk(requestId)).unwrap();
       }
 
@@ -274,7 +259,6 @@ export default function MessengerPage() {
     handleRequestUpdate
   );
 
-  // Join selected thread room on socket
   useEffect(() => {
     if (
       selectedChat?.threadId &&
@@ -286,7 +270,6 @@ export default function MessengerPage() {
     }
   }, [selectedChat, joinThread]);
 
-  // Join all thread rooms on socket
   useEffect(() => {
     if (!currentUserId || dedupedConversations.length === 0) return;
 
@@ -299,7 +282,6 @@ export default function MessengerPage() {
     });
   }, [currentUserId, dedupedConversations, joinThread]);
 
-  // Update selected chat when conversations change
   useEffect(() => {
     console.log('[selectedChat effect] Running with selectedChat:', selectedChat?.threadId);
     console.log('[selectedChat effect] Conversations count:', dedupedConversations.length);
@@ -311,7 +293,6 @@ export default function MessengerPage() {
     }
 
     if (!selectedChat) {
-      // Only update if first conversation is different from current selectedChat
       if (
         dedupedConversations.length > 0 &&
         dedupedConversations[0].threadId !== selectedChat?.threadId
@@ -322,13 +303,11 @@ export default function MessengerPage() {
       return;
     }
 
-    // Skip update if user manually selected a chat recently
     if (userSelectedChatRef.current) {
       console.log('[selectedChat effect] Skipping update due to recent user selection');
       return;
     }
 
-    // Check if current selectedChat still exists in conversations
     const stillExists = dedupedConversations.some(
       (c) => c.threadId === selectedChat.threadId
     );
@@ -343,23 +322,18 @@ export default function MessengerPage() {
     }
   }, [dedupedConversations, selectedChat]);
 
-  // Reset unread count when selected chat changes
- useEffect(() => {
-  if (!selectedChat) return;
+  useEffect(() => {
+    if (!selectedChat) return;
 
-  // Remove or comment out the guard for testing:
-  // if (lastResetThreadIdRef.current === selectedChat.threadId) return;
+    dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
 
-  dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
+    if (emitMarkThreadRead) {
+      emitMarkThreadRead(selectedChat.threadId);
+    }
 
-  if (emitMarkThreadRead) {
-    emitMarkThreadRead(selectedChat.threadId);
-  }
+    lastResetThreadIdRef.current = selectedChat.threadId;
+  }, [selectedChat, dispatch, emitMarkThreadRead]);
 
-  lastResetThreadIdRef.current = selectedChat.threadId;
-}, [selectedChat, dispatch, emitMarkThreadRead]);
-
-  // Approve request handler
   const handleApprove = async (requestId) => {
     try {
       await dispatch(approveRequestThunk(requestId)).unwrap();
@@ -369,15 +343,13 @@ export default function MessengerPage() {
     }
   };
 
-  // Reject request handler
   const handleReject = async (requestId) => {
     try {
-      await fetch(
+      // Use axios with credentials, no token header needed
+      await axios.post(
         `http://localhost:5000/api/teacher-requests/${requestId}/reject`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        {},
+        { withCredentials: true }
       );
       await fetchConversations(); // Refresh after rejection
     } catch (err) {
@@ -385,13 +357,11 @@ export default function MessengerPage() {
     }
   };
 
-  // When user selects a conversation
   const handleSelectChat = (selected) => {
     console.log('[User Action] Selecting chat:', selected.threadId);
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
 
-    // Mark user selection so effect does not override
     userSelectedChatRef.current = true;
 
     setSelectedChat(finalSelection);
@@ -412,7 +382,6 @@ export default function MessengerPage() {
       <ChatPanel
         chat={selectedChat}
         user={user}
-        token={token}
         onApprove={handleApprove}
         onReject={handleReject}
         sendMessage={sendMessage}

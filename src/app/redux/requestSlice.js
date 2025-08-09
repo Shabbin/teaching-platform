@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-//src\app\redux\requestSlice.js
+
 // ===============================
 // SEND TUITION REQUEST
 // ===============================
@@ -8,20 +8,21 @@ export const sendTuitionRequest = createAsyncThunk(
   async ({ teacherId, postId, message }, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const token = state.user.userInfo.token || localStorage.getItem('token');
-      const studentId = state.user.userInfo.id;
-      const studentName = state.user.userInfo.name;
+      const userInfo = state.user.userInfo;
 
-      console.log(token, 'token');
-      console.log(studentId, 'StudentID');
-      console.log(studentName, 'StudentName');
+      if (!userInfo) {
+        return rejectWithValue('User not authenticated');
+      }
+
+      const studentId = userInfo.id || userInfo._id;
+      const studentName = userInfo.name;
 
       const res = await fetch('http://localhost:5000/api/teacher-requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+        credentials: 'include', // send cookies
         body: JSON.stringify({ teacherId, postId, message, studentId, studentName }),
       });
 
@@ -31,8 +32,7 @@ export const sendTuitionRequest = createAsyncThunk(
       }
 
       const data = await res.json();
-      console.log('✅ Tuition Request ID:', data.request._id);
-      return data; // return full response (includes `request`)
+      return data; // includes request object
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -47,20 +47,21 @@ export const sendTopicHelpRequest = createAsyncThunk(
   async ({ teacherId, topic, message }, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const token = state.user.userInfo.token || localStorage.getItem('token');
-      const studentId = state.user.userInfo.id;
-      const studentName = state.user.userInfo.name;
+      const userInfo = state.user.userInfo;
 
-      console.log(token, 'token');
-      console.log(studentId, 'StudentID');
-      console.log(studentName, 'StudentName');
+      if (!userInfo) {
+        return rejectWithValue('User not authenticated');
+      }
+
+      const studentId = userInfo.id || userInfo._id;
+      const studentName = userInfo.name;
 
       const res = await fetch('http://localhost:5000/api/teacher-requests', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({ teacherId, studentId, studentName, topic, message }),
       });
 
@@ -70,8 +71,7 @@ export const sendTopicHelpRequest = createAsyncThunk(
       }
 
       const data = await res.json();
-      console.log('✅ Topic Help Request ID:', data.request._id);
-      return data; // return full response (includes `request`)
+      return data;
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -87,7 +87,7 @@ const requestSlice = createSlice({
     loading: false,
     error: null,
     successMessage: null,
-    lastRequestId: null, // optional: useful if you want to access this elsewhere
+    lastRequestId: null,
   },
   reducers: {
     clearMessages: (state) => {
@@ -106,8 +106,7 @@ const requestSlice = createSlice({
       .addCase(sendTuitionRequest.fulfilled, (state, action) => {
         state.loading = false;
         state.successMessage = 'Tuition request sent successfully!';
-        state.lastRequestId = action.payload.request._id; // Save requestId to state
-        console.log('🎯 Tuition Request Fulfilled ID:', state.lastRequestId);
+        state.lastRequestId = action.payload.request._id;
       })
       .addCase(sendTuitionRequest.rejected, (state, action) => {
         state.loading = false;
@@ -121,8 +120,7 @@ const requestSlice = createSlice({
       .addCase(sendTopicHelpRequest.fulfilled, (state, action) => {
         state.loading = false;
         state.successMessage = 'Topic help request sent successfully!';
-        state.lastRequestId = action.payload.request._id; // Save requestId
-        console.log('🎯 Topic Help Request Fulfilled ID:', state.lastRequestId);
+        state.lastRequestId = action.payload.request._id;
       })
       .addCase(sendTopicHelpRequest.rejected, (state, action) => {
         state.loading = false;

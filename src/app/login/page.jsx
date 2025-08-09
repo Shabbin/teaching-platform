@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { loginUser } from '../redux/userSlice';
+import { loginUser, clearError } from '../redux/userSlice';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -16,6 +16,9 @@ export default function LoginPage() {
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
+useEffect(() => {
+  dispatch(clearError());
+}, [dispatch]);
 
 const handleSubmit = async (e) => {
   e.preventDefault();

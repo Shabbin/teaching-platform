@@ -14,7 +14,7 @@ import {
 import {
   fetchConversationsThunk,
   approveRequestThunk,
-  markThreadAsRead,
+  // markThreadAsRead,  <-- removed import
 } from '../../../redux/chatThunks';
 import useSocket from '../../../hooks/useSocket';
 import { FiMessageCircle } from 'react-icons/fi';
@@ -25,11 +25,10 @@ export default function MessengerPopup({ role: propRole }) {
   const loading = useSelector((state) => state.chat.loading);
   const error = useSelector((state) => state.chat.error);
 
-  // <-- NEW: onlineUserIds from redux for online indicator
+  // Online user IDs for online indicator
   const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
 
   const [open, setOpen] = useState(false);
-  const [token, setToken] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [needsRefresh, setNeedsRefresh] = useState(false);
 
@@ -59,14 +58,10 @@ export default function MessengerPopup({ role: propRole }) {
     setBadgeCount(totalUnreadUsers);
   }, [totalUnreadUsers]);
 
-  useEffect(() => {
-    setToken(localStorage.getItem('token'));
-  }, []);
-
   const hasFetchedRef = useRef(false);
 
   const fetchConversations = useCallback(async () => {
-    if (!token || !userId) return;
+    if (!userId) return;
     try {
       dispatch(setLoading(true));
       dispatch(setError(null));
@@ -77,26 +72,26 @@ export default function MessengerPopup({ role: propRole }) {
     } finally {
       dispatch(setLoading(false));
     }
-  }, [dispatch, token, userId, role]);
+  }, [dispatch, userId, role]);
 
-  // Initial fetch on mount - optional, keeps existing logic
+  // Initial fetch on mount
   useEffect(() => {
-    if (!token || !userId) return;
+    if (!userId) return;
     if (!hasFetchedRef.current) {
       fetchConversations();
       hasFetchedRef.current = true;
     }
-  }, [token, userId, fetchConversations]);
+  }, [userId, fetchConversations]);
 
-  // Effect to fetch conversations when popup opens and needsRefresh is true
+  // Fetch conversations when popup opens and refresh is needed
   useEffect(() => {
-    if (open && needsRefresh && token && userId) {
+    if (open && needsRefresh && userId) {
       fetchConversations();
       setNeedsRefresh(false);
     }
-  }, [open, needsRefresh, token, userId, fetchConversations]);
+  }, [open, needsRefresh, userId, fetchConversations]);
 
-  // Mark needsRefresh true when navigating away from messenger page
+  // Mark needsRefresh when navigating away from messenger page
   useEffect(() => {
     if (!pathname.includes('/messenger')) {
       setNeedsRefresh(true);
@@ -127,59 +122,55 @@ export default function MessengerPopup({ role: propRole }) {
     dispatch(addOrUpdateConversation(fullThread));
   };
 
-  // Instead of fetching immediately on new tuition request, just mark refresh needed
-const handleNewTuitionRequest = useCallback(
-  (data) => {
-    if (data?.type === 'new') {
-      console.log('[MessengerPopup] New tuition request received:', data);
+  // Handle new tuition request notification
+  const handleNewTuitionRequest = useCallback(
+    (data) => {
+      if (data?.type === 'new') {
+        console.log('[MessengerPopup] New tuition request received:', data);
 
-      // Build realMessage here or receive from socket:
-      const lastMsgText = data.lastMessageText?.trim() || 'New tuition request received';
-      const lastMsgTimestamp = data.lastMessageTimestamp || new Date().toISOString();
+        const lastMsgText = data.lastMessageText?.trim() || 'New tuition request received';
+        const lastMsgTimestamp = data.lastMessageTimestamp || new Date().toISOString();
 
-      const realMessage = {
-        _id: `tuition-${Date.now()}`,
-        text: lastMsgText,
-        senderId: data.studentId,
-        senderName: data.studentName || 'Student',
-        threadId: data.threadId,
-        timestamp: lastMsgTimestamp,
-        isSystemMessage: true,
-      };
-
-      dispatch(addMessageToThread({ threadId: data.threadId, message: realMessage }));
-      dispatch(updateLastMessageInConversation({ threadId: data.threadId, message: realMessage }));
-      dispatch(incrementUnreadCount({ threadId: data.threadId }));
-
-      const isCurrentUserStudent = userId === data.studentId;
-      const otherName = isCurrentUserStudent ? data.teacherName : data.studentName;
-      const otherImage = isCurrentUserStudent ? data.teacherProfileImage : data.studentProfileImage;
-
-      dispatch(
-        addOrUpdateConversation({
+        const realMessage = {
+          _id: `tuition-${Date.now()}`,
+          text: lastMsgText,
+          senderId: data.studentId,
+          senderName: data.studentName || 'Student',
           threadId: data.threadId,
-          requestId: data.request?._id,
-          studentId: data.studentId,
-          teacherId: data.teacherId,
-          studentName: data.studentName,
-          teacherName: data.teacherName,
-          name: otherName,
-          profileImage: otherImage,
-          participants: data.participants,
-          lastMessage: lastMsgText,
-          lastMessageTimestamp: lastMsgTimestamp,
-          messages: [realMessage],
-          status: 'pending',
-          unreadCount: 1, // set explicitly for clarity
-        })
-      );
+          timestamp: lastMsgTimestamp,
+          isSystemMessage: true,
+        };
 
-      // playKnock();
-    }
-  },
-  [dispatch, userId]
-);
+        dispatch(addMessageToThread({ threadId: data.threadId, message: realMessage }));
+        dispatch(updateLastMessageInConversation({ threadId: data.threadId, message: realMessage }));
+        dispatch(incrementUnreadCount({ threadId: data.threadId }));
 
+        const isCurrentUserStudent = userId === data.studentId;
+        const otherName = isCurrentUserStudent ? data.teacherName : data.studentName;
+        const otherImage = isCurrentUserStudent ? data.teacherProfileImage : data.studentProfileImage;
+
+        dispatch(
+          addOrUpdateConversation({
+            threadId: data.threadId,
+            requestId: data.request?._id,
+            studentId: data.studentId,
+            teacherId: data.teacherId,
+            studentName: data.studentName,
+            teacherName: data.teacherName,
+            name: otherName,
+            profileImage: otherImage,
+            participants: data.participants,
+            lastMessage: lastMsgText,
+            lastMessageTimestamp: lastMsgTimestamp,
+            messages: [realMessage],
+            status: 'pending',
+            unreadCount: 1,
+          })
+        );
+      }
+    },
+    [dispatch, userId]
+  );
 
   const { joinThread } = useSocket(
     userId,
@@ -221,7 +212,7 @@ const handleNewTuitionRequest = useCallback(
     try {
       await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/reject`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include', // important to send cookies
       });
       fetchConversations();
     } catch (err) {
@@ -229,28 +220,27 @@ const handleNewTuitionRequest = useCallback(
     }
   };
 
-const getAvatar = (conv) => {
-  if (conv.profileImage) return conv.profileImage;
+  const getAvatar = (conv) => {
+    if (conv.profileImage) return conv.profileImage;
 
-  if (conv.participants && conv.participants.length) {
-    // Find participant other than current user
-    const other = conv.participants.find(p => p._id.toString() !== userId);
-    if (other && other.profileImage) return other.profileImage;
-  }
+    if (conv.participants && conv.participants.length) {
+      // Find participant other than current user
+      const other = conv.participants.find(p => p._id.toString() !== userId);
+      if (other && other.profileImage) return other.profileImage;
+    }
 
-  // Fallback
-  const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
-  return `https://i.pravatar.cc/150?u=${fallbackId}`;
-};
+    // Fallback
+    const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
+    return `https://i.pravatar.cc/150?u=${fallbackId}`;
+  };
 
-
-  // NEW: helper to find the other participant's userId string for online check
+  // Get the other participant's userId string for online check
   const getOtherParticipantId = (conv) => {
     if (!conv.participants || !userId) return null;
     return conv.participants.find(p => p._id.toString() !== userId)?._id.toString() || null;
   };
 
-  // Filtered conversations as before
+  // Filter conversations by search term
   const filteredConversations = conversations.filter((conv) => {
     const displayName = conv.name || conv.teacherName || conv.studentName || '';
     const lastMessage = conv.lastMessage || '';
@@ -321,15 +311,8 @@ const getAvatar = (conv) => {
                   <div
                     key={chat.threadId || chat.requestId || index}
                     className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100 transition"
-                    onClick={async () => {
+                    onClick={() => {
                       setOpen(false);
-                      if (chat.threadId && userId) {
-                        try {
-                          await dispatch(markThreadAsRead({ threadId: chat.threadId, userId }));
-                        } catch (err) {
-                          console.error('Failed to mark thread as read:', err);
-                        }
-                      }
                       router.push(
                         role === 'teacher'
                           ? `/dashboard/${role}/messenger/${chat.threadId || chat.requestId}`
@@ -344,7 +327,6 @@ const getAvatar = (conv) => {
                         className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                         loading="lazy"
                       />
-                      {/* Online indicator: green if online, gray if offline */}
                       <span
                         title={isOnline ? "Online" : "Offline"}
                         className={`absolute bottom-0 right-0 block w-3 h-3 rounded-full ring-2 ring-white ${
@@ -355,7 +337,15 @@ const getAvatar = (conv) => {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
-                        <h3 className="font-semibold text-gray-900 truncate">{chat.name}</h3>
+                       {(() => {
+  if (chat.name) return chat.name;
+
+  if (chat.participants && userId) {
+    const other = chat.participants.find(p => p._id.toString() !== userId);
+    if (other && other.name) return other.name;
+  }
+  return chat.studentName || chat.teacherName || 'Unknown';
+})()}
                         {chat.unreadCount > 0 && (
                           <span className="text-xs bg-red-600 text-white rounded-full px-2 py-0.5">
                             {chat.unreadCount}

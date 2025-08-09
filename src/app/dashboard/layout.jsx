@@ -55,12 +55,22 @@ export default function DashboardLayout({ children }) {
     }
   }, [role]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('token');
-    dispatch(logout());
-    router.push('/login');
-  };
+const handleLogout = async () => {
+  try {
+    await fetch('http://localhost:5000/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include', // very important for cookie clearing
+    });
+      dispatch(logout()); 
+      router.push('/login');
+  } catch (err) {
+    console.error('Logout failed', err);
+  }
+
+ // update redux state
+  ;
+};
+
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -73,7 +83,8 @@ export default function DashboardLayout({ children }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+   <div className="w-screen h-screen bg-gray-50 flex flex-col">
+
       <header className="bg-white shadow px-6 py-4 flex items-center justify-between relative">
         <div className="text-xl font-bold text-indigo-600 capitalize">
           {role} Panel

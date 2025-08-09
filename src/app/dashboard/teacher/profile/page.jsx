@@ -7,9 +7,11 @@ import toast, { Toaster } from 'react-hot-toast'
 import { updateProfileImage } from '../../../redux/userSlice'
 
 export default function TeacherProfilePage() {
+  
   const dispatch = useDispatch()
   const teacherId = useSelector((state) => state.user.userInfo?._id)
-console.log(teacherId, "redux TeacherId")
+
+  console.log('redux TeacherId:', teacherId)
   const [teacher, setTeacher] = useState(null)
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -24,16 +26,24 @@ console.log(teacherId, "redux TeacherId")
     availability: ''
   })
 
-  // Fetch teacher profile and posts
+  // Fetch teacher profile and posts, with cookies sent automatically
   const fetchProfile = async () => {
     setLoading(true)
+    console.log('fetchProfile called')
     if (!teacherId) {
+      console.log('No teacherId, skipping fetch')
       setLoading(false)
       return
     }
 
     try {
-      const res = await axios.get(`http://localhost:5000/api/teachers/${teacherId}/profile`)
+      const res = await axios.get(
+        `http://localhost:5000/api/teachers/${teacherId}/profile`,
+        {
+          withCredentials: true, // send cookies automatically
+        }
+      )
+      console.log('Profile API response:', res.data)
       const { teacher, posts } = res.data
       setTeacher(teacher)
       setPosts(posts)
@@ -47,6 +57,7 @@ console.log(teacherId, "redux TeacherId")
         availability: teacher.availability || ''
       })
     } catch (err) {
+      console.error('Failed to fetch profile:', err)
       toast.error('Failed to fetch profile')
     } finally {
       setLoading(false)
@@ -66,15 +77,14 @@ console.log(teacherId, "redux TeacherId")
     uploadData.append(type, file)
 
     try {
-      const token = localStorage.getItem('token')
       const res = await axios.put(
         `http://localhost:5000/api/teachers/${type === 'profileImage' ? 'profile-picture' : 'cover-image'}`,
         uploadData,
         {
           headers: {
             'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}`,
           },
+          withCredentials: true, // send cookies automatically
         }
       )
 
@@ -85,6 +95,7 @@ console.log(teacherId, "redux TeacherId")
       toast.success('Image uploaded successfully')
       fetchProfile()
     } catch (error) {
+      console.error('Image upload failed:', error)
       toast.error('Image upload failed')
     }
   }
@@ -98,18 +109,18 @@ console.log(teacherId, "redux TeacherId")
     }
 
     try {
-      const token = localStorage.getItem('token')
       const res = await axios.put(
         'http://localhost:5000/api/teachers/profile-info',
         formData,
         {
-          headers: { Authorization: `Bearer ${token}` }
+          withCredentials: true, // send cookies automatically
         }
       )
       setTeacher(res.data.user)
       toast.success('Profile updated')
       setIsEditing(false)
     } catch (err) {
+      console.error('Profile update failed:', err)
       toast.error('Profile update failed')
     }
   }
@@ -127,6 +138,14 @@ console.log(teacherId, "redux TeacherId")
             <div className="h-4 w-3/4 bg-gray-200 animate-pulse rounded"></div>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  if (!teacher) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 text-center text-red-600">
+        Unable to load teacher profile.
       </div>
     )
   }

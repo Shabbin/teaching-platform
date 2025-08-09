@@ -1,22 +1,22 @@
-import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { setUserInfo } from '../redux/userSlice';
+'use client';
 
-const UserRehydrator = () => {
+import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchCurrentUser } from '../redux/userSlice';
+
+export default function UserRehydrator({ children }) {
   const dispatch = useDispatch();
+  const isFetched = useSelector((state) => state.user.isFetched);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-
-    if (storedUser) {
-      dispatch(setUserInfo(JSON.parse(storedUser)));
-    } else {
-      // Reset Redux userInfo to null on refresh if no user stored
-      dispatch(setUserInfo(null));
+    if (!isFetched) {
+      dispatch(fetchCurrentUser());
     }
-  }, [dispatch]);
+  }, [dispatch, isFetched]);
 
-  return null;
-};
+  if (!isFetched) {
+    return null; // Wait until user info is fetched before rendering children
+  }
 
-export default UserRehydrator;
+  return children;
+}

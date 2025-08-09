@@ -1,25 +1,19 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { logout } from './userSlice'; // import logout action to clear on logout
 
 // Async: Fetch teacher profile (with posts)
 export const fetchTeacherProfile = createAsyncThunk(
   'teacherProfile/fetchTeacherProfile',
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const state = getState();
-      const teacherId = state.user?.user?._id;
-      const token = state.user?.token || localStorage.getItem('token');
-
-      if (!teacherId || !token) {
-        return rejectWithValue('Unauthorized or missing credentials');
-      }
+      // No need for token or teacherId from state here
+      // Backend identifies teacher from cookie session
 
       const res = await axios.get(
-        `http://localhost:5000/api/teachers/${teacherId}/profile`,
+        `http://localhost:5000/api/teachers/profile`, // change endpoint if needed to get current teacher profile
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          withCredentials: true,
         }
       );
 
@@ -33,16 +27,8 @@ export const fetchTeacherProfile = createAsyncThunk(
 // Async: Upload profile or background image
 export const uploadTeacherImage = createAsyncThunk(
   'teacherProfile/uploadTeacherImage',
-  async ({ file, type }, { getState, rejectWithValue }) => {
+  async ({ file, type }, { rejectWithValue }) => {
     try {
-      const state = getState();
-      const teacherId = state.user?.user?._id;
-      const token = state.user?.token || localStorage.getItem('token');
-
-      if (!teacherId || !token) {
-        return rejectWithValue('Unauthorized or missing credentials');
-      }
-
       const formData = new FormData();
       formData.append(type, file);
 
@@ -56,18 +42,16 @@ export const uploadTeacherImage = createAsyncThunk(
         {
           headers: {
             'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${token}`,
           },
+          withCredentials: true,
         }
       );
 
       // Re-fetch updated profile
       const refreshed = await axios.get(
-        `http://localhost:5000/api/teachers/${teacherId}/profile`,
+        `http://localhost:5000/api/teachers/profile`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          withCredentials: true,
         }
       );
 
@@ -90,6 +74,14 @@ const teacherProfileSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
+      // Reset state on logout
+      .addCase(logout, (state) => {
+        state.teacher = null;
+        state.posts = [];
+        state.loading = false;
+        state.error = null;
+      })
+
       // Fetch
       .addCase(fetchTeacherProfile.pending, (state) => {
         state.loading = true;

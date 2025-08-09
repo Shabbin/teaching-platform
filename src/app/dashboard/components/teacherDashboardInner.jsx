@@ -1,9 +1,10 @@
 'use client';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useDispatch } from 'react-redux';
-import { setTeacherData, updateProfileImage } from './../../redux/userSlice';
+import { useDispatch, useSelector } from 'react-redux';
+import { setTeacherData, updateProfileImage, fetchCurrentUser, getTeacherDashboard } from './../../redux/userSlice';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   ImageIcon,
   ShieldCheck,
@@ -16,43 +17,34 @@ import {
   BookOpen,
   Video,
   CalendarClock,
-  MailCheck
+  MailCheck,
 } from 'lucide-react';
 
 export default function TeacherDashboardInner() {
   const router = useRouter();
   const fileInputRef = useRef(null);
-  const [teacherData, setTeacherDataLocal] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
   const dispatch = useDispatch();
+  const { userInfo, isFetched, isAuthenticated, teacherDashboard, dashboardLoading, dashboardError } = useSelector(
+    (state) => state.user
+  );
 
-  const fetchDashboard = async () => {
-    const token = localStorage.getItem('token');
-    try {
-      const res = await fetch('http://localhost:5000/api/auth/teacher/dashboard', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error('Unauthorized');
-      const data = await res.json();
-      setTeacherDataLocal(data);
-      dispatch(setTeacherData({ ...data.teacher, canApplyToTuitions: data.canApplyToTuitions }));
-    } catch (err) {
-      console.error(err);
-      router.push('/login');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Redirect to /login if user info fetched but NOT authenticated
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    if (isFetched && !isAuthenticated) {
       router.push('/login');
-    } else {
-      fetchDashboard();
     }
-  }, [router]);
+  }, [isFetched, isAuthenticated, router]);
+
+  // Fetch teacher dashboard ONLY if authenticated and dashboard data not loaded yet
+  useEffect(() => {
+    if (isAuthenticated && !teacherDashboard && !dashboardLoading && !dashboardError) {
+      dispatch(getTeacherDashboard());
+    }
+  }, [dispatch, isAuthenticated, teacherDashboard, dashboardLoading, dashboardError]);
+
+  // if (!isFetched) return <div>Loading user info...</div>;
+  // if (dashboardLoading) return <div>Loading dashboard...</div>;
+  // if (dashboardError) return <div>Error loading dashboard: {dashboardError}</div>;
 
   const handleImageClick = () => fileInputRef.current.click();
 
@@ -60,40 +52,37 @@ export default function TeacherDashboardInner() {
     const file = e.target.files[0];
     if (!file) return;
 
-    const token = localStorage.getItem('token');
     const formData = new FormData();
     formData.append('profileImage', file);
 
     try {
-      setUploading(true);
+      // Upload profile image
       const res = await fetch('http://localhost:5000/api/teachers/profile-picture', {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
         body: formData,
       });
 
       if (!res.ok) throw new Error('Upload failed');
       const data = await res.json();
-      setTeacherDataLocal((prev) => ({
-        ...prev,
-        teacher: { ...prev.teacher, profileImage: data.profileImage },
-      }));
+
+      // Update profile image locally and in Redux
       dispatch(updateProfileImage(data.profileImage));
     } catch (err) {
       console.error(err);
-    } finally {
-      setUploading(false);
     }
   };
 
-  if (loading)
+  // Loading state from Redux
+  if (dashboardLoading)
     return (
       <div className="flex justify-center items-center h-[70vh] text-lg text-gray-500 animate-pulse">
         Loading your dashboard...
       </div>
     );
 
-  if (!teacherData)
+  // Error or no dashboard data
+  if (dashboardError || !teacherDashboard)
     return (
       <div className="max-w-xl mx-auto p-6 text-red-700 bg-red-50 border border-red-300 rounded-lg shadow-md">
         <h2 className="font-semibold text-xl mb-2">Unable to load dashboard</h2>
@@ -101,10 +90,11 @@ export default function TeacherDashboardInner() {
       </div>
     );
 
-  const teacher = teacherData.teacher || {};
-  const teacherPosts = teacherData.teacherPosts || [];
-  const upcomingSessions = teacherData.upcomingSessions || [];
-  const sessionRequests = teacherData.sessionRequests || [];
+  // Extract dashboard data from Redux state
+  const teacher = teacherDashboard.teacher || {};
+  const teacherPosts = teacherDashboard.teacherPosts || [];
+  const upcomingSessions = teacherDashboard.upcomingSessions || [];
+  const sessionRequests = teacherDashboard.sessionRequests || [];
   const mediaAds = [
     {
       _id: '1',
@@ -222,9 +212,7 @@ export default function TeacherDashboardInner() {
               </span>
               <span
                 className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-semibold shadow-sm select-none ${
-                  teacher.isEligible
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-red-100 text-red-700'
+                  teacher.isEligible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                 }`}
               >
                 {teacher.isEligible ? (
@@ -247,11 +235,6 @@ export default function TeacherDashboardInner() {
                 {teacher.hasPaid ? 'Payment Done' : 'Not Paid'}
               </span>
             </div>
-            {uploading && (
-              <p className="mt-2 text-indigo-600 font-medium animate-pulse text-sm sm:text-base">
-                Uploading new profile image...
-              </p>
-            )}
           </div>
         </section>
 
@@ -387,16 +370,15 @@ export default function TeacherDashboardInner() {
               upcomingSessions.map((session, index) => (
                 <div
                   key={index}
-                  className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 hover:shadow-md transition cursor-default"
+                  className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 hover:shadow-lg transition cursor-pointer"
                 >
-                  <p className="text-indigo-900 font-semibold truncate">{session.topic}</p>
-                  <p className="text-indigo-700 text-sm">
-                    {session.date} at {session.time}
-                  </p>
+                  <h3 className="font-semibold text-indigo-900 text-lg truncate">{session.title}</h3>
+                  <p className="text-indigo-700 text-sm truncate">{session.date}</p>
+                  <p className="text-indigo-700 text-sm truncate">{session.time}</p>
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 text-center py-10">No upcoming sessions found.</p>
+              <p className="text-gray-500 text-center py-10">No upcoming sessions scheduled.</p>
             )}
           </div>
         </section>
@@ -408,13 +390,14 @@ export default function TeacherDashboardInner() {
           </h2>
           <div className="space-y-4">
             {sessionRequests.length ? (
-              sessionRequests.map((req, index) => (
+              sessionRequests.map((request, index) => (
                 <div
                   key={index}
-                  className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 hover:shadow-md transition cursor-default"
+                  className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 hover:shadow-lg transition cursor-pointer"
                 >
-                  <p className="text-indigo-900 font-semibold truncate">From: {req.studentName}</p>
-                  <p className="text-indigo-700 text-sm truncate">Subject: {req.subject}</p>
+                  <h3 className="font-semibold text-indigo-900 text-lg truncate">{request.studentName}</h3>
+                  <p className="text-indigo-700 text-sm truncate">{request.topic}</p>
+                  <p className="text-indigo-700 text-sm truncate">{request.status}</p>
                 </div>
               ))
             ) : (

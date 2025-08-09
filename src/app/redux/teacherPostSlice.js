@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { logout } from './userSlice';
 
 // Async thunk to create a teacher post
 export const createTeacherPost = createAsyncThunk(
@@ -23,13 +24,11 @@ export const createTeacherPost = createAsyncThunk(
         }
       });
 
-      const token = localStorage.getItem('token');
-
       const response = await axios.post('http://localhost:5000/api/posts', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
+        withCredentials: true,
       });
 
       return response.data;
@@ -44,15 +43,11 @@ export const updateTeacherPost = createAsyncThunk(
   'teacherPosts/updateTeacherPost',
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-
       const response = await axios.put(
         `http://localhost:5000/api/posts/${id}`,
         updatedData,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          withCredentials: true,
         }
       );
 
@@ -63,19 +58,16 @@ export const updateTeacherPost = createAsyncThunk(
   }
 );
 
-// ✅ Async thunk to delete a teacher post
+// Async thunk to delete a teacher post
 export const deleteTeacherPost = createAsyncThunk(
   'teacherPosts/deleteTeacherPost',
   async (postId, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
       await axios.delete(`http://localhost:5000/api/posts/${postId}`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        withCredentials: true,
       });
 
-      return { postId }; // return just the ID for local removal
+      return { postId };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }
@@ -96,6 +88,13 @@ const teacherPostSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Clear posts on logout
+      .addCase(logout, (state) => {
+        state.posts = [];
+        state.loading = false;
+        state.error = null;
+      })
+
       // CREATE
       .addCase(createTeacherPost.pending, (state) => {
         state.loading = true;
@@ -127,7 +126,7 @@ const teacherPostSlice = createSlice({
         state.error = action.payload || 'Failed to update post';
       })
 
-      // ✅ DELETE
+      // DELETE
       .addCase(deleteTeacherPost.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -145,4 +144,4 @@ const teacherPostSlice = createSlice({
 
 export const { resetError } = teacherPostSlice.actions;
 
-export default teacherPostSlice.reducer; 
+export default teacherPostSlice.reducer;

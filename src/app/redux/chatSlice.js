@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
 const initialState = {
+  currentUserId: null,
   conversations: [],
   messagesByThread: {}, // threadId -> messages[]
   loading: false,
@@ -88,11 +89,10 @@ setCurrentThreadId(state, action) {
 },
 addOrUpdateConversation(state, action) {
   const convo = action.payload;
-  console.log('[addOrUpdateConversation] payload:', convo);
 
   const id = convo.threadId || convo._id || convo.requestId;
 
-  const currentUserId = state.currentUserId; // ⚠️ Must be set before reducer is used
+  const currentUserId = state.currentUserId;
 
   // Normalize lastMessage
   let lastMessage = convo.lastMessage;
@@ -112,21 +112,24 @@ addOrUpdateConversation(state, action) {
     ? new Date(lastTimestampRaw).toISOString()
     : null;
 
-  // 🧠 Prefer using participants for display
   let otherParticipant = null;
+
   if (Array.isArray(convo.participants) && currentUserId) {
-    otherParticipant = convo.participants.find(p => p._id !== currentUserId);
+    otherParticipant = convo.participants.find(
+      (p) => p._id.toString() !== currentUserId.toString()
+    );
   }
 
   const otherName =
     otherParticipant?.name ||
-    convo.studentName ||
     convo.teacherName ||
+    convo.studentName ||
     'No Name';
 
   const otherImage =
     otherParticipant?.profileImage ||
-    convo.profileImage ||
+    convo.teacherProfileImage ||
+    convo.studentProfileImage ||
     '';
 
   const existingIndex = state.conversations.findIndex(
@@ -173,8 +176,12 @@ addOrUpdateConversation(state, action) {
 },
 
 
+
 setOnlineUserIds(state, action) {
   state.onlineUserIds = action.payload;
+},
+setCurrentUserId(state,action){
+  state.currentUserId=action.payload;
 },
 
     // New reducer to increment unread count for a conversation by threadId
@@ -303,6 +310,7 @@ export const {
   setLoading,
   setError,
   setOnlineUserIds,
+  setCurrentUserId,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

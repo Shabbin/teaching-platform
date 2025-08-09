@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
-// 🔐 Login Thunk
+// 🔐 Login Thunk (unchanged)
 export const loginUser = createAsyncThunk(
   'user/loginUser',
   async (formData, { rejectWithValue }) => {
@@ -9,15 +9,14 @@ export const loginUser = createAsyncThunk(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
+        credentials: 'include',
       });
 
       const data = await res.json();
+
       if (!res.ok) {
         throw new Error(data.message || 'Login failed');
       }
-
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
 
       return data.user;
     } catch (error) {
@@ -26,21 +25,46 @@ export const loginUser = createAsyncThunk(
   }
 );
 
-// 🧠 Student Dashboard Thunk
+// 🎓 Student Dashboard Thunk (unchanged)
 export const getStudentDashboard = createAsyncThunk(
   'user/getStudentDashboard',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
       const res = await fetch('http://localhost:5000/api/students/dashboard', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        credentials: 'include',
+      });
+
+      console.log('getStudentDashboard response status:', res.status);
+
+      const data = await res.json();
+
+      console.log('getStudentDashboard response data:', data);
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to fetch student dashboard');
+      }
+
+      return data;
+    } catch (error) {
+      console.error('getStudentDashboard error:', error);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// 🧑‍🏫 Teacher Dashboard Thunk (unchanged)
+export const getTeacherDashboard = createAsyncThunk(
+  'user/getTeacherDashboard',
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await fetch('http://localhost:5000/api/teachers/dashboard', {
+        credentials: 'include',
       });
 
       const data = await res.json();
+
       if (!res.ok) {
-        throw new Error(data.message || 'Failed to fetch student dashboard');
+        throw new Error(data.message || 'Failed to fetch teacher dashboard');
       }
 
       return data;
@@ -50,31 +74,58 @@ export const getStudentDashboard = createAsyncThunk(
   }
 );
 
-// 🧾 Initial State
-const initialUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('user')) : null;
-const initialProfileImage =
-  initialUser?.profileImage?.startsWith('http') || !initialUser?.profileImage
-    ? initialUser?.profileImage
-    : `http://localhost:5000/${initialUser?.profileImage}`;
+// 🧠 Get current logged-in user info (unchanged thunk code)
+export const fetchCurrentUser = createAsyncThunk(
+  'user/fetchCurrentUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const res = await fetch('http://localhost:5000/api/auth/me', {
+        credentials: 'include',
+      });
 
+      console.log('fetchCurrentUser response status:', res.status);
+
+      if (res.status === 401) {
+        // 401 means not authenticated, return null silently (no error)
+        return null;
+      }
+
+      const data = await res.json();
+
+      console.log('fetchCurrentUser data:', data);
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to fetch user');
+      }
+
+      return data.user;
+    } catch (error) {
+      if (error.message !== 'Not authenticated') {
+        console.error('fetchCurrentUser error:', error);
+      }
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// 🧾 Initial State
 const initialState = {
-  userInfo: initialUser,
-  profileImage: initialProfileImage || '/default-profile.png',
-  loading: false,
-  error: null,
-  studentDashboard: null,
-  teacherProfile: null,
-  isRehydrated: false,
-};
-const emptyState = {
   userInfo: null,
   profileImage: '/default-profile.png',
+
+  studentDashboard: null,
+  teacherDashboard: null,
+
   loading: false,
   error: null,
-  studentDashboard: null,
-  teacherProfile: null,
-  isRehydrated: false,
+
+  dashboardLoading: false,
+  dashboardError: null,
+
+  isFetched: false,        // true once we attempted fetchCurrentUser (success or fail)
+  isAuthenticated: false,  // true if userInfo exists and valid
 };
+
 // 🔧 Slice
 const userSlice = createSlice({
   name: 'user',
@@ -82,39 +133,56 @@ const userSlice = createSlice({
 
   reducers: {
     logout: (state) => {
-      Object.assign(state, emptyState);
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      state.userInfo = null;
+      state.profileImage = '/default-profile.png';
+      state.isFetched = true;
+      state.isAuthenticated = false;  // reset auth state on logout
+      state.error = null;
+      state.studentDashboard = null;
+      state.teacherDashboard = null;
     },
-    setTeacherData: (state, action) => {
-      state.teacherProfile = action.payload;
+
+    clearError: (state) => {
+      state.error = null;
     },
+
     updateProfileImage: (state, action) => {
       const newImg = action.payload;
       state.profileImage = newImg;
+
       if (state.userInfo) {
         state.userInfo.profileImage = newImg;
       }
-      if (state.teacherProfile) {
-        state.teacherProfile.profileImage = newImg;
-      }
-
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const user = JSON.parse(storedUser);
-        user.profileImage = newImg;
-        localStorage.setItem('user', JSON.stringify(user));
-      }
     },
+
     setUserInfo: (state, action) => {
       state.userInfo = action.payload;
-      state.isRehydrated = true;
-      localStorage.setItem('user', JSON.stringify(action.payload));
+      state.isFetched = true;
+      state.isAuthenticated = Boolean(action.payload);
+
+      const img = action.payload?.profileImage;
+      state.profileImage =
+        img?.startsWith('http') || !img
+          ? img || '/default-profile.png'
+          : `http://localhost:5000/${img}`;
+    },
+
+    setTeacherData: (state, action) => {
+      state.userInfo = action.payload;
+      state.isFetched = true;
+      state.isAuthenticated = Boolean(action.payload);
+
+      const img = action.payload?.profileImage;
+      state.profileImage =
+        img?.startsWith('http') || !img
+          ? img || '/default-profile.png'
+          : `http://localhost:5000/${img}`;
     },
   },
 
   extraReducers: (builder) => {
     builder
+      // === Login ===
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -128,27 +196,92 @@ const userSlice = createSlice({
           img?.startsWith('http') || !img
             ? img || '/default-profile.png'
             : `http://localhost:5000/${img}`;
+
+        state.isFetched = true;
+        state.isAuthenticated = true;  // user is logged in
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        state.isAuthenticated = false;
       })
 
+      // === Fetch Current User ===
+      .addCase(fetchCurrentUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userInfo = action.payload;
+
+        const img = action.payload?.profileImage;
+        state.profileImage =
+          img?.startsWith('http') || !img
+            ? img || '/default-profile.png'
+            : `http://localhost:5000/${img}`;
+
+        if (action.payload === null) {
+          // Not authenticated
+          state.error = null;
+          state.isAuthenticated = false;
+        } else {
+          state.isAuthenticated = true;
+        }
+
+        state.isFetched = true;
+      })
+      .addCase(fetchCurrentUser.rejected, (state, action) => {
+        state.loading = false;
+        state.userInfo = null;
+        state.profileImage = '/default-profile.png';
+
+        if (action.payload === 'Not authenticated') {
+          state.error = null;
+          state.isAuthenticated = false;
+        } else {
+          state.error = action.payload;
+        }
+
+        state.isFetched = true;
+      })
+
+      // === Student Dashboard ===
       .addCase(getStudentDashboard.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(getStudentDashboard.fulfilled, (state, action) => {
+        console.log('Reducer received studentDashboard:', action.payload);
         state.loading = false;
         state.studentDashboard = action.payload;
       })
       .addCase(getStudentDashboard.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+
+      // === Teacher Dashboard ===
+      .addCase(getTeacherDashboard.pending, (state) => {
+        state.dashboardLoading = true;
+        state.dashboardError = null;
+      })
+      .addCase(getTeacherDashboard.fulfilled, (state, action) => {
+        state.dashboardLoading = false;
+        state.teacherDashboard = action.payload;
+      })
+      .addCase(getTeacherDashboard.rejected, (state, action) => {
+        state.dashboardLoading = false;
+        state.dashboardError = action.payload;
       });
   },
 });
 
-// ✅ Export actions
-export const { logout, setTeacherData, updateProfileImage, setUserInfo } = userSlice.actions;
+export const {
+  logout,
+  updateProfileImage,
+  setUserInfo,
+  setTeacherData,
+  clearError,
+} = userSlice.actions;
 export default userSlice.reducer;
