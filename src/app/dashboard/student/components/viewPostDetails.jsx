@@ -1,17 +1,36 @@
 'use client';
-//dashboard\student\components\viewPostDetails.jsx
+// dashboard\student\components\viewPostDetails.jsx
 import { useSelector } from 'react-redux';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useDispatch } from 'react-redux';
 
 import TuitionRequestModal from './tuitionRequestComponent';
 import TopicHelpModal from './topicHelpModal'; // import your topic help modal
+import { updatePostViewsCount } from '../../../redux/postViewEventSlice';
+
+function setCookie(name, value, days = 365) {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/`;
+}
+function getCookie(name) {
+  const cookieString = document.cookie;
+  const cookies = cookieString ? cookieString.split('; ') : [];
+  for (let i = 0; i < cookies.length; i++) {
+    const [cookieName, cookieValue] = cookies[i].split('=');
+    if (cookieName === name) {
+      return decodeURIComponent(cookieValue);
+    }
+  }
+  return undefined;
+}
 
 const ViewPostDetails = ({ post }) => {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const dispatch = useDispatch();
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -23,7 +42,8 @@ const ViewPostDetails = ({ post }) => {
   const userInfo = user?.userInfo || {};
   const userId = userInfo?.id || userInfo?._id;
   const userRole = userInfo?.role;
-console.log(userInfo)
+  const [hasRecordedView, setHasRecordedView] = useState(false);
+  const hasRecordedRef = useRef(false);
   const teacherIdFromQuery = searchParams.get('teacherId');
   const fallbackTeacher = post.teacher || {
     _id: userId,
@@ -74,14 +94,71 @@ console.log(userInfo)
     Tags: post.tags?.join(', '),
   };
 
- const handleRequestSuccess = (requestId) => {
-  setShowTuitionModal(false);
-  setShowTopicHelpModal(false);
+  // Updated: Record the post view on mount using cookies to avoid double counting
+  useEffect(() => {
+    if (!post?._id) return;
+    if (hasRecordedRef.current) return; // Already recorded for this mount
 
-  if (requestId) {
-    router.push(`/messenger/${requestId}`);
-  }
-};
+    const viewedKey = `viewed_post_${post._id}`;
+
+    if (getCookie(viewedKey)) {
+      // View already recorded recently in cookie, skip
+      setHasRecordedView(true);
+      hasRecordedRef.current = true;
+      return;
+    }
+
+    hasRecordedRef.current = true;
+
+    const controller = new AbortController();
+
+    const recordView = async () => {
+      try {
+        const res = await fetch(`http://localhost:5000/api/posts/${post._id}/view`, {
+          method: 'POST',
+          credentials: 'include',
+          signal: controller.signal,
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          if (data.message === "View already counted recently") {
+            console.log('View already counted recently, skipping duplicate count.');
+            setHasRecordedView(true);
+          } else {
+            console.error('Failed to record post view:', data.message || res.status);
+          }
+        } else {
+          setHasRecordedView(true);
+
+          // Set cookie to expire in 1 hour (3600 seconds)
+          setCookie(viewedKey, 'true', 3600);
+
+          dispatch(updatePostViewsCount({ postId: post._id, viewsCount: data.viewsCount }));
+        }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Error recording post view', err);
+        }
+      }
+    };
+
+    recordView();
+
+    return () => {
+      controller.abort();
+    };
+  }, [post._id, dispatch]);
+
+  const handleRequestSuccess = (requestId) => {
+    setShowTuitionModal(false);
+    setShowTopicHelpModal(false);
+
+    if (requestId) {
+      router.push(`/messenger/${requestId}`);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 relative">

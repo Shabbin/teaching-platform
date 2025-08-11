@@ -5,7 +5,7 @@ import TeacherDashboardInner from '../components/teacherDashboardInner';
 export default function TeacherDashboardPage() {
   return (
     <ProtectedRoute allowedRole="teacher">
-      <TeacherDashboardInner />
+      <TeacherDashboardInner  />
     </ProtectedRoute>
   );
 }

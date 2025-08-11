@@ -11,6 +11,7 @@ import {
   setCurrentThreadId, // ✅ needed for request_update handler
 } from '../redux/chatSlice';
 import { normalizeMessage } from '../redux/chatThunks';
+import { addPostViewEvent,updatePostViewsCount } from '../redux/postViewEventSlice';
 
 const SOCKET_URL = 'http://localhost:5000';
 
@@ -43,9 +44,8 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
   useEffect(() => {
     if (!userId) return;
 
-    // ✅ Cookie-based auth version
     socketRef.current = io(SOCKET_URL, {
-      withCredentials: true, // Send cookies along with requests
+      withCredentials: true,
     });
 
     socketRef.current.on('connect', () => {
@@ -103,6 +103,17 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
         onMessageAlert(alert);
       }
     });
+
+socketRef.current.on('post_view_event', (event) => {
+  console.log('[socket] post_view_event received:', event);
+  dispatch(addPostViewEvent(event));
+  dispatch(updatePostViewsCount({
+    postId: event.postId,
+    viewsCount: event.viewsCount,
+  }));
+});
+
+    
 
     socketRef.current.on('new_tuition_request', (data) => {
       console.log('[socket] new_tuition_request received:', data);
@@ -210,10 +221,20 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
       console.log('[useSocket] disconnected:', reason);
     });
 
-    // Cleanup
+    // Cleanup all listeners on unmount or userId change
     return () => {
       if (socketRef.current) {
+        socketRef.current.off('connect');
         socketRef.current.off('online_users');
+        socketRef.current.off('new_message');
+        socketRef.current.off('conversation_list_updated');
+        socketRef.current.off('new_message_alert');
+        socketRef.current.off('post_view_event');
+        socketRef.current.off('new_tuition_request');
+        socketRef.current.off('request_update');
+        socketRef.current.off('request_approved');
+        socketRef.current.off('mark_thread_read');
+        socketRef.current.off('disconnect');
         socketRef.current.disconnect();
       }
     };

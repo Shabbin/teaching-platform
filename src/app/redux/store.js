@@ -4,6 +4,7 @@ import teacherProfileReducer from './teacherProfileSlice'
 import teacherPostsReducer from './teacherPostSlice'
 import requestReducer from './requestSlice';
 import chatReducer from './chatSlice';
+import postViewEventsReducer from './postViewEventSlice';
 export const store = configureStore({
   reducer: {
     user: userReducer,
@@ -11,6 +12,7 @@ export const store = configureStore({
     teacherProfile: teacherProfileReducer,
     teacherPosts: teacherPostsReducer,
  chat: chatReducer,
-    requests: requestReducer
+    requests: requestReducer,
+      postViewEvents: postViewEventsReducer,
   },
 });

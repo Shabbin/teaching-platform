@@ -2,9 +2,10 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
-import { setTeacherData, updateProfileImage, fetchCurrentUser, getTeacherDashboard } from './../../redux/userSlice';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import {  updateProfileImage,getTeacherDashboard } from './../../redux/userSlice';
+
+import ViewedPostsTimeline from './ViewedPostsTimeline';; // Adjust path accordingly
+import { fetchPostViewEvents } from '../../redux/postViewEventSlice'; // Adjust if needed
 import {
   ImageIcon,
   ShieldCheck,
@@ -24,10 +25,16 @@ export default function TeacherDashboardInner() {
   const router = useRouter();
   const fileInputRef = useRef(null);
   const dispatch = useDispatch();
-  const { userInfo, isFetched, isAuthenticated, teacherDashboard, dashboardLoading, dashboardError } = useSelector(
+  const { isFetched, isAuthenticated, teacherDashboard, dashboardLoading, dashboardError } = useSelector(
     (state) => state.user
   );
-
+const { userInfo } = useSelector(state => state.user); 
+const postViewEventsState = useSelector(state => state.postViewEvents);
+useEffect(() => {
+  if (userInfo && userInfo._id) {
+    dispatch(fetchPostViewEvents(userInfo._id));
+  }
+}, [dispatch, userInfo]);
   // Redirect to /login if user info fetched but NOT authenticated
   useEffect(() => {
     if (isFetched && !isAuthenticated) {
@@ -284,80 +291,15 @@ export default function TeacherDashboardInner() {
       </div>
 
       {/* Bottom Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Tuition Posts */}
-        <section className="bg-white shadow-lg rounded-3xl p-6 sm:p-8 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl sm:text-2xl font-semibold text-indigo-700 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" /> Tuition Posts
-            </h2>
-            <Link href="/dashboard/teacher/post-content" passHref>
-              <button className="bg-indigo-600 text-white px-4 sm:px-5 py-2 rounded-lg hover:bg-indigo-700 transition shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                + Post
-              </button>
-            </Link>
-          </div>
-          <div className="space-y-4">
-            {teacherPosts.length ? (
-              teacherPosts.map((post) => (
-                <div
-                  key={post._id}
-                  className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 hover:shadow-lg transition cursor-pointer"
-                >
-                  <h3 className="font-semibold text-indigo-900 text-lg truncate">{post.title}</h3>
-                  <p className="text-indigo-700 text-sm truncate">{post.subject}</p>
-                </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-10">No tuition posts found.</p>
-            )}
-          </div>
-        </section>
-
-        {/* Tuition Media Ads */}
-        <section className="bg-white shadow-lg rounded-3xl p-6 sm:p-8 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl sm:text-2xl font-semibold text-indigo-700 flex items-center gap-2">
-              <Video className="w-5 h-5 sm:w-6 sm:h-6" /> Tuition Media Ads
-            </h2>
-            <Link href="/dashboard/teacher/media-tuitions" passHref>
-              <button className="bg-indigo-600 text-white px-5 py-2 rounded-lg hover:bg-indigo-700 transition shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                + Media
-              </button>
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-            {mediaAds.length ? (
-              mediaAds.map((ad) => (
-                <article
-                  key={ad._id}
-                  className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 flex flex-col justify-between shadow-sm hover:shadow-md transition cursor-pointer"
-                >
-                  <div>
-                    <h3 className="font-semibold text-indigo-900 text-lg mb-1 truncate">{ad.title}</h3>
-                    <p className="text-indigo-700 text-sm">{ad.class}</p>
-                    <p className="text-indigo-700 text-sm">{ad.subject}</p>
-                    <p className="text-indigo-700 text-sm">{ad.days}</p>
-                    <p className="text-indigo-700 text-sm">{ad.salary}</p>
-                    <p className="text-indigo-700 text-sm font-mono mt-1">Code: {ad.code}</p>
-                    <p className="text-indigo-800 text-xs mt-2 leading-tight">{ad.contact}</p>
-                  </div>
-                  <button
-                    className="mt-4 w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 transition font-semibold shadow focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                    onClick={() => alert(`Applied to ad: ${ad.code}`)}
-                  >
-                    Apply
-                  </button>
-                </article>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-12">No media ads available.</p>
-            )}
-          </div>
-        </section>
-      </div>
-
+  <section className="bg-white shadow-lg rounded-3xl p-6 sm:p-8 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
+  <h2 className="text-xl sm:text-2xl font-semibold text-indigo-700 flex items-center gap-2 mb-6">
+    <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" /> Recently Viewed Posts
+  </h2>
+  <ViewedPostsTimeline
+ 
+  />
+</section>
+{/** The div above is the place where I want to showcase that*/}
       {/* Additional Sections */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
         {/* Upcoming Sessions */}

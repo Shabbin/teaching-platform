@@ -100,10 +100,8 @@ export const fetchCurrentUser = createAsyncThunk(
 
       return data.user;
     } catch (error) {
-      if (error.message !== 'Not authenticated') {
-        console.error('fetchCurrentUser error:', error);
-      }
-      return rejectWithValue(error.message);
+       return rejectWithValue(error.message);
+     
     }
   }
 );
