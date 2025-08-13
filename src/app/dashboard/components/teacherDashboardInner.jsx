@@ -2,10 +2,10 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
-import {  updateProfileImage,getTeacherDashboard } from './../../redux/userSlice';
+import { updateProfileImage, getTeacherDashboard } from './../../redux/userSlice';
 
-import ViewedPostsTimeline from './ViewedPostsTimeline';; // Adjust path accordingly
-import { fetchPostViewEvents } from '../../redux/postViewEventSlice'; // Adjust if needed
+import ViewedPostsTimeline from './ViewedPostsTimeline'; 
+import { fetchPostViewEvents } from '../../redux/postViewEventSlice'; 
 import {
   ImageIcon,
   ShieldCheck,
@@ -16,7 +16,6 @@ import {
   Users,
   Star,
   BookOpen,
-  Video,
   CalendarClock,
   MailCheck,
 } from 'lucide-react';
@@ -28,30 +27,26 @@ export default function TeacherDashboardInner() {
   const { isFetched, isAuthenticated, teacherDashboard, dashboardLoading, dashboardError } = useSelector(
     (state) => state.user
   );
-const { userInfo } = useSelector(state => state.user); 
-const postViewEventsState = useSelector(state => state.postViewEvents);
-useEffect(() => {
-  if (userInfo && userInfo._id) {
-    dispatch(fetchPostViewEvents(userInfo._id));
-  }
-}, [dispatch, userInfo]);
-  // Redirect to /login if user info fetched but NOT authenticated
+  const { userInfo } = useSelector(state => state.user); 
+  const postViewEventsState = useSelector(state => state.postViewEvents);
+
+  useEffect(() => {
+    if (userInfo && userInfo._id) {
+      dispatch(fetchPostViewEvents(userInfo._id));
+    }
+  }, [dispatch, userInfo]);
+
   useEffect(() => {
     if (isFetched && !isAuthenticated) {
       router.push('/login');
     }
   }, [isFetched, isAuthenticated, router]);
 
-  // Fetch teacher dashboard ONLY if authenticated and dashboard data not loaded yet
   useEffect(() => {
     if (isAuthenticated && !teacherDashboard && !dashboardLoading && !dashboardError) {
       dispatch(getTeacherDashboard());
     }
   }, [dispatch, isAuthenticated, teacherDashboard, dashboardLoading, dashboardError]);
-
-  // if (!isFetched) return <div>Loading user info...</div>;
-  // if (dashboardLoading) return <div>Loading dashboard...</div>;
-  // if (dashboardError) return <div>Error loading dashboard: {dashboardError}</div>;
 
   const handleImageClick = () => fileInputRef.current.click();
 
@@ -63,7 +58,6 @@ useEffect(() => {
     formData.append('profileImage', file);
 
     try {
-      // Upload profile image
       const res = await fetch('http://localhost:5000/api/teachers/profile-picture', {
         method: 'PUT',
         credentials: 'include',
@@ -72,98 +66,30 @@ useEffect(() => {
 
       if (!res.ok) throw new Error('Upload failed');
       const data = await res.json();
-
-      // Update profile image locally and in Redux
       dispatch(updateProfileImage(data.profileImage));
     } catch (err) {
       console.error(err);
     }
   };
 
-  // Loading state from Redux
   if (dashboardLoading)
     return (
-      <div className="flex justify-center items-center h-[70vh] text-lg text-gray-500 animate-pulse">
+      <div className="flex justify-center items-center h-[70vh] text-gray-500 animate-pulse">
         Loading your dashboard...
       </div>
     );
 
-  // Error or no dashboard data
   if (dashboardError || !teacherDashboard)
     return (
-      <div className="max-w-xl mx-auto p-6 text-red-700 bg-red-50 border border-red-300 rounded-lg shadow-md">
+      <div className="max-w-xl mx-auto p-6 text-red-700 bg-red-50 border border-red-100 rounded-2xl shadow-sm">
         <h2 className="font-semibold text-xl mb-2">Unable to load dashboard</h2>
         <p className="text-sm">Please try refreshing or check your internet connection.</p>
       </div>
     );
 
-  // Extract dashboard data from Redux state
   const teacher = teacherDashboard.teacher || {};
-  const teacherPosts = teacherDashboard.teacherPosts || [];
   const upcomingSessions = teacherDashboard.upcomingSessions || [];
   const sessionRequests = teacherDashboard.sessionRequests || [];
-  const mediaAds = [
-    {
-      _id: '1',
-      title: 'Public University Male/Lady Tutor Wanted at Savar Radio Colony TNT Gate',
-      class: 'Class: 9',
-      subject: 'Sub: Only English',
-      days: 'Days: 4',
-      salary: 'Salary: 3000',
-      code: 'Savar9engML.Tud1023',
-      contact: 'sms Your short cv & Tuition screen shot to WhatsApp number : 01890078222',
-    },
-    {
-      _id: '2',
-      title: '👔 Buet/Du Male Tutor Wanted at Sadarghat Near Kotowali Thana Bikrompur Garden City',
-      class: 'Class: 10',
-      subject: 'Sub: Phy+Chem+Biology',
-      days: 'Days: 4',
-      salary: 'Salary: 7000',
-      code: 'Sadarghat10sciM.Tud1021',
-      contact: 'sms Your short cv & Tuition screen shot to WhatsApp number : 01890078222',
-    },
-    {
-      _id: '3',
-      title: '👔🧥 Male/Lady Tutor Wanted at Gazipur Near Bhabanipur Kindergarten',
-      class: 'Class: 5',
-      subject: 'Sub: All',
-      days: 'Days: 5',
-      salary: 'Salary: 3000',
-      code: 'Gazipur5ML.Tud1024',
-      contact: 'sms Your short cv & Tuition screen shot to WhatsApp number : 01890078222',
-    },
-    {
-      _id: '4',
-      title: '🧥 Lady Tutor Wanted at Keraniganj Ambagicha Boubazar',
-      class: 'Class: 6',
-      subject: 'Sub: All',
-      days: 'Days: 5',
-      salary: 'Salary: 3000',
-      code: 'Keraniganj6L.Tud1020',
-      contact: 'sms Your short cv & Tuition screen shot to WhatsApp number : 01890078222',
-    },
-    {
-      _id: '5',
-      title: '🧥 Lady Tutor Wanted at Abdullahpur Bus-stand, South Keranigonj',
-      class: 'Class: 7',
-      subject: 'Sub: All',
-      days: 'Days: 5',
-      salary: 'Salary: 5000',
-      code: 'Abdullahpur7L.Tud1018',
-      contact: 'sms Your short cv & Tuition screen shot to WhatsApp number : 01890078222',
-    },
-    {
-      _id: '6',
-      title: '🧥 Lady Tutor Wanted at Songramy Soroni Uttara Azimpur Kachabazar',
-      class: 'Class: 4',
-      subject: 'Sub: Math+Eng+Bangla',
-      days: 'Days: 5',
-      salary: 'Salary: 3000',
-      code: 'Uttara4L.Tud1022',
-      contact: 'sms Your short cv & Tuition screen shot to WhatsApp number : 01890078222',
-    },
-  ];
 
   const paymentSummary = {
     monthlyEarnings: 45000,
@@ -178,12 +104,11 @@ useEffect(() => {
   };
 
   return (
-    <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
-      {/* Top Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Profile Overview */}
-        <section className="bg-white shadow-lg rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row gap-6 sm:gap-8 items-center">
-          <div className="relative w-28 h-28 sm:w-36 sm:h-36 flex-shrink-0 rounded-full overflow-hidden border-8 border-indigo-600 shadow-md cursor-pointer group">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 p-6">
+      <div className="max-w-6xl mx-auto space-y-8">
+        {/* Profile Section */}
+        <section className="bg-white p-6 flex flex-col sm:flex-row items-center gap-5 rounded-3xl border border-gray-100 transition">
+          <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full overflow-hidden cursor-pointer">
             <img
               src={
                 teacher?.profileImage?.startsWith('http')
@@ -191,16 +116,15 @@ useEffect(() => {
                   : `http://localhost:5000/${teacher.profileImage}`
               }
               alt="Profile"
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              className="w-full h-full object-cover"
             />
             <button
               onClick={handleImageClick}
-              className="absolute inset-0 bg-black bg-opacity-40 text-white flex items-center justify-center rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute inset-0 bg-black bg-opacity-25 flex items-center justify-center rounded-full opacity-0 hover:opacity-100 transition"
               title="Change Profile Picture"
               aria-label="Change Profile Picture"
-              type="button"
             >
-              <ImageIcon className="w-6 h-6 sm:w-7 sm:h-7" />
+              <ImageIcon className="w-6 h-6" />
             </button>
             <input
               type="file"
@@ -211,142 +135,97 @@ useEffect(() => {
             />
           </div>
           <div className="flex flex-col justify-center flex-grow min-w-0 text-center sm:text-left">
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-gray-900 truncate">{teacher.name}</h1>
-            <p className="text-gray-600 text-sm sm:text-lg mb-2 sm:mb-3 truncate">{teacher.email}</p>
-            <div className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-3">
-              <span className="inline-flex items-center px-3 py-1 bg-indigo-100 text-indigo-700 font-semibold text-xs sm:text-sm rounded-full shadow-sm select-none">
+            <h1 className="text-2xl font-extrabold text-gray-900 truncate">{teacher.name}</h1>
+            <p className="text-gray-500 text-sm mt-1 truncate">{teacher.email}</p>
+            <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-2">
+              <span className="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 font-medium text-xs rounded-full border border-gray-100">
                 Role: {teacher.role}
               </span>
               <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-semibold shadow-sm select-none ${
-                  teacher.isEligible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full border border-gray-100 ${
+                  teacher.isEligible ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
                 }`}
               >
-                {teacher.isEligible ? (
-                  <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5 mr-1" />
-                ) : (
-                  <ShieldOff className="w-4 h-4 sm:w-5 sm:h-5 mr-1" />
-                )}
-                {teacher.isEligible ? 'Eligible for Tuition' : 'Not Eligible'}
+                {teacher.isEligible ? <ShieldCheck className="w-4 h-4 mr-1" /> : <ShieldOff className="w-4 h-4 mr-1" />}
+                {teacher.isEligible ? 'Eligible' : 'Not Eligible'}
               </span>
               <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-xs sm:text-sm font-semibold shadow-sm select-none ${
-                  teacher.hasPaid ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-200 text-gray-600'
+                className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full border border-gray-100 ${
+                  teacher.hasPaid ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-50 text-gray-500'
                 }`}
               >
-                {teacher.hasPaid ? (
-                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-1" />
-                ) : (
-                  <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 mr-1" />
-                )}
-                {teacher.hasPaid ? 'Payment Done' : 'Not Paid'}
+                {teacher.hasPaid ? <CheckCircle className="w-4 h-4 mr-1" /> : <AlertCircle className="w-4 h-4 mr-1" />}
+                {teacher.hasPaid ? 'Paid' : 'Not Paid'}
               </span>
             </div>
           </div>
         </section>
 
-        {/* Quick Stats */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div className="bg-white shadow-lg rounded-3xl p-6 flex flex-col justify-between min-w-0">
-            <div>
-              <h2 className="text-lg sm:text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" /> Payment Summary
-              </h2>
-              <p className="text-gray-700 text-base sm:text-lg mb-1 sm:mb-2">
-                Monthly Earnings: <span className="font-semibold">PKR {paymentSummary.monthlyEarnings.toLocaleString()}</span>
-              </p>
-              <p className="text-gray-700 text-base sm:text-lg mb-1 sm:mb-2">
-                Total Sessions: <span className="font-semibold">{paymentSummary.totalSessions}</span>
-              </p>
-              <p className="text-gray-700 text-base sm:text-lg">
-                Commission Paid: <span className="font-semibold">PKR {paymentSummary.commissionPaid.toLocaleString()}</span>
-              </p>
-            </div>
-            <button className="mt-6 bg-indigo-600 text-white rounded-lg py-2 font-semibold hover:bg-indigo-700 transition shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-400">
-              View History
-            </button>
+        {/* Quick Stats Section */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-3xl border border-gray-100 transition">
+            <h2 className="text-lg font-semibold text-indigo-600 mb-3 flex items-center gap-2">
+              <CreditCard className="w-5 h-5" /> Payment Summary
+            </h2>
+            <p className="text-gray-700 text-sm">Monthly Earnings: <span className="font-semibold">PKR {paymentSummary.monthlyEarnings.toLocaleString()}</span></p>
+            <p className="text-gray-700 text-sm">Total Sessions: <span className="font-semibold">{paymentSummary.totalSessions}</span></p>
+            <p className="text-gray-700 text-sm">Commission Paid: <span className="font-semibold">PKR {paymentSummary.commissionPaid.toLocaleString()}</span></p>
           </div>
 
-          <div className="bg-white shadow-lg rounded-3xl p-6 flex flex-col justify-between min-w-0">
-            <div>
-              <h2 className="text-lg sm:text-xl font-semibold text-indigo-600 mb-4 flex items-center gap-2">
-                <Users className="w-5 h-5 sm:w-6 sm:h-6" /> Student Stats
-              </h2>
-              <p className="text-gray-700 text-base sm:text-lg mb-1 sm:mb-2">
-                Students Taught: <span className="font-semibold">{studentStats.taught}</span>
-              </p>
-              <p className="text-gray-700 text-base sm:text-lg mb-1 sm:mb-2">
-                Repeat Students: <span className="font-semibold">{studentStats.repeat}</span>
-              </p>
-              <p className="text-gray-700 text-base sm:text-lg flex items-center gap-1">
-                Rating:{' '}
-                <span className="font-semibold flex items-center gap-1">
-                  {studentStats.rating}{' '}
-                  <Star className="w-5 h-5 text-yellow-400" />
-                </span>
-              </p>
-            </div>
+          <div className="bg-white p-6 rounded-3xl border border-gray-100 transition">
+            <h2 className="text-lg font-semibold text-indigo-600 mb-3 flex items-center gap-2">
+              <Users className="w-5 h-5" /> Student Stats
+            </h2>
+            <p className="text-gray-700 text-sm">Students Taught: <span className="font-semibold">{studentStats.taught}</span></p>
+            <p className="text-gray-700 text-sm">Repeat Students: <span className="font-semibold">{studentStats.repeat}</span></p>
+            <p className="text-gray-700 text-sm flex items-center gap-1">Rating: <span className="font-semibold flex items-center gap-1">{studentStats.rating} <Star className="w-4 h-4 text-yellow-400" /></span></p>
           </div>
-        </section>
-      </div>
+        </div>
 
-      {/* Bottom Section */}
-  <section className="bg-white shadow-lg rounded-3xl p-6 sm:p-8 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
-  <h2 className="text-xl sm:text-2xl font-semibold text-indigo-700 flex items-center gap-2 mb-6">
-    <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" /> Recently Viewed Posts
-  </h2>
-  <ViewedPostsTimeline
- 
-  />
-</section>
-{/** The div above is the place where I want to showcase that*/}
-      {/* Additional Sections */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Upcoming Sessions */}
-        <section className="bg-white shadow-lg rounded-3xl p-6 sm:p-8 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-          <h2 className="text-2xl font-semibold text-indigo-700 mb-6 flex items-center gap-2">
-            <CalendarClock className="w-6 h-6" /> Upcoming Sessions
+        {/* Recently Viewed Posts */}
+        <section className="bg-white p-6 rounded-3xl border border-gray-100 transition">
+          <h2 className="text-lg font-semibold text-indigo-600 mb-4 flex items-center gap-2">
+            <BookOpen className="w-5 h-5" /> Recently Viewed Posts
           </h2>
-          <div className="space-y-4">
+          <ViewedPostsTimeline />
+        </section>
+
+        {/* Upcoming Sessions & Requests */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <section className="bg-white p-6 rounded-3xl border border-gray-100 transition">
+            <h2 className="text-lg font-semibold text-indigo-600 mb-3 flex items-center gap-2">
+              <CalendarClock className="w-5 h-5" /> Upcoming Sessions
+            </h2>
             {upcomingSessions.length ? (
-              upcomingSessions.map((session, index) => (
-                <div
-                  key={index}
-                  className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 hover:shadow-lg transition cursor-pointer"
-                >
-                  <h3 className="font-semibold text-indigo-900 text-lg truncate">{session.title}</h3>
-                  <p className="text-indigo-700 text-sm truncate">{session.date}</p>
-                  <p className="text-indigo-700 text-sm truncate">{session.time}</p>
+              upcomingSessions.map((session, i) => (
+                <div key={i} className="p-3 mb-2 border border-gray-100 rounded-lg transition">
+                  <h3 className="text-gray-900 font-medium truncate">{session.title}</h3>
+                  <p className="text-gray-500 text-sm">{session.date}</p>
+                  <p className="text-gray-500 text-sm">{session.time}</p>
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 text-center py-10">No upcoming sessions scheduled.</p>
+              <p className="text-gray-500 text-center py-6">No upcoming sessions scheduled.</p>
             )}
-          </div>
-        </section>
+          </section>
 
-        {/* Session Requests */}
-        <section className="bg-white shadow-lg rounded-3xl p-6 sm:p-8 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-          <h2 className="text-2xl font-semibold text-indigo-700 mb-6 flex items-center gap-2">
-            <MailCheck className="w-6 h-6" /> Session Requests
-          </h2>
-          <div className="space-y-4">
+          <section className="bg-white p-6 rounded-3xl border border-gray-100 transition">
+            <h2 className="text-lg font-semibold text-indigo-600 mb-3 flex items-center gap-2">
+              <MailCheck className="w-5 h-5" /> Session Requests
+            </h2>
             {sessionRequests.length ? (
-              sessionRequests.map((request, index) => (
-                <div
-                  key={index}
-                  className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 hover:shadow-lg transition cursor-pointer"
-                >
-                  <h3 className="font-semibold text-indigo-900 text-lg truncate">{request.studentName}</h3>
-                  <p className="text-indigo-700 text-sm truncate">{request.topic}</p>
-                  <p className="text-indigo-700 text-sm truncate">{request.status}</p>
+              sessionRequests.map((request, i) => (
+                <div key={i} className="p-3 mb-2 border border-gray-100 rounded-lg transition">
+                  <h3 className="text-gray-900 font-medium truncate">{request.studentName}</h3>
+                  <p className="text-gray-500 text-sm truncate">{request.topic}</p>
+                  <p className="text-gray-500 text-sm truncate">{request.status}</p>
                 </div>
               ))
             ) : (
-              <p className="text-gray-500 text-center py-10">No session requests at the moment.</p>
+              <p className="text-gray-500 text-center py-6">No session requests at the moment.</p>
             )}
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </div>
   );

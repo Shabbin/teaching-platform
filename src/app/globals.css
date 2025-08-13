@@ -1,3 +1,8 @@
+
+@import "tailwindcss";
+@plugin "daisyui";
+globals.css
+
 html, body, #__next {
   margin: 0;
   padding: 0;
@@ -8,9 +13,11 @@ html, body, #__next {
 *, *::before, *::after {
   box-sizing: border-box;
 }
-@import "tailwindcss";
-@plugin "daisyui";
-globals.css
+
+
+
+
+
 
 @keyframes comicPop {
   0% {

@@ -132,7 +132,7 @@ const userSlice = createSlice({
   reducers: {
     logout: (state) => {
       state.userInfo = null;
-      state.profileImage = '/default-avatar.png';
+      // state.profileImage = '/default-avatar.png';
       state.isFetched = true;
       state.isAuthenticated = false;  // reset auth state on logout
       state.error = null;

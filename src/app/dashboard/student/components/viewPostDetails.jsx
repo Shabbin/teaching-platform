@@ -6,7 +6,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
-
+import { Send, BookOpen } from 'lucide-react';
 import TuitionRequestModal from './tuitionRequestComponent';
 import TopicHelpModal from './topicHelpModal'; // import your topic help modal
 import { updatePostViewsCount } from '../../../redux/postViewEventSlice';
@@ -160,145 +160,168 @@ const ViewPostDetails = ({ post }) => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-50 relative">
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 p-6">
-        {/* Sidebar: Teacher Info */}
-        <aside className="hidden lg:block w-64 sticky top-6 self-start">
-          <div className="bg-white rounded-xl p-6 shadow-lg flex flex-col items-center">
-            <div className="w-40 h-40 rounded-full overflow-hidden flex-shrink-0">
-              <Image
-                src={getImageUrl(fallbackTeacher.profileImage)}
-                alt={fallbackTeacher.name}
-                width={160}
-                height={160}
-                className="object-cover w-full h-full"
-              />
-            </div>
-            <div className="mt-4 text-center text-gray-700 text-base space-y-1">
-              <div className="font-semibold text-gray-800">
-                {fallbackTeacher.name || 'Unnamed Teacher'}
-              </div>
-              <div className="text-sm text-gray-500">
-                📍 {post.location || fallbackTeacher.location || 'Unknown'}
-              </div>
-              <div className="text-sm text-yellow-500">★★★★☆ (12 reviews)</div>
-            </div>
+return (
+  <div className="min-h-screen bg-gray-50 relative">
+    <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 p-6">
+      {/* Sidebar: Teacher Info */}
+      <aside className="hidden lg:block w-64 sticky top-6 self-start">
+        <div className="bg-white rounded-2xl p-6 shadow-lg flex flex-col items-center border border-gray-200">
+          <div className="w-40 h-40 rounded-full overflow-hidden flex-shrink-0">
+            <Image
+              src={getImageUrl(fallbackTeacher.profileImage)}
+              alt={fallbackTeacher.name}
+              width={160}
+              height={160}
+              className="object-cover w-full h-full"
+            />
           </div>
-        </aside>
+          <div className="mt-4 text-center text-gray-700 text-base space-y-1">
+            <div className="font-semibold text-gray-900">{fallbackTeacher.name || 'Unnamed Teacher'}</div>
+            <div className="text-sm text-gray-500">📍 {post.location || fallbackTeacher.location || 'Unknown'}</div>
+            <div className="text-sm text-yellow-500">★★★★☆ (12 reviews)</div>
+          </div>
+        </div>
+      </aside>
 
-        {/* Main Content */}
-        <main className="flex-1 space-y-6 lg:pl-8">
-          {/* Top Navigation */}
-          <div className="flex gap-4 flex-wrap">
+      {/* Main Content */}
+      <main className="flex-1 space-y-8 lg:pl-8">
+        {/* Top Navigation */}
+        <div className="flex gap-4 flex-wrap">
+          <button
+            onClick={handleGoBack}
+            className="
+              mb-4 px-6 py-2
+              bg-white text-[oklch(0.51_0.26_276.94)]
+              font-semibold
+              rounded-full
+              border-2 border-[oklch(0.51_0.26_276.94)]
+              shadow-sm
+              hover:bg-[oklch(0.51_0.20_276.94)]
+              hover:text-white
+              hover:border-[oklch(0.51_0.26_276.94)]
+              transition-colors duration-200
+              flex items-center gap-2 text-lg
+            "
+            aria-label="Go back to posts list"
+          >
+            ← Go Back
+          </button>
+
+          {!isOwner && (
             <button
-              onClick={handleGoBack}
-              className="mb-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-              aria-label="Go back to posts list"
+              onClick={() => router.push('/dashboard/student/teachers')}
+              className="
+                mb-4 px-6 py-2
+                bg-white text-[oklch(0.51_0.26_276.94)]
+                font-medium
+                rounded-full
+                border-2 border-[oklch(0.51_0.26_276.94)]
+                shadow-sm
+                hover:bg-[oklch(0.51_0.20_276.94)]
+                hover:text-white
+                hover:border-[oklch(0.51_0.26_276.94)]
+                transition-colors duration-200
+                flex items-center gap-2 text-lg
+              "
             >
-              ← Go Back
+              🎓 All Teachers
             </button>
+          )}
+        </div>
 
-            {!isOwner && (
+        {/* YouTube at Top */}
+        {youtubeId && (
+          <div className="w-full max-w-3xl mx-auto overflow-hidden rounded-xl border border-gray-200 shadow-sm mb-6">
+            <iframe
+              className="w-full aspect-video rounded-lg"
+              src={`https://www.youtube.com/embed/${youtubeId}`}
+              title="Intro Video"
+              allowFullScreen
+            />
+          </div>
+        )}
+
+        {/* Post Title */}
+        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">{post.title}</h1>
+
+        {/* Post Description */}
+        <div className="text-gray-700 text-lg leading-relaxed whitespace-pre-line prose prose-slate max-w-4xl">
+          {post.description}
+        </div>
+
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Object.entries(entries).map(
+            ([label, value]) =>
+              value && (
+                <div key={label} className="bg-white rounded-xl p-5 shadow hover:shadow-md transition-shadow duration-300 border border-gray-100">
+                  <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{label}</div>
+                  <div className="text-gray-900 text-base mt-2 break-words whitespace-pre-wrap">{value}</div>
+                </div>
+              )
+          )}
+        </div>
+
+        {error && <p className="text-red-600">{error}</p>}
+
+        {/* Footer Buttons */}
+        <div className="flex justify-end gap-4 pt-6 flex-wrap">
+          {isOwner ? (
+            <>
+              <Link href={`/dashboard/posts/${post._id}/edit?from=view`}>
+                <button className="px-6 py-3 bg-white text-[oklch(0.57_0.3_200)] border-2 border-[oklch(0.57_0.3_200)] rounded-xl shadow-md hover:bg-[oklch(0.57_0.25_200)] hover:text-white hover:border-[oklch(0.57_0.25_200)] transition duration-300 flex items-center justify-center font-medium">
+                  Edit Post
+                </button>
+              </Link>
               <button
-                onClick={() => router.push('/dashboard/student/teachers')}
-                className="mb-4 px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                onClick={() => alert('Delete not implemented here')}
+                disabled={saving}
+                className="px-6 py-3 bg-white text-[oklch(0.63_0.35_30)] border-2 border-[oklch(0.63_0.35_30)] rounded-xl shadow-md hover:bg-[oklch(0.63_0.3_30)] hover:text-white hover:border-[oklch(0.63_0.3_30)] transition duration-300 flex items-center justify-center font-medium disabled:opacity-50"
               >
-                🎓 All Teachers
+                Delete Post
               </button>
-            )}
-          </div>
-
-          {/* YouTube at Top */}
-          {youtubeId && (
-            <div>
-              <iframe
-                className="w-full aspect-video rounded-md border mb-6"
-                src={`https://www.youtube.com/embed/${youtubeId}`}
-                title="Intro Video"
-                allowFullScreen
-              />
-            </div>
+            </>
+          ) : (
+         <div className="flex flex-col sm:flex-row gap-4">
+  <button
+    onClick={() => setShowTuitionModal(true)}
+    className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-2xl shadow-lg border-2 border-blue-600 hover:bg-blue-600 hover:text-white transition duration-300 transform flex items-center justify-center gap-2"
+  >
+    <Send size={18} /> Request Tuition
+  </button>
+  <button
+    onClick={() => setShowTopicHelpModal(true)}
+    className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-2xl shadow-lg border-2 border-blue-600 hover:bg-blue-600 hover:text-white transition duration-300 transform flex items-center justify-center gap-2"
+  >
+    <BookOpen size={18} /> Ask for Topic Help
+  </button>
+</div>
           )}
+        </div>
 
-          <h1 className="text-4xl font-bold text-gray-800">{post.title}</h1>
+        {showTuitionModal && (
+          <TuitionRequestModal
+            teacherId={teacherId}
+            postId={post._id}
+            onClose={() => setShowTuitionModal(false)}
+            onSuccess={handleRequestSuccess}
+          />
+        )}
 
-          <div className="text-gray-700 text-lg leading-relaxed whitespace-pre-line">
-            {post.description}
-          </div>
-
-          {/* Info Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {Object.entries(entries).map(
-              ([label, value]) =>
-                value && (
-                  <div key={label} className="bg-gray-100 rounded-lg p-4">
-                    <div className="text-sm font-semibold text-gray-600">{label}</div>
-                    <div className="text-base text-gray-800 mt-1 break-words whitespace-pre-wrap">
-                      {value}
-                    </div>
-                  </div>
-                )
-            )}
-          </div>
-
-          {error && <p className="text-red-600">{error}</p>}
-
-          {/* Footer Buttons */}
-          <div className="flex justify-end gap-4 pt-4">
-            {isOwner ? (
-              <>
-                <Link href={`/dashboard/posts/${post._id}/edit?from=view`}>
-                  <button className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                    ✏️ Edit Post
-                  </button>
-                </Link>
-                <button
-                  onClick={() => alert('Delete not implemented here')}
-                  disabled={saving}
-                  className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
-                >
-                  {saving ? 'Deleting...' : '🗑 Delete Post'}
-                </button>
-              </>
-            ) : (
-              <div className="space-x-4">
-                <button
-                  onClick={() => setShowTuitionModal(true)}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  📩 Request Tuition
-                </button>
-                <button
-                  onClick={() => setShowTopicHelpModal(true)}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  📩 Ask for Topic Help
-                </button>
-              </div>
-            )}
-          </div>
-
-          {showTuitionModal && (
-            <TuitionRequestModal
-              teacherId={teacherId}
-              postId={post._id}
-              onClose={() => setShowTuitionModal(false)}
-              onSuccess={handleRequestSuccess}
-            />
-          )}
-
-          {showTopicHelpModal && (
-            <TopicHelpModal
-              teacherId={teacherId}
-              onClose={() => setShowTopicHelpModal(false)}
-              onSuccess={handleRequestSuccess}
-            />
-          )}
-        </main>
-      </div>
+        {showTopicHelpModal && (
+          <TopicHelpModal
+            teacherId={teacherId}
+            onClose={() => setShowTopicHelpModal(false)}
+            onSuccess={handleRequestSuccess}
+          />
+        )}
+      </main>
     </div>
-  );
+  </div>
+);
+
+
+
 };
 
 export default ViewPostDetails;

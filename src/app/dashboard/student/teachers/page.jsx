@@ -216,7 +216,7 @@ const ViewTeachers = () => {
   : `/teachers/${teacher._id}/posts`
                         }
                       >
-                        <button className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        <button className="bg-gradient-to-r from-indigo-600 to-purple-600  text-white py-2 px-4 rounded-md hover:bg-blue-700">
                           View Posts
                         </button>
                       </Link>
