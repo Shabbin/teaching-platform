@@ -36,7 +36,7 @@ const TeacherProfilePage = () => {
         {/* Profile Header */}
         <div className="flex items-center gap-6">
           <Image
-            src={teacher.profileImage || '/default-profile.png'}
+            src={teacher.profileImage || '/default-avatar.png'}
             alt={teacher.name || 'Teacher Profile'}
             width={90}
             height={90}

@@ -12,7 +12,7 @@ import {
 } from '../redux/chatSlice';
 import { normalizeMessage } from '../redux/chatThunks';
 import { addPostViewEvent,updatePostViewsCount } from '../redux/postViewEventSlice';
-
+import {addNotification} from '../redux/notificationSlice'
 const SOCKET_URL = 'http://localhost:5000';
 
 export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessageAlert) {
@@ -92,6 +92,10 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
         onNewMessage(normalizedMessage);
       }
     });
+socketRef.current.on('new_notification', (notification) => {
+  if (notification.read === undefined) notification.read = false;
+  dispatch(addNotification(notification));
+});
 
     socketRef.current.on('conversation_list_updated', (fullThread) => {
       console.log('[socket] conversation_list_updated received:', fullThread);
@@ -137,7 +141,9 @@ socketRef.current.on('post_view_event', (event) => {
 
       const isCurrentUserStudent = userId === data.studentId;
       const otherName = isCurrentUserStudent ? data.teacherName : data.studentName;
-      const otherImage = isCurrentUserStudent ? data.teacherProfileImage : data.studentProfileImage;
+     const otherImage = isCurrentUserStudent
+  ? data.teacherProfileImage || 'https://via.placeholder.com/40'
+  : data.studentProfileImage || 'https://via.placeholder.com/40';
 
       dispatch(
         addOrUpdateConversation({
@@ -220,6 +226,41 @@ socketRef.current.on('post_view_event', (event) => {
     socketRef.current.on('disconnect', (reason) => {
       console.log('[useSocket] disconnected:', reason);
     });
+    socketRef.current.on('request_rejected', (data) => {
+  console.log('[socket] request_rejected received:', data);
+
+  const { threadId, requestId, timestamp, rejectionMessage } = data;
+
+  const rejectionMessageObj = {
+    _id: `rejection-${Date.now()}`,
+    text: `Your tuition request was rejected. ${rejectionMessage || ''}`,
+    senderId: 'system',
+    threadId,
+    timestamp,
+    isSystemMessage: true,
+  };
+
+  dispatch(addMessageToThread({ threadId, message: rejectionMessageObj }));
+  dispatch(updateLastMessageInConversation({ threadId, message: rejectionMessageObj }));
+  dispatch(resetUnreadCount({ threadId }));
+
+  dispatch(
+    addOrUpdateConversation({
+      threadId,
+      requestId,
+      lastMessage: rejectionMessageObj.text,
+      lastMessageTimestamp: rejectionMessageObj.timestamp,
+      status: 'rejected',
+    })
+  );
+
+  if (typeof onRequestUpdate === 'function') {
+    onRequestUpdate({ type: 'rejected', threadId, requestId, timestamp });
+  }
+
+ 
+});
+
 
     // Cleanup all listeners on unmount or userId change
     return () => {

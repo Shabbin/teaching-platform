@@ -109,7 +109,7 @@ export const fetchCurrentUser = createAsyncThunk(
 // 🧾 Initial State
 const initialState = {
   userInfo: null,
-  profileImage: '/default-profile.png',
+  profileImage: '/default-avatar.png',
 
   studentDashboard: null,
   teacherDashboard: null,
@@ -132,7 +132,7 @@ const userSlice = createSlice({
   reducers: {
     logout: (state) => {
       state.userInfo = null;
-      state.profileImage = '/default-profile.png';
+      state.profileImage = '/default-avatar.png';
       state.isFetched = true;
       state.isAuthenticated = false;  // reset auth state on logout
       state.error = null;
@@ -161,7 +161,7 @@ const userSlice = createSlice({
       const img = action.payload?.profileImage;
       state.profileImage =
         img?.startsWith('http') || !img
-          ? img || '/default-profile.png'
+          ? img || '/default-avatar.png'
           : `http://localhost:5000/${img}`;
     },
 
@@ -173,7 +173,7 @@ const userSlice = createSlice({
       const img = action.payload?.profileImage;
       state.profileImage =
         img?.startsWith('http') || !img
-          ? img || '/default-profile.png'
+          ? img || '/default-avatar.png'
           : `http://localhost:5000/${img}`;
     },
   },
@@ -192,7 +192,7 @@ const userSlice = createSlice({
         const img = action.payload?.profileImage;
         state.profileImage =
           img?.startsWith('http') || !img
-            ? img || '/default-profile.png'
+            ? img || '/default-avatar.png'
             : `http://localhost:5000/${img}`;
 
         state.isFetched = true;
@@ -216,7 +216,7 @@ const userSlice = createSlice({
         const img = action.payload?.profileImage;
         state.profileImage =
           img?.startsWith('http') || !img
-            ? img || '/default-profile.png'
+            ? img || '/default-avatar.png'
             : `http://localhost:5000/${img}`;
 
         if (action.payload === null) {
@@ -232,7 +232,7 @@ const userSlice = createSlice({
       .addCase(fetchCurrentUser.rejected, (state, action) => {
         state.loading = false;
         state.userInfo = null;
-        state.profileImage = '/default-profile.png';
+        state.profileImage = '/default-avatar.png';
 
         if (action.payload === 'Not authenticated') {
           state.error = null;

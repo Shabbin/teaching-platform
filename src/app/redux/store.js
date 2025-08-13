@@ -5,6 +5,7 @@ import teacherPostsReducer from './teacherPostSlice'
 import requestReducer from './requestSlice';
 import chatReducer from './chatSlice';
 import postViewEventsReducer from './postViewEventSlice';
+import notificationsReducer from './notificationSlice';
 export const store = configureStore({
   reducer: {
     user: userReducer,
@@ -14,5 +15,6 @@ export const store = configureStore({
  chat: chatReducer,
     requests: requestReducer,
       postViewEvents: postViewEventsReducer,
+          notifications: notificationsReducer,
   },
 });

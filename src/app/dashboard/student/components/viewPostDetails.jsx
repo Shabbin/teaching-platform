@@ -57,7 +57,7 @@ const ViewPostDetails = ({ post }) => {
 
   const getImageUrl = (img) =>
     !img || img.trim() === ''
-      ? '/default-profile.png'
+      ? '/default-avatar.png'
       : img.startsWith('http')
       ? img
       : `http://localhost:5000/${img}`;

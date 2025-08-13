@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MessengerPopup from './components/chat-components/MessengerPopup';
+import NotificationBellIcon from './components/notificationComponent/NotificationBellIcon';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -111,10 +112,7 @@ const handleLogout = async () => {
 
         <div className="flex items-center space-x-4 relative" ref={dropdownRef}>
             <MessengerPopup user={userInfo} role={userInfo?.role} />
-          <button className="text-gray-600 hover:text-indigo-600">
-            <Bell className="w-5 h-5" />
-          </button>
-
+           <NotificationBellIcon />
       
 
           <img
@@ -123,7 +121,7 @@ const handleLogout = async () => {
                 ? profileImage
                 : profileImage
                 ? `http://localhost:5000/${profileImage}`
-                : '/default-profile.png'
+                : '/default-avatar.png'
             }
             alt="Profile"
             className="w-10 h-10 rounded-full object-cover border border-gray-300 cursor-pointer"

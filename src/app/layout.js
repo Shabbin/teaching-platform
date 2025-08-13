@@ -18,7 +18,10 @@ const geistMono = Geist_Mono({
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body className="m-0 p-0 min-h-screen w-screen h-screen">
+      <body
+        className="m-0 p-0 min-h-screen w-screen h-screen"
+        suppressHydrationWarning={true} // 👈 This silences extension/dynamic mismatch warnings
+      >
         <ReduxProviderWrapper>{children}</ReduxProviderWrapper>
       </body>
     </html>

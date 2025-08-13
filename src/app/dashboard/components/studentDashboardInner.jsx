@@ -35,7 +35,7 @@ useEffect(() => {
               {/* Welcome Section */}
               <div className="bg-white p-6 rounded-lg shadow-md flex items-center gap-4">
                 <Image
-                  src={studentDashboard.student?.profileImage || '/default-profile.png'}
+                  src={studentDashboard.student?.profileImage || '/default-avatar.png'}
                   alt="Student Profile"
                   width={64}
                   height={64}
