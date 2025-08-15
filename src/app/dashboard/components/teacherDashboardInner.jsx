@@ -104,7 +104,7 @@ export default function TeacherDashboardInner() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 p-6">
+    <div className="min-h-screen  from-gray-50 via-white to-gray-50 p-6">
       <div className="max-w-6xl mx-auto space-y-8">
         {/* Profile Section */}
         <section className="bg-white p-6 flex flex-col sm:flex-row items-center gap-5 rounded-3xl border border-gray-100 transition">
@@ -135,7 +135,7 @@ export default function TeacherDashboardInner() {
             />
           </div>
           <div className="flex flex-col justify-center flex-grow min-w-0 text-center sm:text-left">
-            <h1 className="text-2xl font-extrabold text-gray-900 truncate">{teacher.name}</h1>
+            <h1 className="text-2xl font-extrabold text-[oklch(0.55_0.28_296.71)] truncate">{teacher.name}</h1>
             <p className="text-gray-500 text-sm mt-1 truncate">{teacher.email}</p>
             <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-2">
               <span className="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 font-medium text-xs rounded-full border border-gray-100">

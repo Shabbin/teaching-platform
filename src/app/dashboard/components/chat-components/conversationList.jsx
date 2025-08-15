@@ -127,7 +127,7 @@ console.log('participants:', chat.participants.map(p => ({ id: p?._id, idType: t
           <span className="absolute top-0 left-9 block h-3 w-3 rounded-full ring-2 ring-white bg-red-500" />
         )}
         <div className="min-w-0">
-          <div className="font-semibold text-lg truncate">{displayName}</div>
+          <div className="text-lg  truncate">{displayName}</div>
           <div
             className={`text-sm truncate line-clamp-2 ${
               unreadCount > 0 ? 'font-bold text-gray-900' : 'text-gray-600'

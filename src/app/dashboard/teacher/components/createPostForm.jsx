@@ -1,3 +1,4 @@
+'use client'
 import React, { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,7 +43,8 @@ export default function CreatePostForm() {
       language: '',
       hourlyRate: '',
       youtubeLink: '',
-      file: null,
+      videoFile: null,
+     
     },
   });
 
@@ -215,23 +217,76 @@ export default function CreatePostForm() {
   }
 
   // === NEW: Normalize arrays before dispatch ===
-  const onSubmit = (data) => {
-    // Remove empty or falsy entries from arrays
-    const normalizedData = {
-      ...data,
-      subjects: (data.subjects || []).filter(Boolean),
-      tags: (data.tags || []).filter(Boolean),
-    };
+const onSubmit = (data) => {
+  console.log('--- Raw form data ---');
+  console.log(data);
 
-    // Dispatch normalized object, thunk will handle FormData creation
-    dispatch(createTeacherPost(normalizedData))
-      .unwrap()
-      .then(() => {
-        alert('Post created successfully');
-        reset();
-      })
-      .catch((err) => alert('Failed to create post: ' + err));
-  };
+  const formData = new FormData();
+
+  // Arrays
+  (data.subjects || []).filter(Boolean).forEach(sub => {
+    formData.append('subjects', sub);
+    console.log('Appending subject:', sub);
+  });
+  (data.tags || []).filter(Boolean).forEach(tag => {
+    formData.append('tags', tag);
+    console.log('Appending tag:', tag);
+  });
+
+  // All other fields
+  Object.entries(data).forEach(([key, value]) => {
+    if (key === 'subjects' || key === 'tags') return;
+
+    if (key === 'videoFile') {
+      if (value && value.length > 0) {
+        formData.append('videoFile', value[0]);
+        console.log('Appending videoFile:', value[0].name);
+      } else {
+        console.log('No video file selected.');
+      }
+    } else if (value !== undefined && value !== null && value !== '') {
+      formData.append(key, value);
+      console.log(`Appending field: ${key} => ${value}`);
+    }
+  });
+
+  // Debug FormData content
+  console.log('--- Final FormData ---');
+  for (let pair of formData.entries()) {
+    console.log(pair[0], pair[1]);
+  }
+
+  dispatch(createTeacherPost(formData))
+    .unwrap()
+    .then(() => {
+      alert('Post created successfully');
+      reset();
+    })
+    .catch(err => alert('Failed to create post: ' + err));
+};
+
+
+
+
+  dispatch(createTeacherPost(formData))
+    .unwrap()
+    .then(() => {
+      alert('Post created successfully');
+      reset();
+    })
+    .catch((err) => alert('Failed to create post: ' + err));
+};
+
+  // dispatch FormData directly
+  dispatch(createTeacherPost(formData))
+    .unwrap()
+    .then(() => {
+      alert('Post created successfully');
+      reset();
+    })
+    .catch((err) => alert('Failed to create post: ' + err));
+
+
 
   return (
     <form
@@ -428,7 +483,12 @@ export default function CreatePostForm() {
       {/* File Upload */}
       <div>
         <label className="font-semibold block">Video File (optional)</label>
-        <input type="file" accept="video/*" {...register('file')} className="w-full" />
+       <input
+  type="file"
+  accept="video/*"
+  onChange={(e) => setValue('videoFile', e.target.files)}
+  className="w-full"
+/>
       </div>
 
       {/* Submit */}

@@ -64,7 +64,7 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
         language: initialData.language || '',
         hourlyRate: initialData.hourlyRate || '',
         youtubeLink: initialData.youtubeLink || '',
-        file: null,
+        videoFile: null, // <-- fixed
       }
     : {
         title: '',
@@ -80,7 +80,7 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
         language: '',
         hourlyRate: '',
         youtubeLink: '',
-        file: null,
+        videoFile: null, // <-- fixed
       };
 
   const methods = useForm({

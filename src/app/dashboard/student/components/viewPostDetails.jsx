@@ -1,5 +1,4 @@
 'use client';
-// dashboard\student\components\viewPostDetails.jsx
 import { useSelector } from 'react-redux';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
@@ -8,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { Send, BookOpen } from 'lucide-react';
 import TuitionRequestModal from './tuitionRequestComponent';
-import TopicHelpModal from './topicHelpModal'; // import your topic help modal
+import TopicHelpModal from './topicHelpModal'; 
 import { updatePostViewsCount } from '../../../redux/postViewEventSlice';
 
 function setCookie(name, value, days = 365) {
@@ -34,6 +33,8 @@ const ViewPostDetails = ({ post }) => {
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [viewsCount, setViewsCount] = useState(post.viewsCount || 0);
+  const dummyEnrollments = 3; // static for now
 
   const [showTuitionModal, setShowTuitionModal] = useState(false);
   const [showTopicHelpModal, setShowTopicHelpModal] = useState(false);
@@ -94,22 +95,18 @@ const ViewPostDetails = ({ post }) => {
     Tags: post.tags?.join(', '),
   };
 
-  // Updated: Record the post view on mount using cookies to avoid double counting
   useEffect(() => {
     if (!post?._id) return;
-    if (hasRecordedRef.current) return; // Already recorded for this mount
+    if (hasRecordedRef.current) return;
 
     const viewedKey = `viewed_post_${post._id}`;
-
     if (getCookie(viewedKey)) {
-      // View already recorded recently in cookie, skip
       setHasRecordedView(true);
       hasRecordedRef.current = true;
       return;
     }
 
     hasRecordedRef.current = true;
-
     const controller = new AbortController();
 
     const recordView = async () => {
@@ -119,22 +116,18 @@ const ViewPostDetails = ({ post }) => {
           credentials: 'include',
           signal: controller.signal,
         });
-
         const data = await res.json();
 
         if (!res.ok) {
           if (data.message === "View already counted recently") {
-            console.log('View already counted recently, skipping duplicate count.');
             setHasRecordedView(true);
           } else {
             console.error('Failed to record post view:', data.message || res.status);
           }
         } else {
           setHasRecordedView(true);
-
-          // Set cookie to expire in 1 hour (3600 seconds)
+          setViewsCount(data.viewsCount);
           setCookie(viewedKey, 'true', 3600);
-
           dispatch(updatePostViewsCount({ postId: post._id, viewsCount: data.viewsCount }));
         }
       } catch (err) {
@@ -143,185 +136,167 @@ const ViewPostDetails = ({ post }) => {
         }
       }
     };
-
     recordView();
-
-    return () => {
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [post._id, dispatch]);
 
   const handleRequestSuccess = (requestId) => {
     setShowTuitionModal(false);
     setShowTopicHelpModal(false);
-
-    if (requestId) {
-      router.push(`/messenger/${requestId}`);
-    }
+    if (requestId) router.push(`/messenger/${requestId}`);
   };
 
-return (
-  <div className="min-h-screen bg-gray-50 relative">
-    <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 p-6">
-      {/* Sidebar: Teacher Info */}
-      <aside className="hidden lg:block w-64 sticky top-6 self-start">
-        <div className="bg-white rounded-2xl p-6 shadow-lg flex flex-col items-center border border-gray-200">
-          <div className="w-40 h-40 rounded-full overflow-hidden flex-shrink-0">
-            <Image
-              src={getImageUrl(fallbackTeacher.profileImage)}
-              alt={fallbackTeacher.name}
-              width={160}
-              height={160}
-              className="object-cover w-full h-full"
-            />
+  return (
+    <div className="min-h-screen bg-gray-50 relative">
+      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 p-6">
+        {/* Sidebar */}
+        <aside className="hidden lg:block w-64 sticky top-6 self-start">
+          <div className="bg-white rounded-2xl p-6 shadow-lg flex flex-col items-center border border-gray-200">
+            <div className="w-40 h-40 rounded-full overflow-hidden flex-shrink-0">
+              <Image
+                src={getImageUrl(fallbackTeacher.profileImage)}
+                alt={fallbackTeacher.name}
+                width={160}
+                height={160}
+                className="object-cover w-full h-full"
+              />
+            </div>
+            <div className="mt-4 text-center text-gray-700 text-base space-y-1">
+              <div className="font-semibold text-gray-900">{fallbackTeacher.name || 'Unnamed Teacher'}</div>
+              <div className="text-sm text-gray-500">📍 {post.location || fallbackTeacher.location || 'Unknown'}</div>
+              <div className="text-sm text-yellow-500">★★★★☆ (12 reviews)</div>
+            </div>
           </div>
-          <div className="mt-4 text-center text-gray-700 text-base space-y-1">
-            <div className="font-semibold text-gray-900">{fallbackTeacher.name || 'Unnamed Teacher'}</div>
-            <div className="text-sm text-gray-500">📍 {post.location || fallbackTeacher.location || 'Unknown'}</div>
-            <div className="text-sm text-yellow-500">★★★★☆ (12 reviews)</div>
-          </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 space-y-8 lg:pl-8">
-        {/* Top Navigation */}
-        <div className="flex gap-4 flex-wrap">
-          <button
-            onClick={handleGoBack}
-            className="
-              mb-4 px-6 py-2
-              bg-white text-[oklch(0.51_0.26_276.94)]
-              font-semibold
-              rounded-full
-              border-2 border-[oklch(0.51_0.26_276.94)]
-              shadow-sm
-              hover:bg-[oklch(0.51_0.20_276.94)]
-              hover:text-white
-              hover:border-[oklch(0.51_0.26_276.94)]
-              transition-colors duration-200
-              flex items-center gap-2 text-lg
-            "
-            aria-label="Go back to posts list"
-          >
-            ← Go Back
-          </button>
-
-          {!isOwner && (
+        {/* Main */}
+        <main className="flex-1 space-y-8 lg:pl-8">
+          <div className="flex gap-4 flex-wrap">
             <button
-              onClick={() => router.push('/dashboard/student/teachers')}
-              className="
-                mb-4 px-6 py-2
-                bg-white text-[oklch(0.51_0.26_276.94)]
-                font-medium
-                rounded-full
-                border-2 border-[oklch(0.51_0.26_276.94)]
-                shadow-sm
-                hover:bg-[oklch(0.51_0.20_276.94)]
-                hover:text-white
-                hover:border-[oklch(0.51_0.26_276.94)]
-                transition-colors duration-200
-                flex items-center gap-2 text-lg
-              "
+              onClick={handleGoBack}
+              className="mb-4 px-6 py-2 bg-white text-[oklch(0.51_0.26_276.94)] font-semibold rounded-full border-2 border-[oklch(0.51_0.26_276.94)] shadow-sm hover:bg-[oklch(0.51_0.20_276.94)] hover:text-white hover:border-[oklch(0.51_0.26_276.94)] transition-colors duration-200 flex items-center gap-2 text-lg"
             >
-              🎓 All Teachers
+              ← Go Back
             </button>
-          )}
-        </div>
 
-        {/* YouTube at Top */}
-        {youtubeId && (
-          <div className="w-full max-w-3xl mx-auto overflow-hidden rounded-xl border border-gray-200 shadow-sm mb-6">
-            <iframe
-              className="w-full aspect-video rounded-lg"
-              src={`https://www.youtube.com/embed/${youtubeId}`}
-              title="Intro Video"
-              allowFullScreen
-            />
-          </div>
-        )}
-
-        {/* Post Title */}
-        <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">{post.title}</h1>
-
-        {/* Post Description */}
-        <div className="text-gray-700 text-lg leading-relaxed whitespace-pre-line prose prose-slate max-w-4xl">
-          {post.description}
-        </div>
-
-        {/* Info Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Object.entries(entries).map(
-            ([label, value]) =>
-              value && (
-                <div key={label} className="bg-white rounded-xl p-5 shadow hover:shadow-md transition-shadow duration-300 border border-gray-100">
-                  <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{label}</div>
-                  <div className="text-gray-900 text-base mt-2 break-words whitespace-pre-wrap">{value}</div>
-                </div>
-              )
-          )}
-        </div>
-
-        {error && <p className="text-red-600">{error}</p>}
-
-        {/* Footer Buttons */}
-        <div className="flex justify-end gap-4 pt-6 flex-wrap">
-          {isOwner ? (
-            <>
-              <Link href={`/dashboard/posts/${post._id}/edit?from=view`}>
-                <button className="px-6 py-3 bg-white text-[oklch(0.57_0.3_200)] border-2 border-[oklch(0.57_0.3_200)] rounded-xl shadow-md hover:bg-[oklch(0.57_0.25_200)] hover:text-white hover:border-[oklch(0.57_0.25_200)] transition duration-300 flex items-center justify-center font-medium">
-                  Edit Post
-                </button>
-              </Link>
+            {!isOwner && (
               <button
-                onClick={() => alert('Delete not implemented here')}
-                disabled={saving}
-                className="px-6 py-3 bg-white text-[oklch(0.63_0.35_30)] border-2 border-[oklch(0.63_0.35_30)] rounded-xl shadow-md hover:bg-[oklch(0.63_0.3_30)] hover:text-white hover:border-[oklch(0.63_0.3_30)] transition duration-300 flex items-center justify-center font-medium disabled:opacity-50"
+                onClick={() => router.push('/dashboard/student/teachers')}
+                className="mb-4 px-6 py-2 bg-white text-[oklch(0.51_0.26_276.94)] font-medium rounded-full border-2 border-[oklch(0.51_0.26_276.94)] shadow-sm hover:bg-[oklch(0.51_0.20_276.94)] hover:text-white hover:border-[oklch(0.51_0.26_276.94)] transition-colors duration-200 flex items-center gap-2 text-lg"
               >
-                Delete Post
+                🎓 All Teachers
               </button>
-            </>
-          ) : (
-         <div className="flex flex-col sm:flex-row gap-4">
-  <button
-    onClick={() => setShowTuitionModal(true)}
-    className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-2xl shadow-lg border-2 border-blue-600 hover:bg-blue-600 hover:text-white transition duration-300 transform flex items-center justify-center gap-2"
-  >
-    <Send size={18} /> Request Tuition
-  </button>
-  <button
-    onClick={() => setShowTopicHelpModal(true)}
-    className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-2xl shadow-lg border-2 border-blue-600 hover:bg-blue-600 hover:text-white transition duration-300 transform flex items-center justify-center gap-2"
-  >
-    <BookOpen size={18} /> Ask for Topic Help
-  </button>
-</div>
+            )}
+          </div>
+
+          {/* Video Section */}
+          <div className="w-full max-w-3xl mx-auto overflow-hidden rounded-xl border border-gray-200 shadow-sm mb-6">
+            {youtubeId ? (
+              <iframe
+                className="w-full aspect-video rounded-lg"
+                src={`https://www.youtube.com/embed/${youtubeId}`}
+                title="YouTube Video"
+                allowFullScreen
+              />
+            ) : post.videoFile ? (
+              <video
+                controls
+                className="w-full aspect-video rounded-lg"
+              >
+                <source src={`http://localhost:5000/videos/${post.videoFile.split('/').pop()}`} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
+            ) : null}
+          </div>
+
+          {/* Views & Enrollments */}
+          <div className="flex gap-6 mb-6 ml-[70px] ">
+            <div className="bg-white rounded-xl p-4 shadow border border-gray-100 flex items-center gap-2">
+              <span className="font-semibold text-gray-700">👁️ </span>
+              <span className="text-gray-900">{viewsCount}</span>
+            </div>
+            <div className="bg-white rounded-xl p-4 shadow border border-gray-100 flex items-center gap-2">
+              <span className=" text-gray-700">🎓 Enrollments:</span>
+              <span className="font-semibold text-gray-900">{dummyEnrollments}</span>
+            </div>
+          </div>
+
+          {/* Post Title & Description */}
+          <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">{post.title}</h1>
+          <div className="text-gray-700 text-lg leading-relaxed whitespace-pre-line prose prose-slate max-w-4xl">
+            {post.description}
+          </div>
+
+          {/* Info Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {Object.entries(entries).map(
+              ([label, value]) =>
+                value && (
+                  <div key={label} className="bg-white rounded-xl p-5 shadow hover:shadow-md transition-shadow duration-300 border border-gray-100">
+                    <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{label}</div>
+                    <div className="text-gray-900 text-base mt-2 break-words whitespace-pre-wrap">{value}</div>
+                  </div>
+                )
+            )}
+          </div>
+
+          {error && <p className="text-red-600">{error}</p>}
+
+          {/* Footer Buttons */}
+          <div className="flex justify-end gap-4 pt-6 flex-wrap">
+            {isOwner ? (
+              <>
+                <Link href={`/dashboard/posts/${post._id}/edit?from=view`}>
+                  <button className="px-6 py-3 bg-white text-[oklch(0.57_0.3_200)] border-2 border-[oklch(0.57_0.3_200)] rounded-xl shadow-md hover:bg-[oklch(0.57_0.25_200)] hover:text-white hover:border-[oklch(0.57_0.25_200)] transition duration-300 flex items-center justify-center font-medium">
+                    Edit Post
+                  </button>
+                </Link>
+                <button
+                  onClick={() => alert('Delete not implemented here')}
+                  disabled={saving}
+                  className="px-6 py-3 bg-white text-[oklch(0.63_0.35_30)] border-2 border-[oklch(0.63_0.35_30)] rounded-xl shadow-md hover:bg-[oklch(0.63_0.3_30)] hover:text-white hover:border-[oklch(0.63_0.3_30)] transition duration-300 flex items-center justify-center font-medium disabled:opacity-50"
+                >
+                  Delete Post
+                </button>
+              </>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={() => setShowTuitionModal(true)}
+                  className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-2xl shadow-lg border-2 border-blue-600 hover:bg-blue-600 hover:text-white transition duration-300 transform flex items-center justify-center gap-2"
+                >
+                  <Send size={18} /> Request Tuition
+                </button>
+                <button
+                  onClick={() => setShowTopicHelpModal(true)}
+                  className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-2xl shadow-lg border-2 border-blue-600 hover:bg-blue-600 hover:text-white transition duration-300 transform flex items-center justify-center gap-2"
+                >
+                  <BookOpen size={18} /> Ask for Topic Help
+                </button>
+              </div>
+            )}
+          </div>
+
+          {showTuitionModal && (
+            <TuitionRequestModal
+              teacherId={teacherId}
+              postId={post._id}
+              onClose={() => setShowTuitionModal(false)}
+              onSuccess={handleRequestSuccess}
+            />
           )}
-        </div>
 
-        {showTuitionModal && (
-          <TuitionRequestModal
-            teacherId={teacherId}
-            postId={post._id}
-            onClose={() => setShowTuitionModal(false)}
-            onSuccess={handleRequestSuccess}
-          />
-        )}
-
-        {showTopicHelpModal && (
-          <TopicHelpModal
-            teacherId={teacherId}
-            onClose={() => setShowTopicHelpModal(false)}
-            onSuccess={handleRequestSuccess}
-          />
-        )}
-      </main>
+          {showTopicHelpModal && (
+            <TopicHelpModal
+              teacherId={teacherId}
+              onClose={() => setShowTopicHelpModal(false)}
+              onSuccess={handleRequestSuccess}
+            />
+          )}
+        </main>
+      </div>
     </div>
-  </div>
-);
-
-
-
+  );
 };
 
 export default ViewPostDetails;

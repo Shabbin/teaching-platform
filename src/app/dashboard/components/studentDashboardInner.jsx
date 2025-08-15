@@ -40,7 +40,7 @@ const StudentDashboard = () => {
                   className="rounded-full object-cover ring-2 ring-indigo-500"
                 />
                 <div>
-                  <h2 className="text-2xl font-extrabold text-gray-900">
+                  <h2 className="text-2xl font-extrabold text-[oklch(0.55_0.28_296.71)]">
                     Welcome, {studentDashboard.student?.name || 'Student'}!
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">{studentDashboard.student?.email}</p>

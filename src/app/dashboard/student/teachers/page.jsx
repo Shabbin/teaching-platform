@@ -1,11 +1,11 @@
 'use client';
-
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import Link from 'next/link';
 import Select from 'react-select';
 import Avatar from '@mui/material/Avatar';
 import Skeleton from '@mui/material/Skeleton';
+import { Star, StarBorder } from '@mui/icons-material';
 
 const ViewTeachers = () => {
   const [allTags, setAllTags] = useState([]);
@@ -18,7 +18,6 @@ const ViewTeachers = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch all tags from all posts
   const fetchAllTags = async () => {
     try {
       const res = await axios.get('http://localhost:5000/api/posts');
@@ -34,7 +33,6 @@ const ViewTeachers = () => {
     }
   };
 
-  // Fetch all posts based on filters
   const fetchFilteredPosts = async () => {
     try {
       setLoading(true);
@@ -69,13 +67,11 @@ const ViewTeachers = () => {
 
   const tagOptions = allTags.map(tag => ({ value: tag, label: tag }));
 
-  // Group unique teachers from posts
   const teacherMap = new Map();
 
   posts.forEach(post => {
     const tId = post.teacher._id;
     const currentSubjects = teacherMap.get(tId)?.subjects || new Set();
-
     const filteredSubjects = selectedTags.length > 0
       ? post.subjects.filter(s => selectedTags.some(tag => tag.value === s))
       : post.subjects;
@@ -88,7 +84,9 @@ const ViewTeachers = () => {
         subjects: new Set(filteredSubjects),
         hourlyRate: post.hourlyRate,
         location: post.location,
-        language: post.language,
+        // Dummy ratings/reviews
+        rating: Math.floor(Math.random() * 5) + 1,
+        reviews: Math.floor(Math.random() * 20) + 1,
       });
     } else {
       filteredSubjects.forEach(subj => currentSubjects.add(subj));
@@ -96,17 +94,16 @@ const ViewTeachers = () => {
     }
   });
 
-  const teachers = Array.from(teacherMap.values());
+  // Convert Map to array and sort by rating descending
+  const teachers = Array.from(teacherMap.values()).sort((a, b) => b.rating - a.rating);
 
   return (
     <div className="min-h-screen p-4 sm:p-6 bg-gray-50">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">🎓 Browse Available Teachers</h1>
-
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Filters */}
         <div className="w-full lg:w-1/4 lg:sticky top-6 h-fit">
           <div className="bg-white rounded-xl shadow-md p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-gray-800">🔍 Filter Teachers</h2>
+            <h2 className="text-lg font-semibold text-[oklch(0.55_0.28_296.83)]">🔍 Filter Teachers</h2>
 
             <input
               type="text"
@@ -134,16 +131,6 @@ const ViewTeachers = () => {
               value={location}
               onChange={e => setLocation(e.target.value)}
             />
-
-            <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              value={mode}
-              onChange={e => setMode(e.target.value)}
-            >
-              <option value="">All Modes</option>
-              <option value="online">Online</option>
-              <option value="offline">Offline</option>
-            </select>
 
             <div className="flex gap-2">
               <input
@@ -184,7 +171,7 @@ const ViewTeachers = () => {
             <p className="text-red-500">No matching teachers found.</p>
           ) : (
             <div className="space-y-6">
-              {teachers.map(({ teacher, subjects, hourlyRate, location, language }) => (
+              {teachers.map(({ teacher, subjects, hourlyRate, location, rating, reviews }) => (
                 <div
                   key={teacher._id}
                   className="bg-white rounded-2xl shadow p-6 hover:shadow-lg transition"
@@ -197,11 +184,23 @@ const ViewTeachers = () => {
                     />
                     <div className="flex-1">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <h3 className="text-xl font-semibold text-gray-800">{teacher.name}</h3>
+                        <h3 className="text-xl font-semibold text-[oklch(0.55_0.28_296.83)]">{teacher.name}</h3>
                         <div className="text-sm text-blue-600 font-semibold">৳{hourlyRate} / hr</div>
                       </div>
-                      <p className="text-sm text-gray-500 mb-1">📍 {location}</p>
-                      <p className="text-sm text-gray-500 mb-2">💬 {language || 'Language not specified'}</p>
+                      {/* <p className="text-sm text-gray-500 mb-1">📍 {location}</p> */}
+
+                      {/* Ratings */}
+                      <div className="flex items-center gap-1 mb-2">
+                        {[...Array(5)].map((_, i) =>
+                          i < rating ? (
+                            <Star key={i} className="text-yellow-400" fontSize="small" />
+                          ) : (
+                            <StarBorder key={i} className="text-gray-300" fontSize="small" />
+                          )
+                        )}
+                        <span className="text-sm text-gray-600 ml-2">({reviews} reviews)</span>
+                      </div>
+
                       <div className="flex flex-wrap gap-2 mb-3">
                         {[...subjects].map((subj, i) => (
                           <span key={i} className="bg-blue-100 text-blue-700 text-sm px-2 py-0.5 rounded-full">
@@ -212,11 +211,13 @@ const ViewTeachers = () => {
                       <Link
                         href={
                           selectedTags.length > 0
-  ? `/teachers/${teacher._id}/posts?${selectedTags.map(tag => `subject=${encodeURIComponent(tag.value)}`).join('&')}`
-  : `/teachers/${teacher._id}/posts`
+                            ? `/teachers/${teacher._id}/posts?${selectedTags
+                                .map(tag => `subject=${encodeURIComponent(tag.value)}`)
+                                .join('&')}`
+                            : `/teachers/${teacher._id}/posts`
                         }
                       >
-                        <button className="bg-gradient-to-r from-indigo-600 to-purple-600  text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        <button className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
                           View Posts
                         </button>
                       </Link>

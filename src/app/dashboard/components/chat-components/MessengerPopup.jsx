@@ -272,7 +272,7 @@ export default function MessengerPopup({ role: propRole }) {
       {open && (
         <div className="fixed bottom-4 right-4 w-80 h-[420px] bg-white shadow-lg border rounded-xl p-4 z-50 flex flex-col">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-xl font-semibold select-none">Chats</h2>
+            <h2 className="text-[oklch(0.55_0.28_296.83)] font-semibold select-none">Chats</h2>
             <button
               onClick={() => setOpen(false)}
               className="text-gray-500 hover:text-gray-700 text-lg font-bold"

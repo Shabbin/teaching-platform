@@ -23,8 +23,9 @@ const ANNOUNCEMENTS = [
 const SCHEDULE = ['9:00 AM – Physics', '11:00 AM – Chemistry'];
 
 // Left Sidebar
+// Left Sidebar
 const Sidebar = () => (
-  <aside className="w-[250px] bg-slate-900 text-white p-5 flex flex-col flex-shrink-0">
+  <aside className="w-[250px] bg-[oklch(0.55_0.28_296.83)] text-white p-5 flex flex-col flex-shrink-0">
     <div className="text-center mb-8">
       <img
         src="https://i.pravatar.cc/100"
@@ -33,12 +34,13 @@ const Sidebar = () => (
       />
       <h3 className="mt-2 text-lg font-medium">Mr. Ahmed</h3>
     </div>
-    <nav className="flex flex-col gap-4 mt-5">
+
+    <nav className="flex flex-col gap-2 mt-5">
       {['Students', 'Fix Schedule', 'Exam Scheduler', 'Classroom Settings'].map((item) => (
         <a
           key={item}
           href="#"
-          className="text-slate-300 text-sm hover:text-white transition cursor-pointer"
+          className="bg-white/10 hover:bg-white/20 rounded-lg px-4 py-2 text-sm text-slate-200 hover:text-white transition-colors cursor-pointer"
         >
           {item}
         </a>
@@ -46,6 +48,7 @@ const Sidebar = () => (
     </nav>
   </aside>
 );
+
 
 // Class Overview Cards
 const ClassOverview = ({ subjects }) => (
@@ -110,13 +113,11 @@ const RightSidebar = ({ announcements, schedule }) => (
 // Main Page
 export default function TeacherClassroom() {
   return (
-    <div className="flex w-full h-screen bg-[#f4f6f8]">
+    <div className="flex w-full h-screen ">
       <Sidebar />
       <main className="flex-1 overflow-y-auto">
         <div className="p-8">
-          <div className="text-2xl font-semibold mb-6">
-            👋 Welcome back, Mr. Ahmed!
-          </div>
+       
           <ClassOverview subjects={SUBJECTS} />
           <StudentList students={STUDENTS} />
         </div>

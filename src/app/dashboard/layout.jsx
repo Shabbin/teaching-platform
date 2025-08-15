@@ -31,6 +31,7 @@ export default function DashboardLayout({ children }) {
   const [navOpen, setNavOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [navItems, setNavItems] = useState([]);
+  const [activePath, setActivePath] = useState('');
 
   // Update nav items based on role
   useEffect(() => {
@@ -47,7 +48,6 @@ export default function DashboardLayout({ children }) {
     } else if (role === 'student') {
       setNavItems([
         { label: 'Dashboard Home', href: '/dashboard/student' },
-        // { label: 'My Requests', href: '/dashboard/student/requests' },
         { label: 'Find Teachers', href: '/dashboard/student/teachers' },
         { label: 'My Schedule', href: '/dashboard/student/schedule' },
         { label: 'My Bookings', href: '/dashboard/student/bookings' },
@@ -56,22 +56,23 @@ export default function DashboardLayout({ children }) {
     }
   }, [role]);
 
-const handleLogout = async () => {
-  try {
-    await fetch('http://localhost:5000/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include', // very important for cookie clearing
-    });
-      dispatch(logout()); 
+  // Set active path on mount and router change
+  useEffect(() => {
+    setActivePath(router.pathname);
+  }, [router.pathname]);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('http://localhost:5000/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      dispatch(logout());
       router.push('/login');
-  } catch (err) {
-    console.error('Logout failed', err);
-  }
-
- // update redux state
-  ;
-};
-
+    } catch (err) {
+      console.error('Logout failed', err);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -83,13 +84,23 @@ const handleLogout = async () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  return (
-   <div className="w-screen h-screen bg-gray-50 flex flex-col">
+  // Determine if a nav tab should be highlighted
+  const isActiveTab = (href) => {
+    // Only highlight dashboard pages
+    if (!href.includes('/dashboard')) return false;
+    return router.pathname === href;
+  };
 
-      <header className="bg-white shadow px-6 py-4 flex items-center justify-between relative">
-        <div className="text-xl font-bold text-indigo-600 capitalize">
-          {role} Panel
-        </div>
+  return (
+    <div className="w-screen h-screen flex flex-col">
+      <header className="bg-white  px-6 py-4 flex items-center justify-between relative">
+    <Link href={`/dashboard/${role}`}>
+  <img
+    src="/logo.png"
+    alt="Logo"
+    className="h-16 max-h-full w-auto object-contain cursor-pointer"
+  />
+</Link>
 
         <button
           className="md:hidden text-gray-700"
@@ -98,22 +109,41 @@ const handleLogout = async () => {
           {navOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
 
+        {/* Desktop Navbar */}
         <nav className="hidden md:flex space-x-6">
           {navItems.map((item) => (
-            <Link
+            <div
               key={item.href}
-              href={item.href}
-              className="text-gray-700 hover:text-indigo-600 font-medium"
+              className="relative flex flex-col items-center group"
             >
-              {item.label}
-            </Link>
+              <Link
+                href={item.href}
+                className={`font-medium py-2 cursor-pointer ${
+                  isActiveTab(item.href)
+                    ? 'text-[oklch(0.55_0.28_296.83)] '
+                    : 'text-[oklch(0.55_0.28_296.83)]  group-hover:[oklch(0.55_0.28_296.83)] '
+                }`}
+                onClick={() => setActivePath(item.href)}
+              >
+                {item.label}
+              </Link>
+
+              {/* Underline for active tab */}
+              {isActiveTab(item.href) && (
+                <span className="absolute bottom-0 left-0 w-full h-1 bg-[oklch(0.55_0.28_296.83)]  rounded-full"></span>
+              )}
+
+              {/* Hover underline for inactive tabs */}
+              {!isActiveTab(item.href) && (
+                <span className="absolute bottom-0 left-0 w-full h-1 bg-[oklch(0.55_0.28_296.83)]  rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200"></span>
+              )}
+            </div>
           ))}
         </nav>
 
         <div className="flex items-center space-x-4 relative" ref={dropdownRef}>
-            <MessengerPopup user={userInfo} role={userInfo?.role} />
-           <NotificationBellIcon />
-      
+          <MessengerPopup user={userInfo} role={userInfo?.role} />
+          <NotificationBellIcon />
 
           <img
             src={
@@ -138,7 +168,6 @@ const handleLogout = async () => {
                 className="absolute right-0 top-14 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden"
               >
                 <ul className="flex flex-col text-sm text-gray-800 divide-y divide-gray-100">
-
                   {role === 'teacher' && (
                     <li>
                       <Link
@@ -189,13 +218,17 @@ const handleLogout = async () => {
         </div>
       </header>
 
+      {/* Mobile Navbar */}
       {navOpen && (
         <div className="md:hidden px-6 py-2 bg-white shadow space-y-2">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="block text-gray-700 hover:text-indigo-600 font-medium"
+              className={`block font-medium cursor-pointer ${
+                isActiveTab(item.href) ? 'text-indigo-600' : 'text-gray-700'
+              }`}
+              onClick={() => setActivePath(item.href)}
             >
               {item.label}
             </Link>

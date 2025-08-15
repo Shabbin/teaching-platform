@@ -33,7 +33,7 @@ export default function Step6_Extras({ onNext, onBack, editMode }) {
       <label className="block font-medium mb-1">Upload Video (Optional)</label>
       <input
         type="file"
-        {...register('file')}
+        {...register('videoFile')}
         className="border p-2 rounded w-full mb-2"
         accept="video/*"
       />

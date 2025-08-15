@@ -15,10 +15,7 @@ export default function ViewedPostsTimeline() {
   const viewedPostsRef = useRef(new Set());
 
   useEffect(() => {
-    if (!isFetched) return;
-    if (!teacherId) return;
-
-    // Only fetch if no events loaded yet to prevent clearing and refetching every mount
+    if (!isFetched || !teacherId) return;
     if (events.length === 0 && !loading && !error) {
       dispatch(fetchPostViewEvents(teacherId));
     }
@@ -87,6 +84,39 @@ export default function ViewedPostsTimeline() {
     return Array.from(map.values());
   }, [events]);
 
+  const renderVideo = (post) => {
+    if (post.youtubeLink) {
+      const match = post.youtubeLink.match(
+        /^.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?.+&v=)([^#&?]*).*/
+      );
+      const youtubeId = match && match[1].length === 11 ? match[1] : null;
+      if (youtubeId) {
+        return (
+          <iframe
+            className="w-full max-w-[400px] aspect-video rounded-lg mt-2"
+            src={`https://www.youtube.com/embed/${youtubeId}`}
+            title={post.title}
+            allowFullScreen
+          />
+        );
+      }
+    }
+
+    if (post.videoFile) {
+      return (
+        <video
+          controls
+          className="w-full max-w-[400px] aspect-video rounded-lg mt-2"
+        >
+          <source src={`http://localhost:5000${post.videoFile}`} type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+      );
+    }
+
+    return null; // no video, show nothing
+  };
+
   if (!isFetched) {
     return (
       <div className="flex justify-center items-center h-64 text-gray-500 text-lg font-semibold">
@@ -122,14 +152,14 @@ export default function ViewedPostsTimeline() {
   }
 
   return (
-    <>
+    <div className="space-y-4">
       {groupedEvents.map(({ postId }) => {
         const post = posts[postId];
         if (!post) {
           return (
             <p
               key={`loading-${postId}`}
-              className="bg-gray-100 rounded-xl p-4 text-gray-500 text-center text-lg"
+              className="bg-gray-100 rounded-xl p-6 text-gray-500 text-center text-lg animate-pulse"
             >
               Loading post details...
             </p>
@@ -139,14 +169,22 @@ export default function ViewedPostsTimeline() {
         return (
           <article
             key={post._id}
-            className="border-b last:border-b-0 border-gray-300 py-4"
+            className="bg-white shadow-md rounded-2xl p-6 transition-transform duration-200 hover:scale-[1.02] hover:shadow-xl border border-[oklch(0.85_0.02_270)]"
           >
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">{post.title}</h3>
-            <p className="text-gray-700 mb-2 line-clamp-3">{post.description}</p>
+            {/* Title at top */}
+            <h3 className="text-xl font-semibold text-[oklch(0.55_0.28_296.71)] mb-2">
+              {post.title}
+            </h3>
+
+            {/* Video if exists */}
+            {renderVideo(post)}
+
+            <p className="text-gray-700 mb-4 mt-4 line-clamp-3">{post.description}</p>
+
             <div className="flex items-center text-gray-500 text-sm font-medium space-x-2">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 text-blue-600"
+                className="h-4 w-4 text-[oklch(0.55_0.28_296.71)]"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -172,6 +210,6 @@ export default function ViewedPostsTimeline() {
           </article>
         );
       })}
-    </>
+    </div>
   );
 }

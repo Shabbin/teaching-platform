@@ -7,7 +7,11 @@ export default function HomePage() {
       <header className="w-full bg-white shadow-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="text-3xl font-extrabold text-indigo-600 tracking-wide select-none">
-            LOGO
+            <img
+    src="/logo.png"
+    alt="Logo"
+    className="h-16 max-h-full w-auto object-contain cursor-pointer"
+  />
           </div>
           <nav className="flex gap-8">
             <Link

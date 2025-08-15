@@ -12,7 +12,7 @@ const baseSchema = z.object({
     .url('Invalid YouTube link')
     .optional()
     .or(z.literal('')),
-  file: z.any().optional(),
+  videoFile: z.any().optional(),
   tags: z.array(z.string()).max(5).optional(),
 });
 

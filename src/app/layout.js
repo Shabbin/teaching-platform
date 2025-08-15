@@ -1,13 +1,14 @@
 // app/layout.js (server component, no 'use client')
-import { Geist } from "next/font/google";
+import { Poppins } from "next/font/google";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 import ReduxProviderWrapper from '../app/redux/ReduxProviderWrapper'; // your client wrapper component
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
+  weight: ["400", "500", "700"], // Keep multiple weights for flexibility
 });
 
 const geistMono = Geist_Mono({
@@ -17,7 +18,7 @@ const geistMono = Geist_Mono({
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="en" className={`${poppins.variable} ${geistMono.variable}`}>
       <body
         className="m-0 p-0 min-h-screen w-screen h-screen"
         suppressHydrationWarning={true} // 👈 This silences extension/dynamic mismatch warnings

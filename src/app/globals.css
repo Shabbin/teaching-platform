@@ -38,7 +38,10 @@ html, body, #__next {
   animation: comicPop 0.3s ease forwards;
 }
 
-.font-comicSans {
-  font-family: "Comic Sans MS", cursive, sans-serif;
+html {
+  font-family: var(--font-poppins), sans-serif;
 }
 
+code, pre {
+  font-family: var(--font-geist-mono), monospace; /* You can keep Geist mono for code */
+}

@@ -12,13 +12,10 @@ export const createTeacherPost = createAsyncThunk(
       Object.entries(postData).forEach(([key, value]) => {
         if (Array.isArray(value)) {
           value
-            .filter(
-              (v) =>
-                v !== undefined && v !== null && v !== '' && typeof v === 'string'
-            )
+            .filter((v) => v !== undefined && v !== null && v !== '' && typeof v === 'string')
             .forEach((v) => formData.append(key, v));
-        } else if (key === 'file' && value) {
-          formData.append(key, value);
+        } else if (key === 'videoFile' && value?.length > 0) {
+          formData.append('videoFile', value[0]); // <- fixed
         } else if (value !== undefined && value !== null && value !== '') {
           formData.append(key, value);
         }
@@ -37,6 +34,7 @@ export const createTeacherPost = createAsyncThunk(
     }
   }
 );
+
 
 // Async thunk to update a teacher post
 export const updateTeacherPost = createAsyncThunk(
