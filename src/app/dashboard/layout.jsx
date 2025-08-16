@@ -15,7 +15,6 @@ import {
   Menu,
   X,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import MessengerPopup from './components/chat-components/MessengerPopup';
 import NotificationBellIcon from './components/notificationComponent/NotificationBellIcon';
 
@@ -56,7 +55,7 @@ export default function DashboardLayout({ children }) {
     }
   }, [role]);
 
-  // Set active path on mount and router change
+  // Set active path
   useEffect(() => {
     setActivePath(router.pathname);
   }, [router.pathname]);
@@ -84,24 +83,24 @@ export default function DashboardLayout({ children }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Determine if a nav tab should be highlighted
   const isActiveTab = (href) => {
-    // Only highlight dashboard pages
     if (!href.includes('/dashboard')) return false;
     return router.pathname === href;
   };
 
   return (
-    <div className="w-screen h-screen flex flex-col">
-      <header className="bg-white  px-6 py-4 flex items-center justify-between relative">
-    <Link href={`/dashboard/${role}`}>
-  <img
-    src="/logo.png"
-    alt="Logo"
-    className="h-16 max-h-full w-auto object-contain cursor-pointer"
-  />
-</Link>
+    <div className="w-screen h-screen flex flex-col bg-gray-50 ">
+      {/* Header */}
+      <header className="bg-white px-6 py-4 flex items-center justify-between shadow-sm border-b border-gray-100 sticky top-0 z-40">
+        <Link href={`/dashboard/${role}`}>
+          <img
+            src="/logo.png"
+            alt="Logo"
+            className="h-12 w-auto object-contain cursor-pointer hover:opacity-90 transition"
+          />
+        </Link>
 
+        {/* Mobile menu toggle */}
         <button
           className="md:hidden text-gray-700"
           onClick={() => setNavOpen(!navOpen)}
@@ -118,63 +117,54 @@ export default function DashboardLayout({ children }) {
             >
               <Link
                 href={item.href}
-                className={`font-medium py-2 cursor-pointer ${
+                className={`font-medium py-2 transition-colors ${
                   isActiveTab(item.href)
-                    ? 'text-[oklch(0.55_0.28_296.83)] '
-                    : 'text-[oklch(0.55_0.28_296.83)]  group-hover:[oklch(0.55_0.28_296.83)] '
+                    ? 'text-[oklch(0.62_0.2_310.02)]'
+                    : 'text-gray-600 hover:text-[oklch(0.62_0.2_310.02)]'
                 }`}
                 onClick={() => setActivePath(item.href)}
               >
                 {item.label}
               </Link>
-
-              {/* Underline for active tab */}
               {isActiveTab(item.href) && (
-                <span className="absolute bottom-0 left-0 w-full h-1 bg-[oklch(0.55_0.28_296.83)]  rounded-full"></span>
-              )}
-
-              {/* Hover underline for inactive tabs */}
-              {!isActiveTab(item.href) && (
-                <span className="absolute bottom-0 left-0 w-full h-1 bg-[oklch(0.55_0.28_296.83)]  rounded-full opacity-0 group-hover:opacity-100 transition-all duration-200"></span>
+                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[oklch(0.62_0.2_310.02)] rounded-full"></span>
               )}
             </div>
           ))}
         </nav>
 
+        {/* Right section */}
         <div className="flex items-center space-x-4 relative" ref={dropdownRef}>
           <MessengerPopup user={userInfo} role={userInfo?.role} />
           <NotificationBellIcon />
 
-          <img
-            src={
-              profileImage?.startsWith('http')
-                ? profileImage
-                : profileImage
-                ? `http://localhost:5000/${profileImage}`
-                : '/default-avatar.png'
-            }
-            alt="Profile"
-            className="w-10 h-10 rounded-full object-cover border border-gray-300 cursor-pointer"
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-          />
+          {/* Profile + Dropdown isolated so it doesn't affect flex layout */}
+          <div className="relative">
+            <img
+              src={
+                profileImage?.startsWith('http')
+                  ? profileImage
+                  : profileImage
+                  ? `http://localhost:5000/${profileImage}`
+                  : '/default-avatar.png'
+              }
+              alt="Profile"
+              className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 shadow-sm cursor-pointer ring-2 ring-transparent hover:ring-[oklch(0.62_0.2_310.02)] transition"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+            />
 
-          <AnimatePresence>
+            {/* Dropdown */}
             {dropdownOpen && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: -5 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: -5 }}
-                transition={{ duration: 0.2 }}
-                className="absolute right-0 top-14 w-60 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden"
-              >
+              <div className="absolute right-0 top-14 w-64 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
                 <ul className="flex flex-col text-sm text-gray-800 divide-y divide-gray-100">
                   {role === 'teacher' && (
                     <li>
                       <Link
-                        href="/dashboard/teacher/post-content"
-                        className="flex items-center px-4 py-3 hover:bg-gray-100"
+                        href="/dashboard/teacher/post-content/view-content"
+                        className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
+                        onClick={() => setDropdownOpen(false)}
                       >
-                        ✍️ Post Content
+                        ✍️ Manage Content
                       </Link>
                     </li>
                   )}
@@ -182,7 +172,8 @@ export default function DashboardLayout({ children }) {
                   <li>
                     <Link
                       href={`/dashboard/${role}/profile`}
-                      className="flex items-center px-4 py-3 hover:bg-gray-100"
+                      className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
+                      onClick={() => setDropdownOpen(false)}
                     >
                       <User className="w-4 h-4 mr-2" /> View Profile
                     </Link>
@@ -190,7 +181,8 @@ export default function DashboardLayout({ children }) {
                   <li>
                     <Link
                       href={`/dashboard/${role}/settings`}
-                      className="flex items-center px-4 py-3 hover:bg-gray-100"
+                      className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
+                      onClick={() => setDropdownOpen(false)}
                     >
                       <Settings className="w-4 h-4 mr-2" /> Settings & Privacy
                     </Link>
@@ -198,35 +190,41 @@ export default function DashboardLayout({ children }) {
                   <li>
                     <Link
                       href="/help"
-                      className="flex items-center px-4 py-3 hover:bg-gray-100"
+                      className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
+                      onClick={() => setDropdownOpen(false)}
                     >
                       <HelpCircle className="w-4 h-4 mr-2" /> Help
                     </Link>
                   </li>
                   <li>
                     <button
-                      onClick={handleLogout}
-                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-100 text-red-600"
+                      onClick={() => {
+                        setDropdownOpen(false);
+                        handleLogout();
+                      }}
+                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition text-red-600"
                     >
                       <LogOut className="w-4 h-4 mr-2" /> Logout
                     </button>
                   </li>
                 </ul>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+          </div>
         </div>
       </header>
 
       {/* Mobile Navbar */}
       {navOpen && (
-        <div className="md:hidden px-6 py-2 bg-white shadow space-y-2">
+        <div className="md:hidden px-6 py-4 bg-white border-b border-gray-100 shadow-sm space-y-2">
           {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className={`block font-medium cursor-pointer ${
-                isActiveTab(item.href) ? 'text-indigo-600' : 'text-gray-700'
+              className={`block font-medium py-2 px-2 rounded-lg transition ${
+                isActiveTab(item.href)
+                  ? 'text-[oklch(0.62_0.2_310.02)] bg-[oklch(0.62_0.2_310.02)/10]'
+                  : 'text-gray-700 hover:bg-gray-100'
               }`}
               onClick={() => setActivePath(item.href)}
             >
@@ -236,7 +234,7 @@ export default function DashboardLayout({ children }) {
         </div>
       )}
 
-      <main>{children}</main>
+      <main className="flex-1 overflow-y-auto">{children}</main>
     </div>
   );
 }

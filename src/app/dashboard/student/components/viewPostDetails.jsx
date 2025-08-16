@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
-import { Send, BookOpen } from 'lucide-react';
+import { Send, BookOpen, ArrowLeft, Eye, Users } from 'lucide-react';
 import TuitionRequestModal from './tuitionRequestComponent';
 import TopicHelpModal from './topicHelpModal'; 
 import { updatePostViewsCount } from '../../../redux/postViewEventSlice';
@@ -171,22 +171,14 @@ const ViewPostDetails = ({ post }) => {
 
         {/* Main */}
         <main className="flex-1 space-y-8 lg:pl-8">
-          <div className="flex gap-4 flex-wrap">
+          <div className="flex gap-4 flex-wrap items-center">
+            {/* Go Back button */}
             <button
               onClick={handleGoBack}
-              className="mb-4 px-6 py-2 bg-white text-[oklch(0.51_0.26_276.94)] font-semibold rounded-full border-2 border-[oklch(0.51_0.26_276.94)] shadow-sm hover:bg-[oklch(0.51_0.20_276.94)] hover:text-white hover:border-[oklch(0.51_0.26_276.94)] transition-colors duration-200 flex items-center gap-2 text-lg"
+              className="mb-4 px-6 py-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-full shadow-md hover:opacity-90 transition-all duration-200 flex items-center gap-2 text-lg"
             >
-              ← Go Back
+              <ArrowLeft size={18} /> Go Back
             </button>
-
-            {!isOwner && (
-              <button
-                onClick={() => router.push('/dashboard/student/teachers')}
-                className="mb-4 px-6 py-2 bg-white text-[oklch(0.51_0.26_276.94)] font-medium rounded-full border-2 border-[oklch(0.51_0.26_276.94)] shadow-sm hover:bg-[oklch(0.51_0.20_276.94)] hover:text-white hover:border-[oklch(0.51_0.26_276.94)] transition-colors duration-200 flex items-center gap-2 text-lg"
-              >
-                🎓 All Teachers
-              </button>
-            )}
           </div>
 
           {/* Video Section */}
@@ -210,14 +202,12 @@ const ViewPostDetails = ({ post }) => {
           </div>
 
           {/* Views & Enrollments */}
-          <div className="flex gap-6 mb-6 ml-[70px] ">
-            <div className="bg-white rounded-xl p-4 shadow border border-gray-100 flex items-center gap-2">
-              <span className="font-semibold text-gray-700">👁️ </span>
-              <span className="text-gray-900">{viewsCount}</span>
+          <div className="flex gap-6 mb-6 ml-[70px]">
+            <div className="px-5 py-2 rounded-full font-medium text-white bg-gradient-to-r from-indigo-500 to-purple-600 flex items-center gap-2 shadow">
+              <Eye size={18} /> {viewsCount} Views
             </div>
-            <div className="bg-white rounded-xl p-4 shadow border border-gray-100 flex items-center gap-2">
-              <span className=" text-gray-700">🎓 Enrollments:</span>
-              <span className="font-semibold text-gray-900">{dummyEnrollments}</span>
+            <div className="px-5 py-2 rounded-full font-medium text-white bg-gradient-to-r from-green-400 to-emerald-600 flex items-center gap-2 shadow">
+              <Users size={18} /> {dummyEnrollments} Enrollments
             </div>
           </div>
 
@@ -261,18 +251,21 @@ const ViewPostDetails = ({ post }) => {
               </>
             ) : (
               <div className="flex flex-col sm:flex-row gap-4">
-                <button
-                  onClick={() => setShowTuitionModal(true)}
-                  className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-2xl shadow-lg border-2 border-blue-600 hover:bg-blue-600 hover:text-white transition duration-300 transform flex items-center justify-center gap-2"
-                >
-                  <Send size={18} /> Request Tuition
-                </button>
-                <button
-                  onClick={() => setShowTopicHelpModal(true)}
-                  className="px-6 py-3 bg-white text-blue-600 font-semibold rounded-2xl shadow-lg border-2 border-blue-600 hover:bg-blue-600 hover:text-white transition duration-300 transform flex items-center justify-center gap-2"
-                >
-                  <BookOpen size={18} /> Ask for Topic Help
-                </button>
+ <button
+  onClick={() => setShowTuitionModal(true)}
+  className="px-6 py-3 bg-white text-indigo-600 border-2 border-indigo-600 font-semibold rounded-2xl shadow-sm hover:bg-indigo-600 hover:text-white transition duration-300 flex items-center justify-center gap-2"
+>
+  <Send size={18} /> Request Tuition
+</button>
+
+<button
+  onClick={() => setShowTopicHelpModal(true)}
+  className="px-6 py-3 bg-white text-emerald-600 border-2 border-emerald-600 font-semibold rounded-2xl shadow-sm hover:bg-emerald-600 hover:text-white transition duration-300 flex items-center justify-center gap-2"
+>
+  <BookOpen size={18} /> Ask for Topic Help
+</button>
+
+
               </div>
             )}
           </div>

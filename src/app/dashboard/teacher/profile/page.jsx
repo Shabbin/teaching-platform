@@ -5,13 +5,12 @@ import { useDispatch, useSelector } from 'react-redux'
 import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
 import { updateProfileImage } from '../../../redux/userSlice'
+import { Camera, Star, MessageSquare, DollarSign, CheckCircle } from 'lucide-react'
 
 export default function TeacherProfilePage() {
-  
   const dispatch = useDispatch()
   const teacherId = useSelector((state) => state.user.userInfo?._id)
 
-  console.log('redux TeacherId:', teacherId)
   const [teacher, setTeacher] = useState(null)
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -26,12 +25,9 @@ export default function TeacherProfilePage() {
     availability: ''
   })
 
-  // Fetch teacher profile and posts, with cookies sent automatically
   const fetchProfile = async () => {
     setLoading(true)
-    console.log('fetchProfile called')
     if (!teacherId) {
-      console.log('No teacherId, skipping fetch')
       setLoading(false)
       return
     }
@@ -39,15 +35,11 @@ export default function TeacherProfilePage() {
     try {
       const res = await axios.get(
         `http://localhost:5000/api/teachers/${teacherId}/profile`,
-        {
-          withCredentials: true, // send cookies automatically
-        }
+        { withCredentials: true }
       )
-      console.log('Profile API response:', res.data)
       const { teacher, posts } = res.data
       setTeacher(teacher)
       setPosts(posts)
-
       setFormData({
         name: teacher.name || '',
         bio: teacher.bio || '',
@@ -57,7 +49,6 @@ export default function TeacherProfilePage() {
         availability: teacher.availability || ''
       })
     } catch (err) {
-      console.error('Failed to fetch profile:', err)
       toast.error('Failed to fetch profile')
     } finally {
       setLoading(false)
@@ -68,11 +59,9 @@ export default function TeacherProfilePage() {
     if (teacherId) fetchProfile()
   }, [teacherId])
 
-  // Upload image handler
   const handleUpload = async (e, type) => {
     const file = e.target.files[0]
     if (!file) return
-
     const uploadData = new FormData()
     uploadData.append(type, file)
 
@@ -81,10 +70,8 @@ export default function TeacherProfilePage() {
         `http://localhost:5000/api/teachers/${type === 'profileImage' ? 'profile-picture' : 'cover-image'}`,
         uploadData,
         {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          withCredentials: true, // send cookies automatically
+          headers: { 'Content-Type': 'multipart/form-data' },
+          withCredentials: true,
         }
       )
 
@@ -94,33 +81,26 @@ export default function TeacherProfilePage() {
 
       toast.success('Image uploaded successfully')
       fetchProfile()
-    } catch (error) {
-      console.error('Image upload failed:', error)
+    } catch {
       toast.error('Image upload failed')
     }
   }
 
-  // Handle profile form submission
   const handleProfileUpdate = async (e) => {
     e.preventDefault()
-
     if (!formData.name || !formData.bio || !formData.hourlyRate) {
       return toast.error('Name, bio, and hourly rate are required')
     }
-
     try {
       const res = await axios.put(
         'http://localhost:5000/api/teachers/profile-info',
         formData,
-        {
-          withCredentials: true, // send cookies automatically
-        }
+        { withCredentials: true }
       )
       setTeacher(res.data.user)
       toast.success('Profile updated')
       setIsEditing(false)
-    } catch (err) {
-      console.error('Profile update failed:', err)
+    } catch {
       toast.error('Profile update failed')
     }
   }
@@ -128,14 +108,13 @@ export default function TeacherProfilePage() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto p-4">
-        <div className="h-72 bg-gray-200 animate-pulse rounded-md mb-8"></div>
+        <div className="h-72 bg-gray-200 animate-pulse rounded-2xl mb-8"></div>
         <div className="flex gap-4 mb-4">
-          <div className="w-48 h-64 bg-gray-200 rounded-full animate-pulse"></div>
+          <div className="w-32 h-32 bg-gray-200 rounded-full animate-pulse"></div>
           <div className="flex-1 space-y-4">
             <div className="h-6 w-1/3 bg-gray-200 animate-pulse rounded"></div>
             <div className="h-4 w-1/2 bg-gray-200 animate-pulse rounded"></div>
             <div className="h-4 w-full bg-gray-200 animate-pulse rounded"></div>
-            <div className="h-4 w-3/4 bg-gray-200 animate-pulse rounded"></div>
           </div>
         </div>
       </div>
@@ -154,122 +133,174 @@ export default function TeacherProfilePage() {
     <div className="max-w-7xl mx-auto p-4">
       <Toaster />
 
-      {/* Cover Image */}
-      <div className="relative w-full h-60 sm:h-72 md:h-[30rem] rounded-lg overflow-hidden bg-gray-200">
+      {/* Cover Section */}
+      <div className="relative w-full h-60 sm:h-72 md:h-[20rem] rounded-2xl overflow-hidden shadow-md">
         <img
           src={teacher.coverImage || '/default-cover.jpg'}
           alt="Cover"
-          className="object-cover w-full h-full opacity-80"
+          className="object-cover w-full h-full"
         />
-        <input
-          type="file"
-          onChange={(e) => handleUpload(e, 'coverImage')}
-          className="absolute top-2 right-2 file-input file-input-sm"
-        />
-      </div>
-
-      {/* Profile Image */}
-      <div className="relative z-20 mt-[-5rem] sm:mt-[-7rem] md:mt-[-9rem] pl-4">
-        <div className="w-48 h-64 shadow-lg border-4 border-white overflow-hidden rounded-full">
-          <img
-            src={
-              teacher?.profileImage?.startsWith('http')
-                ? teacher.profileImage
-                : `http://localhost:5000/${teacher.profileImage}`
-            }
-            alt="Profile"
-            className="w-full h-full object-cover border-4 border-blue-500"
-          />
-        </div>
-        <div className="mt-2">
+        <label className="absolute top-4 right-4 bg-white px-3 py-1 text-sm rounded-lg shadow cursor-pointer hover:bg-gray-100">
+          Change Cover
           <input
             type="file"
-            onChange={(e) => handleUpload(e, 'profileImage')}
-            className="file-input file-input-sm"
+            onChange={(e) => handleUpload(e, 'coverImage')}
+            className="hidden"
           />
-        </div>
+        </label>
       </div>
 
-      {/* Profile Info */}
-      <div className="mt-8 px-4 text-left">
-        <div className="flex justify-between items-center">
-          <h2 className="text-3xl font-bold">{teacher.name}</h2>
-          <button onClick={() => setIsEditing(!isEditing)} className="btn btn-sm">
-            {isEditing ? 'Cancel' : 'Edit Profile'}
-          </button>
-        </div>
-        <p className="text-gray-600">{teacher.email}</p>
-        <p className="text-sm text-gray-500 mt-1">Age: {teacher.age || 'N/A'}</p>
-
-        {!isEditing ? (
-          <div className="mt-4 space-y-2 text-gray-700">
-            <p><strong>Bio:</strong> {teacher.bio || 'Not added yet'}</p>
-            <p><strong>Hourly Rate:</strong> ${teacher.hourlyRate || 0}</p>
-            <p><strong>Skills:</strong> {teacher.skills?.join(', ') || 'Not listed'}</p>
-            <p><strong>Location:</strong> {teacher.location || 'Not specified'}</p>
-            <p><strong>Availability:</strong> {teacher.availability || 'Not specified'}</p>
+      {/* Profile Info Card */}
+      <div className="relative bg-white rounded-2xl shadow-lg p-6 mt-[-4rem] z-10 border border-gray-100">
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+          {/* Profile Image with Edit Overlay */}
+          <div className="relative">
+            <div className="w-32 h-32 rounded-full overflow-hidden shadow-md ring-4 ring-white">
+              <img
+                src={
+                  teacher?.profileImage?.startsWith('http')
+                    ? teacher.profileImage
+                    : `http://localhost:5000/${teacher.profileImage}`
+                }
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <label className="absolute bottom-2 right-2 bg-indigo-600 text-white p-2 rounded-full shadow-md cursor-pointer hover:bg-indigo-700">
+              <Camera className="w-4 h-4" />
+              <input
+                type="file"
+                onChange={(e) => handleUpload(e, 'profileImage')}
+                className="hidden"
+              />
+            </label>
           </div>
-        ) : (
-          <form onSubmit={handleProfileUpdate} className="mt-4 space-y-3 max-w-2xl">
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Name"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              required
-            />
-            <textarea
-              className="textarea textarea-bordered w-full"
-              placeholder="Bio"
-              value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-              required
-            />
-            <input
-              type="number"
-              className="input input-bordered w-full"
-              placeholder="Hourly Rate (USD)"
-              value={formData.hourlyRate}
-              onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
-              required
-            />
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Skills (comma separated)"
-              value={formData.skills}
-              onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
-            />
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Location"
-              value={formData.location}
-              onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-            />
-            <input
-              type="text"
-              className="input input-bordered w-full"
-              placeholder="Availability"
-              value={formData.availability}
-              onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
-            />
-            <button type="submit" className="btn btn-primary mt-2">Save</button>
-          </form>
-        )}
+
+          {/* Info */}
+          <div className="flex-1 text-center md:text-left">
+            <div className="flex flex-wrap justify-between items-center gap-2">
+              <h2 className="text-2xl font-bold">{teacher.name}</h2>
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="bg-indigo-600 text-white px-4 py-1 rounded-md shadow hover:bg-indigo-700 text-sm"
+              >
+                {isEditing ? 'Cancel' : 'Edit Profile'}
+              </button>
+            </div>
+            <p className="text-gray-500">@{teacher.username || teacher.email?.split('@')[0]}</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {teacher.role || 'Tutor'} · Joined on {teacher.createdAt ? new Date(teacher.createdAt).toDateString() : 'N/A'}
+            </p>
+
+            {/* Rating + Stats */}
+            <div className="mt-4 flex flex-wrap items-center gap-6 text-gray-700">
+              {/* Rating */}
+              <div className="flex items-center gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star
+                    key={i}
+                    className={`w-5 h-5 ${i < Math.round(teacher.rating || 0) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+                  />
+                ))}
+                <span className="ml-2 font-medium">{teacher.rating || 0}.0</span>
+              </div>
+
+              {/* Reviews */}
+              <div className="flex items-center gap-2 text-sm">
+                <MessageSquare className="w-4 h-4 text-gray-400" />
+                {teacher.reviewsCount || 0} Reviews
+              </div>
+
+              {/* Earnings */}
+              <div className="flex items-center gap-2 text-sm">
+                <DollarSign className="w-4 h-4 text-gray-400" />
+                ${teacher.totalEarnings || 0}
+              </div>
+
+              {/* Completion */}
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle className="w-4 h-4 text-gray-400" />
+                {teacher.completionRate || 0}%
+              </div>
+            </div>
+
+            {/* Bio & Info */}
+            {!isEditing ? (
+              <div className="mt-4 space-y-2 text-gray-700">
+                <p><strong>Bio:</strong> {teacher.bio || 'Not added yet'}</p>
+                <p><strong>Hourly Rate:</strong> ${teacher.hourlyRate || 0} / hour</p>
+                <p><strong>Skills:</strong> {teacher.skills?.join(', ') || 'Not listed'}</p>
+                <p><strong>Location:</strong> {teacher.location || 'Not specified'}</p>
+                <p><strong>Availability:</strong> {teacher.availability || 'Not specified'}</p>
+              </div>
+            ) : (
+              <form onSubmit={handleProfileUpdate} className="mt-4 space-y-3 w-full max-w-2xl">
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="Name"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
+                />
+                <textarea
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="Bio"
+                  value={formData.bio}
+                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                  required
+                />
+                <input
+                  type="number"
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="Hourly Rate (USD)"
+                  value={formData.hourlyRate}
+                  onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                  required
+                />
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="Skills (comma separated)"
+                  value={formData.skills}
+                  onChange={(e) => setFormData({ ...formData, skills: e.target.value })}
+                />
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="Location"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                />
+                <input
+                  type="text"
+                  className="w-full border border-gray-300 rounded-lg p-2"
+                  placeholder="Availability"
+                  value={formData.availability}
+                  onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
+                />
+                <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-md shadow hover:bg-indigo-700">
+                  Save
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Posts */}
-      <div className="mt-10 px-4">
-        <h3 className="text-xl font-semibold mb-3">Your Tuition Posts</h3>
+      {/* Posts Section */}
+      <div className="mt-10">
+        <h3 className="text-xl font-semibold mb-4">Your Tuition Posts</h3>
         {posts.length === 0 ? (
           <p className="text-gray-500">No posts yet.</p>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
             {posts.map((post) => (
-              <div key={post._id} className="border p-4 rounded-lg shadow-sm">
-                <h4 className="font-medium text-lg mb-1">{post.title}</h4>
+              <div
+                key={post._id}
+                className="bg-white border border-gray-100 p-5 rounded-xl shadow hover:shadow-md transition"
+              >
+                <h4 className="font-semibold text-lg mb-2">{post.title}</h4>
                 <p className="text-gray-600 text-sm">{post.description}</p>
               </div>
             ))}

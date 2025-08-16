@@ -40,6 +40,7 @@ html, body, #__next {
 
 html {
   font-family: var(--font-poppins), sans-serif;
+    overflow-x: hidden;
 }
 
 code, pre {
