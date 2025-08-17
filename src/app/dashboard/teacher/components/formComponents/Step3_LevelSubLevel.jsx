@@ -1,7 +1,8 @@
+// Step3_LevelSubLevel.jsx — thin gray focus, no pink/purple/blue outline
 import React, { useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 
-export default function Step3_LevelSubLevel({ educationTree, onNext, onBack, editMode }) {
+export default function Step3_LevelSubLevel({ educationTree, editMode }) {
   const {
     register,
     watch,
@@ -15,7 +16,6 @@ export default function Step3_LevelSubLevel({ educationTree, onNext, onBack, edi
   const level = watch('level');
 
   let levelsOptions = [];
-
   if (educationSystem === 'English-Medium' && board) {
     levelsOptions = Object.keys(educationTree['English-Medium'][board] || {});
   } else if (educationSystem === 'Bangla-Medium' && group) {
@@ -24,90 +24,100 @@ export default function Step3_LevelSubLevel({ educationTree, onNext, onBack, edi
     levelsOptions = Object.keys(educationTree['University-Admission'][board] || {});
   }
 
-  // Reset level and subLevel on educationSystem/board/group change
+  // reset on deps change
   useEffect(() => {
     setValue('level', '');
     setValue('subLevel', '');
   }, [educationSystem, board, group, setValue]);
 
-  // Show subLevel select only for English-Medium A_Level CIE/Edexcel
   const showSubLevel =
     educationSystem === 'English-Medium' &&
     (board === 'CIE' || board === 'Edexcel') &&
     level === 'A_Level';
 
-  // Determine if level select is editable based on your rules:
+  // editability
   let isLevelEditable = true;
-
   if (editMode) {
     if (educationSystem === 'English-Medium') {
-      if (board === 'IB') {
-        isLevelEditable = true; // level editable
-      } else if (board === 'CIE' || board === 'Edexcel') {
-        isLevelEditable = true; // level editable (for A_Level)
-      } else {
-        isLevelEditable = false; // O_Level level fixed
-      }
+      if (board === 'IB') isLevelEditable = true;
+      else if (board === 'CIE' || board === 'Edexcel') isLevelEditable = true;
+      else isLevelEditable = false;
     } else if (educationSystem === 'Bangla-Medium') {
-      isLevelEditable = true; // can change SSC or HSC
+      isLevelEditable = true;
     } else if (educationSystem === 'University-Admission') {
-      if (board === 'Public-University') {
-        isLevelEditable = true; // units editable
-      } else {
-        isLevelEditable = false; // other boards no level editing
-      }
+      isLevelEditable = board === 'Public-University';
     } else {
-      isLevelEditable = false; // GED, Entrance-Exams, BCS no level editing
+      isLevelEditable = false;
     }
   }
 
+  // one class to rule out any focus effects (ring/outline/shadow)
+  const baseSelect =
+    "w-full px-3 py-2 rounded-lg border bg-white appearance-none " +
+    "border-gray-200 hover:border-gray-300 " +
+    "outline-none focus:outline-none focus:ring-0 focus:ring-transparent " +
+    "focus:shadow-none focus:border-gray-300 " +
+    "focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none " +
+    "disabled:bg-gray-100";
+
+  // inline kill-switch for any plugin box-shadows (Tailwind forms/DaisyUI, etc.)
+  const noFocusFX = {
+    outline: 'none',
+    boxShadow: 'none',
+  };
+
   return (
-    <div>
+    <div className="space-y-4">
+      {/* LEVEL */}
       {levelsOptions.length > 0 ? (
-        <>
-          <label className="block font-medium mb-1">Level</label>
+        <div>
           <select
-            {...register('level', { required: 'Level is required' })}
-            className="border p-2 rounded w-full mb-2"
+            {...register('level', { validate: (v) => (v ? true : 'Level is required') })}
+            className={baseSelect}
+            style={noFocusFX}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
             disabled={!isLevelEditable}
+            aria-invalid={!!errors.level}
+            defaultValue=""
           >
-            <option value="">-- Select Level --</option>
+            <option value="" disabled hidden>
+              Select Level
+            </option>
             {levelsOptions.map((lvl) => (
               <option key={lvl} value={lvl}>
                 {lvl}
               </option>
             ))}
           </select>
-          {errors.level && <p className="text-red-600">{errors.level.message}</p>}
-        </>
+          {errors.level && <p className="mt-2 text-sm text-red-600">{errors.level.message}</p>}
+        </div>
       ) : (
-        <p>No level selection needed.</p>
+        <p className="text-gray-500 text-sm">No level selection needed.</p>
       )}
 
+      {/* SUB LEVEL */}
       {showSubLevel && (
-        <>
-          <label className="block font-medium mb-1">Sub Level (optional)</label>
+        <div>
+          <label className="block mb-1 text-sm font-medium text-gray-800">Sub Level (optional)</label>
           <select
             {...register('subLevel')}
-            className="border p-2 rounded w-full mb-2"
-            disabled={editMode ? false : false} // always enable editing subLevel for A_Level in English-Medium
+            className={baseSelect}
+            style={noFocusFX}
+            onFocus={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+            onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+            aria-invalid={false}
+            defaultValue=""
           >
-            <option value="">-- Select Sub Level --</option>
+            <option value="" disabled hidden>
+              Select Sub Level
+            </option>
             <option value="AS_Level">AS Level</option>
             <option value="A_Level">A Level</option>
-            <option value="Both">Both</option>
+            {/* <option value="Both">Both</option> */}
           </select>
-        </>
+        </div>
       )}
-
-      <div className="flex justify-between mt-4">
-        <button type="button" onClick={onBack} className="px-4 py-2 bg-gray-300 rounded">
-          ← Back
-        </button>
-        <button type="button" onClick={onNext} className="px-4 py-2 bg-blue-600 text-white rounded">
-          Next →
-        </button>
-      </div>
     </div>
   );
 }

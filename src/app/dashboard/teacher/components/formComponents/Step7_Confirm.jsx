@@ -1,113 +1,57 @@
+// Step7_Confirm.jsx
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 
-export default function Step7_Confirm({ onBack, onFinalSubmit, isSubmitting }) {
+export default function Step7_Confirm() {
   const { getValues } = useFormContext();
   const data = getValues();
 
+  const Row = ({ label, children }) => (
+    <div className="flex items-start gap-4 py-2 border-b last:border-b-0 border-gray-100">
+      <div className="w-40 shrink-0 text-sm font-medium text-gray-600">{label}</div>
+      <div className="flex-1 text-sm text-gray-800 break-words">{children}</div>
+    </div>
+  );
+
   return (
-    <div>
-      <h3 className="text-xl font-bold mb-4">Please review your post</h3>
-
-      <div className="mb-4 space-y-2 text-sm">
-        <p>
-          <strong>Education System:</strong> {data.educationSystem}
-        </p>
-
-        {data.board && (
-          <p>
-            <strong>Board:</strong> {data.board}
-          </p>
+    <div className="rounded-xl border border-gray-200 bg-white">
+      <div className="p-4">
+        {data.educationSystem && <Row label="Education System">{data.educationSystem}</Row>}
+        {data.board && <Row label="Board">{data.board}</Row>}
+        {data.group && <Row label="Group">{data.group}</Row>}
+        {data.level && <Row label="Level">{data.level}</Row>}
+        {data.subLevel && <Row label="Sub Level">{data.subLevel}</Row>}
+        {Array.isArray(data.subjects) && data.subjects.length > 0 && (
+          <Row label="Subjects">{data.subjects.join(', ')}</Row>
         )}
-
-        {data.group && (
-          <p>
-            <strong>Group:</strong> {data.group}
-          </p>
+        {data.title && <Row label="Title">{data.title}</Row>}
+        {data.description && (
+          <Row label="Description">
+            {/* If you used a rich text editor, this is HTML */}
+            <div
+              className="text-sm leading-6"
+              dangerouslySetInnerHTML={{ __html: data.description }}
+            />
+          </Row>
         )}
-
-        {data.level && (
-          <p>
-            <strong>Level:</strong> {data.level}
-          </p>
-        )}
-
-        {data.subLevel && (
-          <p>
-            <strong>Sub Level:</strong> {data.subLevel}
-          </p>
-        )}
-
-        {data.subjects && data.subjects.length > 0 && (
-          <p>
-            <strong>Subjects:</strong> {data.subjects.join(', ')}
-          </p>
-        )}
-
-        <p>
-          <strong>Title:</strong> {data.title}
-        </p>
-
-        <p>
-          <strong>Description:</strong> {data.description}
-        </p>
-
-        <p>
-          <strong>Hourly Rate:</strong> BDT {data.hourlyRate}
-        </p>
-
-        {data.location && (
-          <p>
-            <strong>Location:</strong> {data.location}
-          </p>
-        )}
-
-        {data.language && (
-          <p>
-            <strong>Language:</strong> {data.language}
-          </p>
-        )}
-
+        {data.hourlyRate && <Row label="Hourly Rate">BDT {data.hourlyRate}</Row>}
+        {data.location && <Row label="Location">{data.location}</Row>}
+        {data.language && <Row label="Language">{data.language}</Row>}
         {data.youtubeLink && (
-          <p>
-            <strong>YouTube Link:</strong>{' '}
+          <Row label="YouTube Link">
             <a
               href={data.youtubeLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-600 underline"
+              className="text-blue-600 underline break-all"
             >
               {data.youtubeLink}
             </a>
-          </p>
+          </Row>
         )}
-
         {data.videoFile && data.videoFile.length > 0 && (
-          <p>
-            <strong>Video File:</strong> {data.videoFile[0].name}
-          </p>
+          <Row label="Video File">{data.videoFile[0]?.name}</Row>
         )}
-      </div>
-
-      <div className="flex justify-between mt-6">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-4 py-2 bg-gray-300 rounded"
-        >
-          ← Back
-        </button>
-
-        <button
-          type="button"
-          onClick={onFinalSubmit}
-          disabled={isSubmitting}
-          className={`px-4 py-2 rounded text-white ${
-            isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600'
-          }`}
-        >
-          {isSubmitting ? 'Submitting...' : 'Submit'}
-        </button>
       </div>
     </div>
   );

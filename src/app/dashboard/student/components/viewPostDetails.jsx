@@ -7,8 +7,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { Send, BookOpen, ArrowLeft, Eye, Users } from 'lucide-react';
 import TuitionRequestModal from './tuitionRequestComponent';
-import TopicHelpModal from './topicHelpModal'; 
+import TopicHelpModal from './topicHelpModal';
 import { updatePostViewsCount } from '../../../redux/postViewEventSlice';
+import DOMPurify from 'isomorphic-dompurify';
 
 function setCookie(name, value, days = 365) {
   const expires = new Date(Date.now() + days * 864e5).toUTCString();
@@ -119,7 +120,7 @@ const ViewPostDetails = ({ post }) => {
         const data = await res.json();
 
         if (!res.ok) {
-          if (data.message === "View already counted recently") {
+          if (data.message === 'View already counted recently') {
             setHasRecordedView(true);
           } else {
             console.error('Failed to record post view:', data.message || res.status);
@@ -191,10 +192,7 @@ const ViewPostDetails = ({ post }) => {
                 allowFullScreen
               />
             ) : post.videoFile ? (
-              <video
-                controls
-                className="w-full aspect-video rounded-lg"
-              >
+              <video controls className="w-full aspect-video rounded-lg">
                 <source src={`http://localhost:5000/videos/${post.videoFile.split('/').pop()}`} type="video/mp4" />
                 Your browser does not support the video tag.
               </video>
@@ -213,16 +211,22 @@ const ViewPostDetails = ({ post }) => {
 
           {/* Post Title & Description */}
           <h1 className="text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight">{post.title}</h1>
-          <div className="text-gray-700 text-lg leading-relaxed whitespace-pre-line prose prose-slate max-w-4xl">
-            {post.description}
-          </div>
+          <div
+            className="text-gray-700 text-lg leading-relaxed whitespace-pre-line prose prose-slate max-w-4xl"
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(post.description || '', { USE_PROFILES: { html: true } }),
+            }}
+          />
 
           {/* Info Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
             {Object.entries(entries).map(
               ([label, value]) =>
                 value && (
-                  <div key={label} className="bg-white rounded-xl p-5 shadow hover:shadow-md transition-shadow duration-300 border border-gray-100">
+                  <div
+                    key={label}
+                    className="bg-white rounded-xl p-5 shadow hover:shadow-md transition-shadow duration-300 border border-gray-100"
+                  >
                     <div className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{label}</div>
                     <div className="text-gray-900 text-base mt-2 break-words whitespace-pre-wrap">{value}</div>
                   </div>
@@ -251,21 +255,19 @@ const ViewPostDetails = ({ post }) => {
               </>
             ) : (
               <div className="flex flex-col sm:flex-row gap-4">
- <button
-  onClick={() => setShowTuitionModal(true)}
-  className="px-6 py-3 bg-white text-indigo-600 border-2 border-indigo-600 font-semibold rounded-2xl shadow-sm hover:bg-indigo-600 hover:text-white transition duration-300 flex items-center justify-center gap-2"
->
-  <Send size={18} /> Request Tuition
-</button>
+                <button
+                  onClick={() => setShowTuitionModal(true)}
+                  className="px-6 py-3 bg-white text-indigo-600 border-2 border-indigo-600 font-semibold rounded-2xl shadow-sm hover:bg-indigo-600 hover:text-white transition duration-300 flex items-center justify-center gap-2"
+                >
+                  <Send size={18} /> Request Tuition
+                </button>
 
-<button
-  onClick={() => setShowTopicHelpModal(true)}
-  className="px-6 py-3 bg-white text-emerald-600 border-2 border-emerald-600 font-semibold rounded-2xl shadow-sm hover:bg-emerald-600 hover:text-white transition duration-300 flex items-center justify-center gap-2"
->
-  <BookOpen size={18} /> Ask for Topic Help
-</button>
-
-
+                <button
+                  onClick={() => setShowTopicHelpModal(true)}
+                  className="px-6 py-3 bg-white text-emerald-600 border-2 border-emerald-600 font-semibold rounded-2xl shadow-sm hover:bg-emerald-600 hover:text-white transition duration-300 flex items-center justify-center gap-2"
+                >
+                  <BookOpen size={18} /> Ask for Topic Help
+                </button>
               </div>
             )}
           </div>

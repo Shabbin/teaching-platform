@@ -1,50 +1,72 @@
+// Step6_Extras.jsx
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 
-export default function Step6_Extras({ onNext, onBack, editMode }) {
-  const {
-    register,
-    formState: { errors },
-  } = useFormContext();
+export default function Step6_Extras({ editMode }) {
+  const { register, formState: { errors } } = useFormContext();
 
   return (
-    <div>
-      <label className="block font-medium mb-1">Location (Optional)</label>
-      <input
-        type="text"
-        {...register('location')}
-        className="border p-2 rounded w-full mb-2"
-      />
+    <div className="space-y-6">
+      {/* Location */}
+      <div>
+        <label className="block font-medium mb-1 text-gray-800">Location</label>
+        <input
+          type="text"
+          placeholder="e.g., Dhaka, Mirpur"
+          {...register('location')}
+          className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white
+                     focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300"
+        />
+        {errors.location && (
+          <p className="mt-2 text-sm text-red-600">{errors.location.message}</p>
+        )}
+      </div>
 
-      <label className="block font-medium mb-1">Language (Optional)</label>
-      <input
-        type="text"
-        {...register('language')}
-        className="border p-2 rounded w-full mb-2"
-      />
+      {/* Language */}
+      <div>
+        <label className="block font-medium mb-1 text-gray-800">Language</label>
+        <input
+          type="text"
+          placeholder="e.g., Bangla, English"
+          {...register('language')}
+          className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white
+                     focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300"
+        />
+        {errors.language && (
+          <p className="mt-2 text-sm text-red-600">{errors.language.message}</p>
+        )}
+      </div>
 
-      <label className="block font-medium mb-1">YouTube Link (Optional)</label>
-      <input
-        type="url"
-        {...register('youtubeLink')}
-        className="border p-2 rounded w-full mb-2"
-      />
+      {/* YouTube Link */}
+      <div>
+        <label className="block font-medium mb-1 text-gray-800">YouTube Link</label>
+        <input
+          type="url"
+          placeholder="https://youtube.com/..."
+          {...register('youtubeLink')}
+          className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white
+                     focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300"
+        />
+        {errors.youtubeLink && (
+          <p className="mt-2 text-sm text-red-600">{errors.youtubeLink.message}</p>
+        )}
+      </div>
 
-      <label className="block font-medium mb-1">Upload Video (Optional)</label>
-      <input
-        type="file"
-        {...register('videoFile')}
-        className="border p-2 rounded w-full mb-2"
-        accept="video/*"
-      />
-
-      <div className="flex justify-between mt-4">
-        <button type="button" onClick={onBack} className="px-4 py-2 bg-gray-300 rounded">
-          ← Back
-        </button>
-        <button type="button" onClick={onNext} className="px-4 py-2 bg-blue-600 text-white rounded">
-          Next →
-        </button>
+      {/* Upload Video */}
+      <div>
+        <label className="block font-medium mb-1 text-gray-800">Upload Video</label>
+        <input
+          type="file"
+          accept="video/*"
+          {...register('videoFile')}
+          className="w-full rounded-xl border border-gray-200 bg-white
+                     file:mr-3 file:px-4 file:py-2 file:border-0 file:rounded-lg file:bg-gray-100 file:text-gray-700
+                     focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300"
+        />
+        <p className="mt-2 text-xs text-gray-500">Optional. Max size depends on server limits.</p>
+        {errors.videoFile && (
+          <p className="mt-2 text-sm text-red-600">{errors.videoFile.message}</p>
+        )}
       </div>
     </div>
   );

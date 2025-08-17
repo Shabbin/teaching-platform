@@ -18,13 +18,60 @@ const ViewTeachers = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Indigo-first theme for react-select
+  const selectTheme = (theme) => ({
+    ...theme,
+    colors: {
+      ...theme.colors,
+      primary: '#4F46E5',      // indigo-600
+      primary25: '#EEF2FF',    // indigo-50
+      primary50: '#E0E7FF',    // indigo-100
+      neutral20: '#E5E7EB',    // border default
+      neutral30: '#A5B4FC',    // border hover/focus (indigo-300)
+    },
+  });
+
+  const selectStyles = {
+    control: (base, state) => ({
+      ...base,
+      borderColor: state.isFocused ? '#A5B4FC' : '#E5E7EB',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(99,102,241,0.30)' : 'none',
+      '&:hover': { borderColor: '#A5B4FC' },
+      borderRadius: '0.5rem',
+      minHeight: '2.5rem',
+    }),
+    multiValue: (base) => ({
+      ...base,
+      backgroundColor: '#EEF2FF',
+      borderRadius: '9999px',
+    }),
+    multiValueLabel: (base) => ({
+      ...base,
+      color: '#4338CA',
+      fontWeight: 500,
+    }),
+    multiValueRemove: (base) => ({
+      ...base,
+      color: '#6366F1',
+      ':hover': {
+        backgroundColor: '#E0E7FF',
+        color: '#4338CA',
+      },
+      borderRadius: '9999px',
+    }),
+    option: (base, state) => ({
+      ...base,
+      fontWeight: state.isSelected ? 600 : 400,
+    }),
+  };
+
   const fetchAllTags = async () => {
     try {
       const res = await axios.get('http://localhost:5000/api/posts');
       const tagSet = new Set();
-      res.data.forEach(post => {
+      res.data.forEach((post) => {
         if (Array.isArray(post.subjects)) {
-          post.subjects.forEach(sub => tagSet.add(sub));
+          post.subjects.forEach((sub) => tagSet.add(sub));
         }
       });
       setAllTags([...tagSet]);
@@ -36,10 +83,10 @@ const ViewTeachers = () => {
   const fetchFilteredPosts = async () => {
     try {
       setLoading(true);
-      const cleanedTags = selectedTags.map(opt => opt.value);
+      const cleanedTags = selectedTags.map((opt) => opt.value);
       const queryParams = [];
 
-      cleanedTags.forEach(tag => queryParams.push(`subject=${encodeURIComponent(tag)}`));
+      cleanedTags.forEach((tag) => queryParams.push(`subject=${encodeURIComponent(tag)}`));
       if (searchQuery) queryParams.push(`search=${encodeURIComponent(searchQuery)}`);
       if (location) queryParams.push(`location=${encodeURIComponent(location)}`);
       if (mode) queryParams.push(`mode=${encodeURIComponent(mode)}`);
@@ -65,16 +112,17 @@ const ViewTeachers = () => {
     fetchFilteredPosts();
   }, [selectedTags, searchQuery, location, mode, minPay, maxPay]);
 
-  const tagOptions = allTags.map(tag => ({ value: tag, label: tag }));
+  const tagOptions = allTags.map((tag) => ({ value: tag, label: tag }));
 
   const teacherMap = new Map();
 
-  posts.forEach(post => {
+  posts.forEach((post) => {
     const tId = post.teacher._id;
     const currentSubjects = teacherMap.get(tId)?.subjects || new Set();
-    const filteredSubjects = selectedTags.length > 0
-      ? post.subjects.filter(s => selectedTags.some(tag => tag.value === s))
-      : post.subjects;
+    const filteredSubjects =
+      selectedTags.length > 0
+        ? post.subjects.filter((s) => selectedTags.some((tag) => tag.value === s))
+        : post.subjects;
 
     if (filteredSubjects.length === 0) return;
 
@@ -89,7 +137,7 @@ const ViewTeachers = () => {
         reviews: Math.floor(Math.random() * 20) + 1,
       });
     } else {
-      filteredSubjects.forEach(subj => currentSubjects.add(subj));
+      filteredSubjects.forEach((subj) => currentSubjects.add(subj));
       teacherMap.get(tId).subjects = currentSubjects;
     }
   });
@@ -98,19 +146,21 @@ const ViewTeachers = () => {
   const teachers = Array.from(teacherMap.values()).sort((a, b) => b.rating - a.rating);
 
   return (
-    <div className="min-h-screen p-4 sm:p-6 bg-gray-50">
+    <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50">
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Filters */}
         <div className="w-full lg:w-1/4 lg:sticky top-6 h-fit">
-          <div className="bg-white rounded-xl shadow-md p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-[oklch(0.55_0.28_296.83)]">🔍 Filter Teachers</h2>
+          <div className="bg-white/95 rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-indigo-700 bg-indigo-50 ring-1 ring-indigo-100">
+              <span className="text-sm font-semibold">🔍 Filter Teachers</span>
+            </div>
 
             <input
               type="text"
               placeholder="Search by name or topic..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
 
             <div>
@@ -121,31 +171,33 @@ const ViewTeachers = () => {
                 value={selectedTags}
                 onChange={setSelectedTags}
                 placeholder="Select subjects..."
+                theme={selectTheme}
+                styles={selectStyles}
               />
             </div>
 
             <input
               type="text"
               placeholder="Location"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
               value={location}
-              onChange={e => setLocation(e.target.value)}
+              onChange={(e) => setLocation(e.target.value)}
             />
 
             <div className="flex gap-2">
               <input
                 type="number"
                 placeholder="Min Pay"
-                className="w-1/2 px-3 py-2 border border-gray-300 rounded-md"
+                className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
                 value={minPay}
-                onChange={e => setMinPay(e.target.value)}
+                onChange={(e) => setMinPay(e.target.value)}
               />
               <input
                 type="number"
                 placeholder="Max Pay"
-                className="w-1/2 px-3 py-2 border border-gray-300 rounded-md"
+                className="w-1/2 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
                 value={maxPay}
-                onChange={e => setMaxPay(e.target.value)}
+                onChange={(e) => setMaxPay(e.target.value)}
               />
             </div>
           </div>
@@ -174,18 +226,15 @@ const ViewTeachers = () => {
               {teachers.map(({ teacher, subjects, hourlyRate, location, rating, reviews }) => (
                 <div
                   key={teacher._id}
-                  className="bg-white rounded-2xl shadow p-6 hover:shadow-lg transition"
+                  className="bg-white/95 rounded-2xl shadow-sm border border-gray-100 p-6"
                 >
                   <div className="flex flex-col sm:flex-row gap-6 sm:items-start">
-                    <Avatar
-                      alt={teacher.name}
-                      src={teacher.profileImage}
-                      sx={{ width: 80, height: 80 }}
-                    />
+                    <Avatar alt={teacher.name} src={teacher.profileImage} sx={{ width: 80, height: 80 }} />
                     <div className="flex-1">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <h3 className="text-xl font-semibold text-[oklch(0.55_0.28_296.83)]">{teacher.name}</h3>
-                        <div className="text-sm text-blue-600 font-semibold">৳{hourlyRate} / hr</div>
+                        {/* Name stays dark for readability; if you later make it a link, add hover styles there */}
+                        <h3 className="text-xl font-semibold text-gray-900">{teacher.name}</h3>
+                        <div className="text-sm font-semibold text-indigo-700">৳{hourlyRate} / hr</div>
                       </div>
                       {/* <p className="text-sm text-gray-500 mb-1">📍 {location}</p> */}
 
@@ -203,21 +252,28 @@ const ViewTeachers = () => {
 
                       <div className="flex flex-wrap gap-2 mb-3">
                         {[...subjects].map((subj, i) => (
-                          <span key={i} className="bg-blue-100 text-blue-700 text-sm px-2 py-0.5 rounded-full">
+                          <span
+                            key={i}
+                            className="bg-indigo-50 text-indigo-700 ring-1 ring-indigo-100 text-sm px-2 py-0.5 rounded-full"
+                          >
                             #{subj}
                           </span>
                         ))}
                       </div>
+
                       <Link
                         href={
                           selectedTags.length > 0
                             ? `/teachers/${teacher._id}/posts?${selectedTags
-                                .map(tag => `subject=${encodeURIComponent(tag.value)}`)
+                                .map((tag) => `subject=${encodeURIComponent(tag.value)}`)
                                 .join('&')}`
                             : `/teachers/${teacher._id}/posts`
                         }
                       >
-                        <button className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                        <button
+                          className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white py-2 px-4 rounded-md
+                                     hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"
+                        >
                           View Posts
                         </button>
                       </Link>

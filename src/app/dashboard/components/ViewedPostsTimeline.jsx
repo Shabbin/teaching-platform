@@ -2,15 +2,19 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPostViewEvents, fetchPostById } from '../../redux/postViewEventSlice';
+import DOMPurify from 'isomorphic-dompurify';
+import { Eye } from 'lucide-react';
 
 export default function ViewedPostsTimeline() {
   const dispatch = useDispatch();
 
-  const userInfo = useSelector(state => state.user.userInfo);
-  const isFetched = useSelector(state => state.user.isFetched);
+  const userInfo = useSelector((state) => state.user.userInfo);
+  const isFetched = useSelector((state) => state.user.isFetched);
   const teacherId = userInfo?._id;
 
-  const { events = [], posts = {}, loading, error } = useSelector(state => state.postViewEvents);
+  const { events = [], posts = {}, loading, error } = useSelector(
+    (state) => state.postViewEvents
+  );
 
   const viewedPostsRef = useRef(new Set());
 
@@ -23,7 +27,7 @@ export default function ViewedPostsTimeline() {
 
   useEffect(() => {
     if (!loading && !error && events.length > 0) {
-      events.forEach(event => {
+      events.forEach((event) => {
         const postIdKey =
           typeof event.postId === 'object'
             ? event.postId._id?.toString() || JSON.stringify(event.postId)
@@ -38,7 +42,7 @@ export default function ViewedPostsTimeline() {
 
   useEffect(() => {
     if (teacherId && events.length > 0) {
-      events.forEach(event => {
+      events.forEach((event) => {
         const postIdKey =
           typeof event.postId === 'object'
             ? event.postId._id?.toString() || JSON.stringify(event.postId)
@@ -54,7 +58,7 @@ export default function ViewedPostsTimeline() {
   const groupedEvents = useMemo(() => {
     const map = new Map();
 
-    events.forEach(event => {
+    events.forEach((event) => {
       const postIdKey =
         typeof event.postId === 'object'
           ? event.postId._id?.toString() || JSON.stringify(event.postId)
@@ -74,7 +78,8 @@ export default function ViewedPostsTimeline() {
 
       if (
         event.viewedAt &&
-        (!existing.latestViewedAt || new Date(event.viewedAt) > new Date(existing.latestViewedAt))
+        (!existing.latestViewedAt ||
+          new Date(event.viewedAt) > new Date(existing.latestViewedAt))
       ) {
         existing.latestViewedAt = event.viewedAt;
         existing.latestEventId = event._id || null;
@@ -104,17 +109,14 @@ export default function ViewedPostsTimeline() {
 
     if (post.videoFile) {
       return (
-        <video
-          controls
-          className="w-full max-w-[400px] aspect-video rounded-lg mt-2"
-        >
+        <video controls className="w-full max-w-[400px] aspect-video rounded-lg mt-2">
           <source src={`http://localhost:5000${post.videoFile}`} type="video/mp4" />
           Your browser does not support the video tag.
         </video>
       );
     }
 
-    return null; // no video, show nothing
+    return null;
   };
 
   if (!isFetched) {
@@ -140,15 +142,11 @@ export default function ViewedPostsTimeline() {
   }
 
   if (error) {
-    return (
-      <p className="text-red-600 text-center text-lg py-20">Error: {error}</p>
-    );
+    return <p className="text-red-600 text-center text-lg py-20">Error: {error}</p>;
   }
 
   if (groupedEvents.length === 0) {
-    return (
-      <p className="text-gray-600 text-center text-lg py-20">No viewed posts yet.</p>
-    );
+    return <p className="text-gray-600 text-center text-lg py-20">No viewed posts yet.</p>;
   }
 
   return (
@@ -166,44 +164,33 @@ export default function ViewedPostsTimeline() {
           );
         }
 
+        const cleanDesc = DOMPurify.sanitize(post.description || '', {
+          USE_PROFILES: { html: true },
+        });
+
         return (
           <article
             key={post._id}
-            className="bg-white shadow-md rounded-2xl p-6 transition-transform duration-200 hover:scale-[1.02] hover:shadow-xl border border-[oklch(0.85_0.02_270)]"
+            className="bg-white/95 shadow-sm rounded-2xl p-6 border border-gray-100 cursor-default"
           >
-            {/* Title at top */}
-            <h3 className="text-xl font-semibold text-[oklch(0.55_0.28_296.71)] mb-2">
+            {/* Title (static color) */}
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {post.title}
             </h3>
 
             {/* Video if exists */}
             {renderVideo(post)}
 
-            <p className="text-gray-700 mb-4 mt-4 line-clamp-3">{post.description}</p>
+            {/* Sanitized rich description */}
+            <div
+              className="text-gray-700 mb-4 mt-4 line-clamp-3 prose prose-sm max-w-none overflow-hidden"
+              dangerouslySetInnerHTML={{ __html: cleanDesc }}
+            />
 
-            <div className="flex items-center text-gray-500 text-sm font-medium space-x-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-4 w-4 text-[oklch(0.55_0.28_296.71)]"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 
-                    8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 
-                    7-4.477 0-8.268-2.943-9.542-7z"
-                />
-              </svg>
-              <span>
+            {/* Views */}
+            <div className="flex items-center text-sm font-medium">
+              <span className="inline-flex items-center gap-1 text-indigo-700">
+                <Eye className="w-4 h-4" />
                 {post.viewsCount || 0} view{(post.viewsCount || 0) !== 1 ? 's' : ''}
               </span>
             </div>

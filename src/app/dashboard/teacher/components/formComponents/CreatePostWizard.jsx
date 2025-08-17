@@ -16,6 +16,16 @@ import Step5_PostDetails from './Step5_PostDetails';
 import Step6_Extras from './Step6_Extras';
 import Step7_Confirm from './Step7_Confirm';
 
+import FullScreenWizard from './FormLayouts/fullScreenWizard';
+// REMOVE the old ProgressBar import
+// import ProgressBar from '../formComponents/FormLayouts/progressBar';
+import HelperBlock from '../formComponents/FormLayouts/helperCard';
+import StepTitle from '../formComponents/FormLayouts/stepTitle';
+import StepActions from '../formComponents/FormLayouts/stepActions';
+import ProgressSteps from '../formComponents/FormLayouts/progressSteps';
+
+import { t } from '../../../../../lib/i18n/ui';
+
 const steps = [
   { label: 'Education System', component: Step1_EducationSystem },
   { label: 'Board / Group', component: Step2_BoardGroup },
@@ -26,7 +36,7 @@ const steps = [
   { label: 'Review & Submit', component: Step7_Confirm },
 ];
 
-export default function CreatePostWizard({ initialData = null, onPostCreated, onPostUpdated }) {
+export default function CreatePostWizard({ initialData = null, onPostCreated, onPostUpdated, lang = 'en' }) {
   const [step, setStep] = useState(0);
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.teacherPosts);
@@ -40,7 +50,7 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
       try {
         const res = await axios.get('http://localhost:5000/api/education-tree');
         setEducationTree(res.data);
-      } catch (err) {
+      } catch {
         setTreeError('Failed to load education data.');
       } finally {
         setLoadingTree(false);
@@ -49,39 +59,37 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
     fetchTree();
   }, []);
 
-  const defaultValues = initialData
-    ? {
-        title: initialData.title || '',
-        description: initialData.description || '',
-        educationSystem: initialData.educationSystem || '',
-        board: initialData.board || '',
-        level: initialData.level || '',
-        subLevel: initialData.subLevel || '',
-        group: initialData.group || '',
-        subjects: initialData.subjects || [],
-        tags: initialData.tags || [],
-        location: initialData.location || '',
-        language: initialData.language || '',
-        hourlyRate: initialData.hourlyRate || '',
-        youtubeLink: initialData.youtubeLink || '',
-        videoFile: null, // <-- fixed
-      }
-    : {
-        title: '',
-        description: '',
-        educationSystem: '',
-        board: '',
-        level: '',
-        subLevel: '',
-        group: '',
-        subjects: [],
-        tags: [],
-        location: '',
-        language: '',
-        hourlyRate: '',
-        youtubeLink: '',
-        videoFile: null, // <-- fixed
-      };
+  const defaultValues = initialData ? {
+    title: initialData.title || '',
+    description: initialData.description || '',
+    educationSystem: initialData.educationSystem || '',
+    board: initialData.board || '',
+    level: initialData.level || '',
+    subLevel: initialData.subLevel || '',
+    group: initialData.group || '',
+    subjects: initialData.subjects || [],
+    tags: initialData.tags || [],
+    location: initialData.location || '',
+    language: initialData.language || '',
+    hourlyRate: initialData.hourlyRate || '',
+    youtubeLink: initialData.youtubeLink || '',
+    videoFile: null,
+  } : {
+    title: '',
+    description: '',
+    educationSystem: '',
+    board: '',
+    level: '',
+    subLevel: '',
+    group: '',
+    subjects: [],
+    tags: [],
+    location: '',
+    language: '',
+    hourlyRate: '',
+    youtubeLink: '',
+    videoFile: null,
+  };
 
   const methods = useForm({
     resolver: zodResolver(teacherPostSchema),
@@ -93,8 +101,8 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
     if (error) dispatch(resetError());
   }, [step, dispatch, error]);
 
-  if (loadingTree) return <p>Loading education data...</p>;
-  if (treeError) return <p className="text-red-600">{treeError}</p>;
+  if (loadingTree) return <p className="p-8">Loading education data...</p>;
+  if (treeError) return <p className="p-8 text-red-600">{treeError}</p>;
 
   const onSubmit = async (data) => {
     let resultAction;
@@ -116,20 +124,13 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
 
   const handleNext = async () => {
     let fieldsToValidate = [];
-
     switch (step) {
-      case 0:
-        fieldsToValidate = ['educationSystem'];
-        break;
+      case 0: fieldsToValidate = ['educationSystem']; break;
       case 1: {
         const eduSys = methods.getValues('educationSystem');
-        if (eduSys === 'Bangla-Medium' || eduSys === 'BCS') {
-          fieldsToValidate = ['group'];
-        } else if (eduSys === 'GED') {
-          fieldsToValidate = [];
-        } else {
-          fieldsToValidate = ['board'];
-        }
+        if (eduSys === 'Bangla-Medium' || eduSys === 'BCS') fieldsToValidate = ['group'];
+        else if (eduSys === 'GED') fieldsToValidate = [];
+        else fieldsToValidate = ['board'];
         break;
       }
       case 2: {
@@ -142,72 +143,88 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
         }
         break;
       }
-      case 3:
-        fieldsToValidate = ['subjects'];
-        break;
-      case 4:
-        fieldsToValidate = ['title', 'description', 'hourlyRate'];
-        break;
-      default:
-        fieldsToValidate = [];
+      case 3: fieldsToValidate = ['subjects']; break;
+      case 4: fieldsToValidate = ['title', 'description', 'hourlyRate']; break;
+      default: fieldsToValidate = [];
     }
-
     const valid = await methods.trigger(fieldsToValidate);
     if (valid) setStep((s) => s + 1);
   };
 
-  const handleBack = () => {
-    setStep((s) => Math.max(s - 1, 0));
-  };
-
+  const handleBack = () => setStep((s) => Math.max(s - 1, 0));
   const editMode = Boolean(initialData && initialData._id);
+  const isLast = step === steps.length - 1;
 
-  return (
-    <FormProvider {...methods}>
-      <div className="min-h-screen bg-gray-50 px-6 py-10">
-        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-md col-span-1 flex flex-col justify-center">
-            <h2 className="text-2xl font-bold text-blue-700 mb-2">
-              {editMode ? 'Edit Your Post 👋' : 'Hello, Teacher 👋'}
-            </h2>
-            <p className="text-gray-600 text-lg">
-              {step < steps.length - 1
-                ? `Step ${step + 1} of ${steps.length}: ${steps[step].label}`
-                : 'Almost done! Review your information.'}
+  const leftPanel = (
+    <div className="space-y-6">
+      <HelperBlock title={editMode ? t(lang,'edit') : t(lang,'goodToKnow')} icon={editMode ? '✏️' : '😊'}>
+        {step < steps.length - 1 ? (
+          <>
+            <p className="mb-2">
+              {t(lang,'stepXofY', { x: step + 1, y: steps.length })} — <span className="font-medium">{steps[step].label}</span>
             </p>
-          </div>
-
-          <div className="col-span-2">
-            <form
-              onSubmit={methods.handleSubmit(onSubmit)}
-              className="bg-white p-6 rounded-xl shadow-md"
-              encType="multipart/form-data"
-            >
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={step}
-                  initial={{ opacity: 0, x: 100 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -100 }}
-                  transition={{ duration: 0.4 }}
-                >
-                  <CurrentStep
-                    onNext={handleNext}
-                    onBack={handleBack}
-                    isSubmitting={loading}
-                    loading={loading}
-                    error={error}
-                    resetError={() => dispatch(resetError())}
-                    educationTree={educationTree}
-                    onFinalSubmit={methods.handleSubmit(onSubmit)}
-                    editMode={editMode}
-                  />
-                </motion.div>
-              </AnimatePresence>
-            </form>
-          </div>
-        </div>
-      </div>
-    </FormProvider>
+            {/* <p>{t(lang,'verify')}</p> */}
+          </>
+        ) : (
+          <p>{t(lang,'almost')}</p>
+        )}
+      </HelperBlock>
+    </div>
   );
+
+  const rightPanel = (
+    <div className="relative">
+      {/* NEW: stepper replaces the old linear bar */}
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur px-6 md:px-10 pt-4">
+        <ProgressSteps steps={steps} currentStep={step} />
+      </div>
+
+      <FormProvider {...methods}>
+        <form
+          onSubmit={methods.handleSubmit(onSubmit)}
+          className="px-6 md:px-10 py-8"
+          encType="multipart/form-data"
+        >
+          <StepTitle
+            prefix={editMode ? t(lang,'updateYour') : t(lang,'createYour')}
+            highlight={step === steps.length - 1 ? t(lang,'reviewing') : steps[step].label}
+          />
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: 60 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -60 }}
+              transition={{ duration: 0.25 }}
+              className="bg-white rounded-3xl shadow-sm border border-[color-mix(in_oklch,var(--brand)_10%,black)] p-6 md:p-8"
+            >
+              <CurrentStep
+                onNext={handleNext}
+                onBack={handleBack}
+                isSubmitting={loading}
+                loading={loading}
+                error={error}
+                resetError={() => dispatch(resetError())}
+                educationTree={educationTree}
+                onFinalSubmit={methods.handleSubmit(onSubmit)}
+                editMode={editMode}
+              />
+            </motion.div>
+          </AnimatePresence>
+
+          <StepActions
+            onBack={handleBack}
+            onNext={handleNext}
+            onSubmit={methods.handleSubmit(onSubmit)}
+            isLast={isLast}
+            loading={loading}
+            nextDisabled={false}
+          />
+        </form>
+      </FormProvider>
+    </div>
+  );
+
+  return <FullScreenWizard left={leftPanel} right={rightPanel} />;
 }

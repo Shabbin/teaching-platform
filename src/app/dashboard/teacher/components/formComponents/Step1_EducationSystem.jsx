@@ -1,3 +1,4 @@
+// Step1_EducationSystem.jsx — thin border, no pink/purple focus highlight
 import React from 'react';
 import { useFormContext } from 'react-hook-form';
 
@@ -10,42 +11,54 @@ const educationSystems = [
   'BCS',
 ];
 
-export default function Step1_EducationSystem({ onNext, editMode }) {
+export default function Step1_EducationSystem({ editMode }) {
   const {
     register,
-    watch,
     formState: { errors },
   } = useFormContext();
 
-  const selected = watch('educationSystem');
+  // shared styles to kill any colored focus ring/outline/shadow
+  const baseSelect =
+    "w-full px-3 py-2 rounded-lg border bg-white appearance-none " +
+    "border-gray-200 hover:border-gray-300 " +
+    "outline-none focus:outline-none focus:ring-0 focus:ring-transparent " +
+    "focus:shadow-none focus:border-gray-300 " +
+    "focus-visible:outline-none focus-visible:ring-0 focus-visible:shadow-none " +
+    "disabled:bg-gray-100";
+  const noFocusFX = { outline: 'none', boxShadow: 'none' };
 
   return (
-    <div>
-      <label className="block font-medium mb-1">Select Education System</label>
-      <select
-        {...register('educationSystem', { required: 'Education System is required' })}
-        className="border p-2 rounded w-full mb-2"
-        disabled={editMode} // disable in edit mode
-      >
-        <option value="">-- Select --</option>
-        {educationSystems.map((sys) => (
-          <option key={sys} value={sys}>
-            {sys}
+    <div className="space-y-4">
+      <div>
+        <select
+          // use custom validate instead of native required to avoid browser pink highlight
+          {...register('educationSystem', {
+            validate: (v) => (v ? true : 'Education System is required'),
+          })}
+          className={baseSelect}
+          style={noFocusFX}
+          onFocus={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+          onBlur={(e) => { e.currentTarget.style.boxShadow = 'none'; }}
+          disabled={editMode}
+          defaultValue=""
+          aria-invalid={!!errors.educationSystem}
+        >
+          {/* hidden + disabled placeholder */}
+          <option value="" disabled hidden>
+            Select Education System
           </option>
-        ))}
-      </select>
-      {errors.educationSystem && <p className="text-red-600">{errors.educationSystem.message}</p>}
 
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={!selected}
-        className={`mt-4 px-4 py-2 rounded text-white ${
-          selected ? 'bg-blue-600' : 'bg-gray-400 cursor-not-allowed'
-        }`}
-      >
-        Next →
-      </button>
+          {educationSystems.map((sys) => (
+            <option key={sys} value={sys}>
+              {sys}
+            </option>
+          ))}
+        </select>
+
+        {errors.educationSystem && (
+          <p className="mt-2 text-sm text-red-600">{errors.educationSystem.message}</p>
+        )}
+      </div>
     </div>
   );
 }

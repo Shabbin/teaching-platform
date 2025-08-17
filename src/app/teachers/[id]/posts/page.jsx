@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Star, StarBorder } from '@mui/icons-material'; // import MUI icons
+import { Star, StarBorder } from '@mui/icons-material';
+import DOMPurify from 'isomorphic-dompurify';
 
 const TeacherPostsPage = () => {
   const { id } = useParams();
@@ -20,7 +21,7 @@ const TeacherPostsPage = () => {
 
     const queryParams = new URLSearchParams();
     queryParams.append('teacher', id);
-    subjectParams.forEach(s => queryParams.append('subject', s));
+    subjectParams.forEach((s) => queryParams.append('subject', s));
 
     const fetchPosts = async () => {
       try {
@@ -51,7 +52,7 @@ const TeacherPostsPage = () => {
       {/* Go Back */}
       <button
         onClick={() => router.push('/dashboard/student/teachers')}
-        className="mb-8 px-5 py-2 bg-[oklch(0.55_0.28_296.83)] text-white font-semibold rounded-sm shadow hover:from-gray-400 hover:to-gray-300 transition transform hover:-translate-y-1"
+        className="mb-8 px-5 py-2 bg-indigo-600 text-white font-semibold rounded-md shadow hover:bg-indigo-700 transition transform hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-indigo-300"
       >
         All Teachers
       </button>
@@ -61,13 +62,15 @@ const TeacherPostsPage = () => {
         <img
           src={teacher.profileImage || '/default.png'}
           alt={teacher.name}
-          className="w-20 h-20 rounded-full object-cover shadow-lg"
+          className="w-20 h-20 rounded-full object-cover shadow-lg ring-2 ring-indigo-500/60"
         />
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-[oklch(0.55_0.28_296.83)] tracking-wide">
-            {teacher.name}
+          <h1 className="text-3xl md:text-4xl font-bold tracking-wide text-gray-900">
+            <span className="text-gray-900 ">
+              {teacher.name}
+            </span>
             {subjectParams.length > 0 && (
-              <span className="text-indigo-600 font-semibold"> (Filtered by {subjectParams.join(', ')})</span>
+              <span className="text-indigo-700 font-semibold"> (Filtered by {subjectParams.join(', ')})</span>
             )}
           </h1>
 
@@ -86,48 +89,66 @@ const TeacherPostsPage = () => {
       </div>
 
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-        {posts.map(post => (
-          <div
-            key={post._id}
-            className="bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition transform hover:-translate-y-1 hover:scale-[1.02] flex flex-col justify-between"
-            style={{ minHeight: '360px' }}
-          >
-            <div>
-              <h2 className="text-2xl font-bold text-[oklch(0.55_0.28_296.83)] mb-3">{post.title}</h2>
-              <p className="text-gray-600 mt-1 line-clamp-3">{post.description}</p>
+        {posts.map((post) => {
+          const cleanDesc = DOMPurify.sanitize(post.description || '', {
+            USE_PROFILES: { html: true },
+          });
 
-              <div className="flex gap-2 mt-4 flex-wrap text-sm text-indigo-700">
-                {post.subjects?.map((s, i) => (
-                  <span
-                    key={i}
-                    className="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full font-medium"
+          return (
+            <div
+              key={post._id}
+              className="group bg-white rounded-3xl p-6 shadow-xl hover:shadow-2xl transition transform hover:-translate-y-1 hover:scale-[1.02] flex flex-col justify-between border border-gray-100 hover:border-indigo-200"
+              style={{ minHeight: '360px' }}
+            >
+              <div>
+                {/* Title: dark for readability, turns indigo on hover/focus */}
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2 transition-colors group-hover:text-indigo-700">
+                  {post.title}
+                </h2>
+
+                {/* Description: neutral, clamped to 3 lines; render sanitized HTML */}
+                <div
+                  className="text-gray-600 leading-relaxed mt-1 prose prose-sm max-w-none line-clamp-3 overflow-hidden"
+                  dangerouslySetInnerHTML={{ __html: cleanDesc }}
+                />
+
+                <div className="flex gap-2 mt-4 flex-wrap text-sm">
+                  {post.subjects?.map((s, i) => (
+                    <span
+                      key={i}
+                      className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full font-medium ring-1 ring-indigo-100"
+                    >
+                      #{s}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="text-sm text-gray-500 mt-3 flex justify-between items-center">
+                  <span>৳ {post.hourlyRate} / hr</span>
+                  <span className="flex items-center gap-1">📍 {post.location}</span>
+                </div>
+
+                {/* Views & Enrollments */}
+                <div className="text-sm text-gray-700 mt-3 flex justify-between items-center">
+                  <span>👁️ {post.viewsCount || 0} views</span>
+                  <span>📝 {5} enrollments</span> {/* dummy value */}
+                </div>
+              </div>
+
+              <div className="mt-5">
+                <Link href={`/dashboard/posts/${post._id}?teacherId=${teacher._id}`}>
+                  <button
+                    className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 text-white py-3 rounded-xl font-semibold shadow-lg
+                               hover:shadow-xl hover:from-indigo-700 hover:to-indigo-700 transition transform hover:-translate-y-1 hover:scale-105
+                               focus:outline-none focus:ring-2 focus:ring-indigo-300"
                   >
-                    #{s}
-                  </span>
-                ))}
-              </div>
-
-              <div className="text-sm text-gray-500 mt-3 flex justify-between items-center">
-                <span>৳ {post.hourlyRate} / hr</span>
-                <span className="flex items-center gap-1">📍 {post.location}</span>
-              </div>
-
-              {/* Views & Enrollments */}
-              <div className="text-sm text-gray-700 mt-3 flex justify-between items-center">
-                <span>👁️ {post.viewsCount || 0} views</span>
-                <span>📝 {5} enrollments</span> {/* dummy value */}
+                    View Details
+                  </button>
+                </Link>
               </div>
             </div>
-
-            <div className="mt-5">
-              <Link href={`/dashboard/posts/${post._id}?teacherId=${teacher._id}`}>
-                <button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-3 rounded-xl font-semibold shadow-lg hover:from-indigo-700 hover:to-purple-700 transition transform hover:-translate-y-1 hover:scale-105">
-                  View Details
-                </button>
-              </Link>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

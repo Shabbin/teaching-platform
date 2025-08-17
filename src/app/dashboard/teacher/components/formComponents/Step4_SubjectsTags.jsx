@@ -1,11 +1,12 @@
+// Step4_SubjectsTags.jsx — thinner, light borders like Step5; logic unchanged
 import React, { useEffect, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 
-export default function Step4_SubjectsTags({ educationTree, onNext, onBack, editMode }) {
+export default function Step4_SubjectsTags({ educationTree, editMode }) {
   const {
-    register,
     watch,
     setValue,
+    clearErrors,
     formState: { errors },
   } = useFormContext();
 
@@ -19,7 +20,6 @@ export default function Step4_SubjectsTags({ educationTree, onNext, onBack, edit
 
   useEffect(() => {
     let subjects = [];
-
     try {
       if (educationSystem === 'English-Medium' && board && level) {
         const subjData = educationTree['English-Medium'][board]?.[level] || {};
@@ -47,101 +47,88 @@ export default function Step4_SubjectsTags({ educationTree, onNext, onBack, edit
     }
 
     setSubjectsOptions(subjects);
-    setValue('subjects', []); // reset subjects on dependencies change
-  }, [educationSystem, board, level, group, subLevel, educationTree, setValue]);
+    // reset WITHOUT validation so no error shows on entry
+    setValue('subjects', [], { shouldValidate: false, shouldDirty: false, shouldTouch: false });
+    clearErrors('subjects');
+  }, [educationSystem, board, level, group, subLevel, educationTree, setValue, clearErrors]);
 
   const selectedSubjects = watch('subjects') || [];
 
-  // Define when subjects are editable
+  // edit-mode rules (unchanged)
   let isSubjectEditable = false;
-
   if (editMode) {
     if (educationSystem === 'English-Medium') {
-      if (board === 'CIE' || board === 'Edexcel') {
-        // For A_Level: sublevel + subjects editable
-        if (level === 'A_Level') {
-          isSubjectEditable = true;
-        } else if (level === 'O_Level') {
-          isSubjectEditable = true;
-        }
-      } else if (board === 'IB') {
-        // IB level and subjects editable (handled elsewhere)
-        isSubjectEditable = true;
-      }
+      if (board === 'CIE' || board === 'Edexcel') isSubjectEditable = true;
+      else if (board === 'IB') isSubjectEditable = true;
     } else if (educationSystem === 'Bangla-Medium') {
-      isSubjectEditable = true; // subjects editable when level/group changes
+      isSubjectEditable = true;
     } else if (educationSystem === 'University-Admission') {
-      if (board === 'Public-University') {
-        isSubjectEditable = false; // only units editable (handled in level step)
-      } else if (['Engineering', 'Medical', 'IBA'].includes(board)) {
-        isSubjectEditable = true;
-      }
+      isSubjectEditable = ['Engineering', 'Medical', 'IBA'].includes(board);
     } else if (educationSystem === 'GED' || educationSystem === 'Entrance-Exams') {
       isSubjectEditable = true;
     }
   } else {
-    // Create mode subjects are always editable
-    isSubjectEditable = true;
+    isSubjectEditable = true; // create mode
   }
+
+  const MAX = 5;
+  const atLimit = selectedSubjects.length >= MAX;
 
   const toggleSubject = (subject) => {
     if (!isSubjectEditable) return;
-    let newSubjects;
-    if (selectedSubjects.includes(subject)) {
-      newSubjects = selectedSubjects.filter((s) => s !== subject);
+    const isSelected = selectedSubjects.includes(subject);
+
+    if (isSelected) {
+      const next = selectedSubjects.filter((s) => s !== subject);
+      setValue('subjects', next, { shouldValidate: false, shouldDirty: true });
     } else {
-      if (selectedSubjects.length >= 5) return; // max 5
-      newSubjects = [...selectedSubjects, subject];
+      if (atLimit) return;
+      const next = [...selectedSubjects, subject];
+      setValue('subjects', next, { shouldValidate: false, shouldDirty: true });
     }
-    setValue('subjects', newSubjects, { shouldValidate: true });
   };
 
   return (
-    <div>
-      <p className="mb-2 font-medium">Select up to 5 Subjects</p>
-
-      {subjectsOptions.length === 0 && <p>No subjects available for selected options.</p>}
-
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-72 overflow-y-auto border rounded p-2 mb-4">
-        {subjectsOptions.map((subject) => (
-          <label
-            key={subject}
-            className={`cursor-pointer border px-3 py-1 rounded ${
-              selectedSubjects.includes(subject) ? 'bg-blue-600 text-white' : ''
-            } ${!isSubjectEditable ? 'opacity-50 cursor-not-allowed' : ''}`}
-          >
-            <input
-              type="checkbox"
-              value={subject}
-              checked={selectedSubjects.includes(subject)}
-              onChange={() => toggleSubject(subject)}
-              className="mr-2"
-              disabled={!isSubjectEditable}
-            />
-            {subject}
-          </label>
-        ))}
+    <div className="space-y-3">
+      {/* Count only (e.g., 0/5 selected) */}
+      <div className="flex items-center justify-end">
+        <span className="text-xs text-gray-500">
+          {selectedSubjects.length}/{MAX} selected
+        </span>
       </div>
-      {errors.subjects && <p className="text-red-600">{errors.subjects.message}</p>}
 
-      <div className="flex justify-between mt-4">
-        <button type="button" onClick={onBack} className="px-4 py-2 bg-gray-300 rounded">
-          ← Back
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (selectedSubjects.length === 0) {
-              alert('Please select at least one subject.');
-              return;
-            }
-            onNext();
-          }}
-          className="px-4 py-2 bg-blue-600 text-white rounded"
-        >
-          Next →
-        </button>
+      {subjectsOptions.length === 0 && (
+        <p className="text-gray-500 text-sm">No subjects available for the selected options.</p>
+      )}
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-64 overflow-y-auto rounded-lg border bg-white p-2 border-gray-200">
+        {subjectsOptions.map((subject) => {
+          const selected = selectedSubjects.includes(subject);
+          const disabled = !isSubjectEditable || (!selected && atLimit);
+
+          return (
+            <button
+              type="button"
+              key={subject}
+              onClick={() => toggleSubject(subject)}
+              disabled={disabled}
+              aria-pressed={selected}
+              className={`px-2.5 py-1.5 rounded-md border text-[13px] leading-5 transition
+                ${selected
+                  ? 'bg-[var(--brand)] border-[var(--brand)] text-white'
+                  : 'bg-white border-gray-200 text-gray-800 hover:bg-gray-50'}
+                ${disabled && !selected ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {subject}
+            </button>
+          );
+        })}
       </div>
+
+      {/* Shows ONLY after Next triggers validation */}
+      {errors.subjects && (
+        <p className="text-sm text-red-600">Select at least one subject.</p>
+      )}
     </div>
   );
 }

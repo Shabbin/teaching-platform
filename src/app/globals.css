@@ -46,3 +46,20 @@ html {
 code, pre {
   font-family: var(--font-geist-mono), monospace; /* You can keep Geist mono for code */
 }
+
+
+
+
+
+
+/* full-screen wizard page hides any site header/nav */
+.wizard-screen header,
+.wizard-screen nav {
+  display: none !important;
+}
+
+/* nice focus outlines */
+:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
