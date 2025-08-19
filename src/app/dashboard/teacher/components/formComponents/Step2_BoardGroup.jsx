@@ -1,4 +1,4 @@
-// Step2_BoardGroup.jsx — thin gray borders + no pink/purple focus highlight
+// Step2_BoardGroup.jsx — excerpt of the relevant parts
 import React, { useEffect } from 'react';
 import { useFormContext } from 'react-hook-form';
 
@@ -11,6 +11,7 @@ export default function Step2_BoardGroup({ educationTree, editMode }) {
   } = useFormContext();
 
   const educationSystem = watch('educationSystem');
+  const board = watch('board');
 
   let boardsOptions = [];
   let groupsOptions = [];
@@ -23,6 +24,7 @@ export default function Step2_BoardGroup({ educationTree, editMode }) {
     boardsOptions = Object.keys(educationTree['English-Medium'] || {});
   } else if (educationSystem === 'Bangla-Medium') {
     groupsOptions = ['Science', 'Commerce', 'Arts'];
+    boardsOptions = []; // no board for BM
   } else if (educationSystem === 'University-Admission') {
     boardsOptions = Object.keys(educationTree['University-Admission'] || {});
   } else if (educationSystem === 'GED') {
@@ -31,30 +33,36 @@ export default function Step2_BoardGroup({ educationTree, editMode }) {
   } else if (educationSystem === 'Entrance-Exams') {
     boardsOptions = Object.keys(educationTree['Entrance-Exams'] || {});
   } else if (educationSystem === 'BCS') {
-    boardsOptions = Object.keys(educationTree['BCS'] || {});
-    groupsOptions = ['General', 'Technical', 'Both'];
+    // stage only
+    boardsOptions = Object.keys(educationTree['BCS'] || {}); // ["Preliminary","Written","Viva"]
+    groupsOptions = []; // ❗️ no group for BCS anymore
   }
 
-  // Clear group if educationSystem changes to one that doesn't need it
+  // Always clear group if current system doesn't use it
   useEffect(() => {
-    if (!['Bangla-Medium', 'BCS'].includes(educationSystem)) {
+    if (educationSystem !== 'Bangla-Medium') {
       setValue('group', '');
     }
   }, [educationSystem, setValue]);
 
-  // Clear board if educationSystem changes to one that doesn't need it
+  // Clear board if system doesn't need it
   useEffect(() => {
     if (!['English-Medium', 'University-Admission', 'Entrance-Exams', 'BCS'].includes(educationSystem)) {
       setValue('board', '');
     }
   }, [educationSystem, setValue]);
 
-  // Always reset board on educationSystem change
+  // Always reset board when educationSystem changes
   useEffect(() => {
     setValue('board', '');
   }, [educationSystem, setValue]);
 
-  // shared styles that kill any colored focus ring/outline/shadow
+  // 🚿 IMPORTANT: Clear subjects/tags whenever the path context changes
+  useEffect(() => {
+    setValue('subjects', []);
+    setValue('tags', []);
+  }, [educationSystem, board, setValue]);
+
   const baseSelect =
     "w-full px-3 py-2 rounded-lg border bg-white appearance-none " +
     "border-gray-200 hover:border-gray-300 " +
@@ -66,7 +74,7 @@ export default function Step2_BoardGroup({ educationTree, editMode }) {
 
   return (
     <div className="space-y-4">
-      {/* BOARD (no label; placeholder disabled + hidden) */}
+      {/* BOARD (stage/exam/board selector) */}
       {boardsOptions.length > 0 && (
         <div>
           <select
@@ -80,11 +88,11 @@ export default function Step2_BoardGroup({ educationTree, editMode }) {
             defaultValue=""
           >
             <option value="" disabled hidden>
-              Select Board
+              {educationSystem === 'BCS' ? 'Select Stage' : 'Select Board'}
             </option>
-            {boardsOptions.map((board) => (
-              <option key={board} value={board}>
-                {board}
+            {boardsOptions.map((b) => (
+              <option key={b} value={b}>
+                {b}
               </option>
             ))}
           </select>
@@ -92,8 +100,8 @@ export default function Step2_BoardGroup({ educationTree, editMode }) {
         </div>
       )}
 
-      {/* GROUP (keep label) */}
-      {groupsOptions.length > 0 && (
+      {/* GROUP (Bangla-Medium only) */}
+      {groupsOptions.length > 0 && educationSystem === 'Bangla-Medium' && (
         <div>
           <label className="block mb-1 text-sm font-medium text-gray-800">Group</label>
           <select
@@ -109,9 +117,9 @@ export default function Step2_BoardGroup({ educationTree, editMode }) {
             <option value="" disabled hidden>
               Select Group
             </option>
-            {groupsOptions.map((group) => (
-              <option key={group} value={group}>
-                {group}
+            {groupsOptions.map((g) => (
+              <option key={g} value={g}>
+                {g}
               </option>
             ))}
           </select>

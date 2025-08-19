@@ -1,42 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { useForm, FormProvider } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import { useForm, FormProvider } from "react-hook-form";
+import { AnimatePresence, motion } from "framer-motion";
+import { useDispatch, useSelector } from "react-redux";
+import axios from "axios";
 
-import { teacherPostSchema } from '../../../../../lib/zodSchemas/teacherPostSchema';
-import { createTeacherPost, updateTeacherPost, resetError } from '../../../../redux/teacherPostSlice';
+import {
+  step1Schema,
+  step2Schema,
+  step3Schema,
+  step4Schema,      // Subjects / Tags
+  step5Schema,      // Post Details
+  step6Schema,      // Extras with required location/language + XOR youtube/video
+  finalTeacherPostSchema,
+} from "../../../../hooks/zodSchemas/teacherPostSchema";
+import { applyZodErrors } from "@/lib/zodToRHF";
 
-import Step1_EducationSystem from './Step1_EducationSystem';
-import Step2_BoardGroup from './Step2_BoardGroup';
-import Step3_LevelSubLevel from './Step3_LevelSubLevel';
-import Step4_SubjectsTags from './Step4_SubjectsTags';
-import Step5_PostDetails from './Step5_PostDetails';
-import Step6_Extras from './Step6_Extras';
-import Step7_Confirm from './Step7_Confirm';
+import { createTeacherPost, updateTeacherPost, resetError } from "../../../../redux/teacherPostSlice";
 
-import FullScreenWizard from './FormLayouts/fullScreenWizard';
-// REMOVE the old ProgressBar import
-// import ProgressBar from '../formComponents/FormLayouts/progressBar';
-import HelperBlock from '../formComponents/FormLayouts/helperCard';
-import StepTitle from '../formComponents/FormLayouts/stepTitle';
-import StepActions from '../formComponents/FormLayouts/stepActions';
-import ProgressSteps from '../formComponents/FormLayouts/progressSteps';
+import Step1_EducationSystem from "./Step1_EducationSystem";
+import Step2_BoardGroup from "./Step2_BoardGroup";
+import Step3_LevelSubLevel from "./Step3_LevelSubLevel";
+import Step4_SubjectsTags from "./Step4_SubjectsTags";
+import Step5_PostDetails from "./Step5_PostDetails";
+import Step6_Extras from "./Step6_Extras";
+import Step7_Confirm from "./Step7_Confirm";
 
-import { t } from '../../../../../lib/i18n/ui';
+import FullScreenWizard from "./FormLayouts/fullScreenWizard";
+import HelperBlock from "../formComponents/FormLayouts/helperCard";
+import StepTitle from "../formComponents/FormLayouts/stepTitle";
+import StepActions from "../formComponents/FormLayouts/stepActions";
+import ProgressSteps from "../formComponents/FormLayouts/progressSteps";
+
+import { t } from "../../../../../lib/i18n/ui";
 
 const steps = [
-  { label: 'Education System', component: Step1_EducationSystem },
-  { label: 'Board / Group', component: Step2_BoardGroup },
-  { label: 'Level / Sublevel', component: Step3_LevelSubLevel },
-  { label: 'Subjects / Universities', component: Step4_SubjectsTags },
-  { label: 'Post Details', component: Step5_PostDetails },
-  { label: 'Additional Info (Optional)', component: Step6_Extras },
-  { label: 'Review & Submit', component: Step7_Confirm },
+  { label: "Education System", component: Step1_EducationSystem },     // 0
+  { label: "Board / Group", component: Step2_BoardGroup },             // 1
+  { label: "Level / Sublevel", component: Step3_LevelSubLevel },       // 2
+  { label: "Subjects / Universities", component: Step4_SubjectsTags }, // 3
+  { label: "Post Details", component: Step5_PostDetails },             // 4
+  { label: "Additional Info", component: Step6_Extras },               // 5
+  { label: "Review & Submit", component: Step7_Confirm },              // 6
 ];
 
-export default function CreatePostWizard({ initialData = null, onPostCreated, onPostUpdated, lang = 'en' }) {
+const stepSchemas = [
+  step1Schema, // 0
+  step2Schema, // 1
+  step3Schema, // 2
+  step4Schema, // 3
+  step5Schema, // 4
+  step6Schema, // 5
+];
+
+export default function CreatePostWizard({
+  initialData = null,
+  onPostCreated,
+  onPostUpdated,
+  lang = "en",
+}) {
   const [step, setStep] = useState(0);
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.teacherPosts);
@@ -48,10 +69,10 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
   useEffect(() => {
     async function fetchTree() {
       try {
-        const res = await axios.get('http://localhost:5000/api/education-tree');
+        const res = await axios.get("http://localhost:5000/api/education-tree");
         setEducationTree(res.data);
       } catch {
-        setTreeError('Failed to load education data.');
+        setTreeError("Failed to load education data.");
       } finally {
         setLoadingTree(false);
       }
@@ -59,41 +80,25 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
     fetchTree();
   }, []);
 
-  const defaultValues = initialData ? {
-    title: initialData.title || '',
-    description: initialData.description || '',
-    educationSystem: initialData.educationSystem || '',
-    board: initialData.board || '',
-    level: initialData.level || '',
-    subLevel: initialData.subLevel || '',
-    group: initialData.group || '',
-    subjects: initialData.subjects || [],
-    tags: initialData.tags || [],
-    location: initialData.location || '',
-    language: initialData.language || '',
-    hourlyRate: initialData.hourlyRate || '',
-    youtubeLink: initialData.youtubeLink || '',
-    videoFile: null,
-  } : {
-    title: '',
-    description: '',
-    educationSystem: '',
-    board: '',
-    level: '',
-    subLevel: '',
-    group: '',
-    subjects: [],
-    tags: [],
-    location: '',
-    language: '',
-    hourlyRate: '',
-    youtubeLink: '',
-    videoFile: null,
+  const defaultValues = {
+    title: initialData?.title ?? "",
+    description: initialData?.description ?? "",
+    educationSystem: initialData?.educationSystem ?? "",
+    board: initialData?.board ?? "",
+    level: initialData?.level ?? "",
+    subLevel: initialData?.subLevel ?? "",
+    group: initialData?.group ?? "",
+    subjects: initialData?.subjects ?? [],
+    tags: initialData?.tags ?? [],
+    location: initialData?.location ?? "",
+    language: initialData?.language ?? "",
+    hourlyRate: initialData?.hourlyRate ?? "",
+    youtubeLink: initialData?.youtubeLink ?? "",
+    videoFile: (initialData && initialData.videoFile) || "",
   };
 
   const methods = useForm({
-    resolver: zodResolver(teacherPostSchema),
-    mode: 'onChange',
+    mode: "onBlur",
     defaultValues,
   });
 
@@ -104,69 +109,167 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
   if (loadingTree) return <p className="p-8">Loading education data...</p>;
   if (treeError) return <p className="p-8 text-red-600">{treeError}</p>;
 
-  const onSubmit = async (data) => {
+  /** Validate only the currently visible step */
+  async function validateCurrentStep() {
+    const schema = stepSchemas[step];
+    if (!schema) return true;
+    const data = methods.getValues();
+    const result = await schema.safeParseAsync(data);
+    if (!result.success) {
+      applyZodErrors(result.error, methods.setError);
+      return false;
+    }
+    return true;
+  }
+
+  /** Compute where to go next, skipping non-applicable steps */
+  function computeNextIndex(curr, data) {
+    const es = data.educationSystem;
+    const board = data.board;
+
+    if (curr === 0) {
+      // GED: skip board/group and level
+      if (es === "GED") return 3; // Subjects
+      return 1;
+    }
+
+    if (curr === 1) {
+      // BCS: stage-only -> Post Details
+      if (es === "BCS") return 4;
+      // GED safety
+      if (es === "GED") return 3;
+      // Entrance-Exams: no Level step
+      if (es === "Entrance-Exams") return 3;
+      // UA: Level only for Public-University
+      if (es === "University-Admission" && board !== "Public-University") return 3;
+      // Otherwise (English/Bangla + UA PU): go Level
+      return 2;
+    }
+
+    if (curr === 2) return 3; // Level -> Subjects
+    if (curr === 3) return 4; // Subjects -> Post Details
+    if (curr === 4) return 5; // Post Details -> Extras
+    if (curr === 5) return 6; // Extras -> Review
+
+    return Math.min(curr + 1, steps.length - 1);
+  }
+
+  /** Compute previous index respecting the same path rules */
+  function computePrevIndex(curr, data) {
+    const es = data.educationSystem;
+    const board = data.board;
+
+    if (curr === 3) {
+      if (es === "GED") return 0;                           // Education System
+      if (es === "Entrance-Exams") return 1;                // Board
+      if (es === "University-Admission" && board !== "Public-University") return 1;
+      return 2;                                             // Level
+    }
+
+    if (curr === 4) {
+      if (es === "BCS") return 1;                           // Board (stage)
+      if (es === "GED") return 0;
+      if (es === "Entrance-Exams") return 1;
+      if (es === "University-Admission" && board !== "Public-University") return 1;
+      return 3;                                             // Subjects
+    }
+
+    if (curr === 5) return 4; // Extras -> Post Details
+    if (curr === 6) return 5; // Review -> Extras
+
+    return Math.max(curr - 1, 0);
+  }
+
+  async function handleNext() {
+    const data = methods.getValues();
+    const es = data.educationSystem;
+
+    // Clean fields that shouldn't apply for the chosen path
+    if (es !== "Bangla-Medium") {
+      methods.setValue("group", "");
+    }
+    if (es === "GED") {
+      methods.setValue("board", "");
+      methods.setValue("level", "");
+      methods.setValue("subLevel", "");
+    }
+    if (es === "Entrance-Exams") {
+      methods.setValue("level", "");
+      methods.setValue("subLevel", "");
+    }
+    if (es === "University-Admission" && data.board !== "Public-University") {
+      methods.setValue("level", "");
+      methods.setValue("subLevel", "");
+    }
+    if (es === "BCS") {
+      // stage-only flow: ensure no stray fields/tags/subjects
+      methods.setValue("group", "");
+      methods.setValue("level", "");
+      methods.setValue("subLevel", "");
+      methods.setValue("tags", []);
+      methods.setValue("subjects", []); // ← IMPORTANT: do NOT inject stage as a subject
+    }
+
+    // Validate current step
+    const ok = await validateCurrentStep();
+    if (!ok) return;
+
+    // NOTE: removed previous code that auto-added [stage] into subjects for BCS.
+    // We intentionally keep subjects empty for BCS.
+
+    const next = computeNextIndex(step, methods.getValues());
+    setStep(next);
+  }
+
+  function handleBack() {
+    const prev = computePrevIndex(step, methods.getValues());
+    setStep(prev);
+  }
+
+  const editMode = Boolean(initialData && initialData._id);
+  const isLast = step === steps.length - 1;
+
+  async function onSubmit(raw) {
+    const parsed = await finalTeacherPostSchema.safeParseAsync(raw);
+    if (!parsed.success) {
+      applyZodErrors(parsed.error, methods.setError);
+      return;
+    }
+    const payload = parsed.data;
+
     let resultAction;
     if (initialData && initialData._id) {
-      resultAction = await dispatch(updateTeacherPost({ id: initialData._id, data }));
+      resultAction = await dispatch(updateTeacherPost({ id: initialData._id, data: payload }));
     } else {
-      resultAction = await dispatch(createTeacherPost(data));
+      resultAction = await dispatch(createTeacherPost(payload));
     }
-    if (resultAction.meta.requestStatus === 'fulfilled') {
-      alert(initialData ? 'Post updated successfully!' : 'Post created successfully!');
+
+    if (resultAction.meta?.requestStatus === "fulfilled") {
+      alert(initialData ? "Post updated successfully!" : "Post created successfully!");
       methods.reset();
       setStep(0);
       if (initialData && onPostUpdated) onPostUpdated(resultAction.payload);
       if (!initialData && onPostCreated) onPostCreated(resultAction.payload);
+    } else {
+      const msg = resultAction?.payload?.message || resultAction?.error?.message || "Server error";
+      methods.setError("root", { type: "server", message: msg });
     }
-  };
+  }
 
   const CurrentStep = steps[step].component;
 
-  const handleNext = async () => {
-    let fieldsToValidate = [];
-    switch (step) {
-      case 0: fieldsToValidate = ['educationSystem']; break;
-      case 1: {
-        const eduSys = methods.getValues('educationSystem');
-        if (eduSys === 'Bangla-Medium' || eduSys === 'BCS') fieldsToValidate = ['group'];
-        else if (eduSys === 'GED') fieldsToValidate = [];
-        else fieldsToValidate = ['board'];
-        break;
-      }
-      case 2: {
-        fieldsToValidate = ['level'];
-        const eduSys = methods.getValues('educationSystem');
-        const board = methods.getValues('board');
-        const level = methods.getValues('level');
-        if (eduSys === 'English-Medium' && (board === 'CIE' || board === 'Edexcel') && level === 'A_Level') {
-          fieldsToValidate.push('subLevel');
-        }
-        break;
-      }
-      case 3: fieldsToValidate = ['subjects']; break;
-      case 4: fieldsToValidate = ['title', 'description', 'hourlyRate']; break;
-      default: fieldsToValidate = [];
-    }
-    const valid = await methods.trigger(fieldsToValidate);
-    if (valid) setStep((s) => s + 1);
-  };
-
-  const handleBack = () => setStep((s) => Math.max(s - 1, 0));
-  const editMode = Boolean(initialData && initialData._id);
-  const isLast = step === steps.length - 1;
-
   const leftPanel = (
     <div className="space-y-6">
-      <HelperBlock title={editMode ? t(lang,'edit') : t(lang,'goodToKnow')} icon={editMode ? '✏️' : '😊'}>
+      <HelperBlock title={editMode ? t(lang, "edit") : t(lang, "goodToKnow")} icon={editMode ? "✏️" : "😊"}>
         {step < steps.length - 1 ? (
           <>
             <p className="mb-2">
-              {t(lang,'stepXofY', { x: step + 1, y: steps.length })} — <span className="font-medium">{steps[step].label}</span>
+              {t(lang, "stepXofY", { x: step + 1, y: steps.length })} —{" "}
+              <span className="font-medium">{steps[step].label}</span>
             </p>
-            {/* <p>{t(lang,'verify')}</p> */}
           </>
         ) : (
-          <p>{t(lang,'almost')}</p>
+          <p>{t(lang, "almost")}</p>
         )}
       </HelperBlock>
     </div>
@@ -174,20 +277,15 @@ export default function CreatePostWizard({ initialData = null, onPostCreated, on
 
   const rightPanel = (
     <div className="relative">
-      {/* NEW: stepper replaces the old linear bar */}
       <div className="sticky top-0 z-10 bg-white/90 backdrop-blur px-6 md:px-10 pt-4">
         <ProgressSteps steps={steps} currentStep={step} />
       </div>
 
       <FormProvider {...methods}>
-        <form
-          onSubmit={methods.handleSubmit(onSubmit)}
-          className="px-6 md:px-10 py-8"
-          encType="multipart/form-data"
-        >
+        <form onSubmit={methods.handleSubmit(onSubmit)} className="px-6 md:px-10 py-8" encType="multipart/form-data">
           <StepTitle
-            prefix={editMode ? t(lang,'updateYour') : t(lang,'createYour')}
-            highlight={step === steps.length - 1 ? t(lang,'reviewing') : steps[step].label}
+            prefix={editMode ? t(lang, "updateYour") : t(lang, "createYour")}
+            highlight={step === steps.length - 1 ? t(lang, "reviewing") : steps[step].label}
           />
 
           <AnimatePresence mode="wait">

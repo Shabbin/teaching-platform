@@ -99,7 +99,7 @@ export default function Step3_LevelSubLevel({ educationTree, editMode }) {
       {/* SUB LEVEL */}
       {showSubLevel && (
         <div>
-          <label className="block mb-1 text-sm font-medium text-gray-800">Sub Level (optional)</label>
+          <label className="block mb-1 text-sm font-medium text-gray-800">Sub Level </label>
           <select
             {...register('subLevel')}
             className={baseSelect}
