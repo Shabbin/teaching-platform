@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useDispatch } from 'react-redux';
 import { updateTeacherPost } from '../../../redux/teacherPostSlice';
-import { teacherPostSchema } from '../../../../lib/zodSchemas/teacherPostSchema';
+import { teacherPostSchema } from '../../../hooks/zodSchemas/teacherPostSchema';
 
 export default function EditPostForm({ post, postId, educationTree, onSuccess }) {
   const dispatch = useDispatch();
