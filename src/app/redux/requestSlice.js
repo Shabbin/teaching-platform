@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import API from '../api/axios'; // ✅ centralized axios
 
 // ===============================
 // SEND TUITION REQUEST
@@ -10,31 +11,20 @@ export const sendTuitionRequest = createAsyncThunk(
       const state = getState();
       const userInfo = state.user.userInfo;
 
-      if (!userInfo) {
-        return rejectWithValue('User not authenticated');
-      }
+      if (!userInfo) return rejectWithValue('User not authenticated');
 
       const studentId = userInfo.id || userInfo._id;
       const studentName = userInfo.name;
 
-      const res = await fetch('http://localhost:5000/api/teacher-requests', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // send cookies
-        body: JSON.stringify({ teacherId, postId, message, studentId, studentName }),
-      });
+      const { data } = await API.post(
+        '/teacher-requests',
+        { teacherId, postId, message, studentId, studentName },
+        { withCredentials: true }
+      );
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to send tuition request');
-      }
-
-      const data = await res.json();
       return data; // includes request object
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message);
     }
   }
 );
@@ -49,31 +39,20 @@ export const sendTopicHelpRequest = createAsyncThunk(
       const state = getState();
       const userInfo = state.user.userInfo;
 
-      if (!userInfo) {
-        return rejectWithValue('User not authenticated');
-      }
+      if (!userInfo) return rejectWithValue('User not authenticated');
 
       const studentId = userInfo.id || userInfo._id;
       const studentName = userInfo.name;
 
-      const res = await fetch('http://localhost:5000/api/teacher-requests', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ teacherId, studentId, studentName, topic, message }),
-      });
+      const { data } = await API.post(
+        '/teacher-requests',
+        { teacherId, studentId, studentName, topic, message },
+        { withCredentials: true }
+      );
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || 'Failed to send topic help request');
-      }
-
-      const data = await res.json();
       return data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message);
     }
   }
 );
@@ -112,6 +91,7 @@ const requestSlice = createSlice({
         state.loading = false;
         state.error = action.payload || 'Failed to send tuition request';
       })
+
       .addCase(sendTopicHelpRequest.pending, (state) => {
         state.loading = true;
         state.error = null;

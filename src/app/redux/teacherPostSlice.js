@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import API from '../api/axios'; // ✅ use the shared axios instance
 import { logout } from './userSlice';
 
 // Async thunk to create a teacher post
@@ -15,41 +15,33 @@ export const createTeacherPost = createAsyncThunk(
             .filter((v) => v !== undefined && v !== null && v !== '' && typeof v === 'string')
             .forEach((v) => formData.append(key, v));
         } else if (key === 'videoFile' && value?.length > 0) {
-          formData.append('videoFile', value[0]); // <- fixed
+          formData.append('videoFile', value[0]); // keep first file
         } else if (value !== undefined && value !== null && value !== '') {
           formData.append(key, value);
         }
       });
 
-      const response = await axios.post('http://localhost:5000/api/posts', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      // NOTE: don't set Content-Type; the browser will set the multipart boundary
+      const { data } = await API.post('/posts', formData, {
         withCredentials: true,
       });
 
-      return response.data;
+      return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
-
 // Async thunk to update a teacher post
 export const updateTeacherPost = createAsyncThunk(
   'teacherPosts/updateTeacherPost',
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
-      const response = await axios.put(
-        `http://localhost:5000/api/posts/${id}`,
-        updatedData,
-        {
-          withCredentials: true,
-        }
-      );
-
-      return response.data;
+      const { data } = await API.put(`/posts/${id}`, updatedData, {
+        withCredentials: true,
+      });
+      return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
     }
@@ -61,10 +53,9 @@ export const deleteTeacherPost = createAsyncThunk(
   'teacherPosts/deleteTeacherPost',
   async (postId, { rejectWithValue }) => {
     try {
-      await axios.delete(`http://localhost:5000/api/posts/${postId}`, {
+      await API.delete(`/posts/${postId}`, {
         withCredentials: true,
       });
-
       return { postId };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message);
@@ -141,5 +132,4 @@ const teacherPostSlice = createSlice({
 });
 
 export const { resetError } = teacherPostSlice.actions;
-
 export default teacherPostSlice.reducer;

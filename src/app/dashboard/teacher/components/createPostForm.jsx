@@ -3,18 +3,18 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useDispatch, useSelector } from 'react-redux';
-import axios from 'axios';
-import { teacherPostSchema } from '../../../../lib/zodSchemas/teacherPostSchema';
+import { teacherPostSchema } from '../../../hooks/zodSchemas/teacherPostSchema';
 import { createTeacherPost, resetError } from '../../../redux/teacherPostSlice';
+import API from '../../../api/axios'; // env-driven axios instance
 
 export default function CreatePostForm() {
   const dispatch = useDispatch();
   const { loading, error } = useSelector((state) => state.teacherPosts);
   const [educationTree, setEducationTree] = useState(null);
 
+  // Load education tree
   useEffect(() => {
-    axios
-      .get('http://localhost:5000/api/education-tree')
+    API.get('/education-tree')
       .then((res) => setEducationTree(res.data))
       .catch(() => setEducationTree(null));
   }, []);
@@ -43,8 +43,7 @@ export default function CreatePostForm() {
       language: '',
       hourlyRate: '',
       youtubeLink: '',
-      videoFile: null,
-     
+      videoFile: undefined, // RHF will keep a FileList here when registered properly
     },
   });
 
@@ -89,51 +88,39 @@ export default function CreatePostForm() {
   }, [group, setValue]);
 
   useEffect(() => {
-    if (
-      educationSystem === 'Entrance-Exams' &&
-      educationTree?.['Entrance-Exams']
-    ) {
+    if (educationSystem === 'Entrance-Exams' && educationTree?.['Entrance-Exams']) {
       const parts = Object.keys(educationTree['Entrance-Exams']);
       if (parts.length > 0) {
-        setValue('board', parts[0]); // Optional: you might want to remove auto select
+        setValue('board', parts[0]); // optional auto-select
       }
     }
   }, [educationSystem, educationTree, setValue]);
 
   const getBoards = useMemo(() => {
     if (!educationTree || !educationSystem) return [];
-
     if (educationSystem === 'Bangla-Medium' || educationSystem === 'GED') return [];
-
     if (educationSystem === 'BCS') return ['Preliminary', 'Written', 'Viva'];
-
     if (educationSystem === 'Entrance-Exams') {
       return Object.keys(educationTree['Entrance-Exams'] || {});
     }
-
     return Object.keys(educationTree[educationSystem] || {});
   }, [educationTree, educationSystem]);
 
   const getLevels = useMemo(() => {
     if (!educationTree || !educationSystem) return [];
-
     if (educationSystem === 'Entrance-Exams') return [];
-
     if (
       educationSystem === 'University-Admission' &&
       ['Engineering', 'Medical', 'IBA'].includes(board)
     ) {
       return [];
     }
-
     if (educationSystem === 'Bangla-Medium') {
       return Object.keys(educationTree[educationSystem] || {});
     }
-
     if (educationSystem === 'University-Admission' && board === 'Public-University') {
       return [];
     }
-
     return board ? Object.keys(educationTree[educationSystem]?.[board] || {}) : [];
   }, [educationTree, educationSystem, board]);
 
@@ -194,11 +181,7 @@ export default function CreatePostForm() {
     )
       return true;
 
-    if (
-      educationSystem === 'English-Medium' &&
-      board === 'IB' &&
-      (level === 'SL' || level === 'HL')
-    )
+    if (educationSystem === 'English-Medium' && board === 'IB' && (level === 'SL' || level === 'HL'))
       return true;
 
     return false;
@@ -216,77 +199,27 @@ export default function CreatePostForm() {
     setValue('tags', selected, { shouldValidate: true });
   }
 
-  // === NEW: Normalize arrays before dispatch ===
-const onSubmit = (data) => {
-  console.log('--- Raw form data ---');
-  console.log(data);
+  // ✅ Submit a plain object; the thunk will turn it into FormData and append file[0]
+  const onSubmit = (data) => {
+    const payload = {
+      ...data,
+      subjects: (data.subjects || []).filter(Boolean),
+      tags: (data.tags || []).filter(Boolean),
+      // RHF will put a FileList here because we used register on <input type="file">
+      // The thunk should check value?.length > 0 and append value[0].
+      videoFile: data.videoFile,
+      // Optionally coerce number:
+      hourlyRate: data.hourlyRate ? Number(data.hourlyRate) : '',
+    };
 
-  const formData = new FormData();
-
-  // Arrays
-  (data.subjects || []).filter(Boolean).forEach(sub => {
-    formData.append('subjects', sub);
-    console.log('Appending subject:', sub);
-  });
-  (data.tags || []).filter(Boolean).forEach(tag => {
-    formData.append('tags', tag);
-    console.log('Appending tag:', tag);
-  });
-
-  // All other fields
-  Object.entries(data).forEach(([key, value]) => {
-    if (key === 'subjects' || key === 'tags') return;
-
-    if (key === 'videoFile') {
-      if (value && value.length > 0) {
-        formData.append('videoFile', value[0]);
-        console.log('Appending videoFile:', value[0].name);
-      } else {
-        console.log('No video file selected.');
-      }
-    } else if (value !== undefined && value !== null && value !== '') {
-      formData.append(key, value);
-      console.log(`Appending field: ${key} => ${value}`);
-    }
-  });
-
-  // Debug FormData content
-  console.log('--- Final FormData ---');
-  for (let pair of formData.entries()) {
-    console.log(pair[0], pair[1]);
-  }
-
-  dispatch(createTeacherPost(formData))
-    .unwrap()
-    .then(() => {
-      alert('Post created successfully');
-      reset();
-    })
-    .catch(err => alert('Failed to create post: ' + err));
-};
-
-
-
-
-  dispatch(createTeacherPost(formData))
-    .unwrap()
-    .then(() => {
-      alert('Post created successfully');
-      reset();
-    })
-    .catch((err) => alert('Failed to create post: ' + err));
-};
-
-  // dispatch FormData directly
-  dispatch(createTeacherPost(formData))
-    .unwrap()
-    .then(() => {
-      alert('Post created successfully');
-      reset();
-    })
-    .catch((err) => alert('Failed to create post: ' + err));
-
-
+    dispatch(createTeacherPost(payload))
+      .unwrap()
+      .then(() => {
+        alert('Post created successfully');
+        reset();
+      })
+      .catch((err) => alert('Failed to create post: ' + err));
+  };
 
   return (
     <form
@@ -451,6 +384,7 @@ const onSubmit = (data) => {
         <label className="font-semibold block">Hourly Rate</label>
         <input
           type="number"
+          inputMode="decimal"
           {...register('hourlyRate')}
           className="w-full border px-3 py-2 rounded"
         />
@@ -480,15 +414,15 @@ const onSubmit = (data) => {
         {errors.youtubeLink && <p className="text-red-600">{errors.youtubeLink.message}</p>}
       </div>
 
-      {/* File Upload */}
+      {/* File Upload (leave UNCONTROLLED; RHF will capture FileList via register) */}
       <div>
         <label className="font-semibold block">Video File (optional)</label>
-       <input
-  type="file"
-  accept="video/*"
-  onChange={(e) => setValue('videoFile', e.target.files)}
-  className="w-full"
-/>
+        <input
+          type="file"
+          accept="video/*"
+          {...register('videoFile')}
+          className="w-full"
+        />
       </div>
 
       {/* Submit */}

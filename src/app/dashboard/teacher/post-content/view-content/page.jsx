@@ -2,11 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import axios from 'axios';
 import { Edit3, Trash2, Users, X, Eye } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPostById } from '../../../../redux/postViewEventSlice'; // adjust path if needed
 import DOMPurify from 'isomorphic-dompurify';
+import API from '../../../../api/axios'; // ← env-driven axios (adjust path if needed)
 
 export default function MyPostsList() {
   const [posts, setPosts] = useState([]);
@@ -24,9 +24,7 @@ export default function MyPostsList() {
       setLoading(true);
       setError(null);
       try {
-        const res = await axios.get('http://localhost:5000/api/posts/mine', {
-          withCredentials: true,
-        });
+        const res = await API.get('/posts/mine');
         setPosts(res.data);
 
         // Fetch full detail for each post (to populate redux with viewsCount)
@@ -53,9 +51,7 @@ export default function MyPostsList() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await axios.delete(`http://localhost:5000/api/posts/${deleteTarget}`, {
-        withCredentials: true,
-      });
+      await API.delete(`/posts/${deleteTarget}`);
       setPosts((prev) => prev.filter((post) => post._id !== deleteTarget));
       setDeleteTarget(null);
     } catch (err) {

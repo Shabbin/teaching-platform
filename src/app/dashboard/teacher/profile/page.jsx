@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import axios from 'axios'
 import toast, { Toaster } from 'react-hot-toast'
 import { updateProfileImage } from '../../../redux/userSlice'
 import { Camera, Star, MessageSquare, DollarSign, CheckCircle } from 'lucide-react'
+import API, { absUrl } from '../../../api/axios' // ← use env-driven axios + URL helper
 
 export default function TeacherProfilePage() {
   const dispatch = useDispatch()
@@ -33,10 +33,7 @@ export default function TeacherProfilePage() {
     }
 
     try {
-      const res = await axios.get(
-        `http://localhost:5000/api/teachers/${teacherId}/profile`,
-        { withCredentials: true }
-      )
+      const res = await API.get(`/teachers/${teacherId}/profile`)
       const { teacher, posts } = res.data
       setTeacher(teacher)
       setPosts(posts)
@@ -66,16 +63,15 @@ export default function TeacherProfilePage() {
     uploadData.append(type, file)
 
     try {
-      const res = await axios.put(
-        `http://localhost:5000/api/teachers/${type === 'profileImage' ? 'profile-picture' : 'cover-image'}`,
-        uploadData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          withCredentials: true,
-        }
-      )
+      const route =
+        type === 'profileImage' ? '/teachers/profile-picture' : '/teachers/cover-image'
+
+      const res = await API.put(route, uploadData, {
+        // let browser set multipart boundary; interceptor removes Content-Type for FormData
+      })
 
       if (type === 'profileImage') {
+        // update redux user slice thumbnail/avatar if you keep it there
         dispatch(updateProfileImage(res.data.profileImage))
       }
 
@@ -92,11 +88,7 @@ export default function TeacherProfilePage() {
       return toast.error('Name, bio, and hourly rate are required')
     }
     try {
-      const res = await axios.put(
-        'http://localhost:5000/api/teachers/profile-info',
-        formData,
-        { withCredentials: true }
-      )
+      const res = await API.put('/teachers/profile-info', formData)
       setTeacher(res.data.user)
       toast.success('Profile updated')
       setIsEditing(false)
@@ -136,7 +128,7 @@ export default function TeacherProfilePage() {
       {/* Cover Section */}
       <div className="relative w-full h-60 sm:h-72 md:h-[20rem] rounded-2xl overflow-hidden shadow-md">
         <img
-          src={teacher.coverImage || '/default-cover.jpg'}
+          src={teacher.coverImage ? absUrl(teacher.coverImage) : '/default-cover.jpg'}
           alt="Cover"
           className="object-cover w-full h-full"
         />
@@ -158,9 +150,9 @@ export default function TeacherProfilePage() {
             <div className="w-32 h-32 rounded-full overflow-hidden shadow-md ring-4 ring-white">
               <img
                 src={
-                  teacher?.profileImage?.startsWith('http')
-                    ? teacher.profileImage
-                    : `http://localhost:5000/${teacher.profileImage}`
+                  teacher?.profileImage
+                    ? absUrl(teacher.profileImage)
+                    : '/default-avatar.png'
                 }
                 alt="Profile"
                 className="w-full h-full object-cover"
@@ -229,7 +221,7 @@ export default function TeacherProfilePage() {
               <div className="mt-4 space-y-2 text-gray-700">
                 <p><strong>Bio:</strong> {teacher.bio || 'Not added yet'}</p>
                 <p><strong>Hourly Rate:</strong> ${teacher.hourlyRate || 0} / hour</p>
-                <p><strong>Skills:</strong> {teacher.skills?.join(', ') || 'Not listed'}</p>
+                <p><strong>Skills:</strong> {Array.isArray(teacher.skills) ? teacher.skills.join(', ') : (teacher.skills || 'Not listed')}</p>
                 <p><strong>Location:</strong> {teacher.location || 'Not specified'}</p>
                 <p><strong>Availability:</strong> {teacher.availability || 'Not specified'}</p>
               </div>

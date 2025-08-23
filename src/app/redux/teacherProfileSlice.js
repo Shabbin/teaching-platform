@@ -1,25 +1,20 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-import { logout } from './userSlice'; // import logout action to clear on logout
+import API from '../api/axios'; // ✅ centralized axios (reads env)
+import { logout } from './userSlice';
 
 // Async: Fetch teacher profile (with posts)
 export const fetchTeacherProfile = createAsyncThunk(
   'teacherProfile/fetchTeacherProfile',
   async (_, { rejectWithValue }) => {
     try {
-      // No need for token or teacherId from state here
-      // Backend identifies teacher from cookie session
-
-      const res = await axios.get(
-        `http://localhost:5000/api/teachers/profile`, // change endpoint if needed to get current teacher profile
-        {
-          withCredentials: true,
-        }
-      );
-
+      const res = await API.get('/teachers/profile', {
+        withCredentials: true, // keep if your instance doesn't set it globally
+      });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || 'Failed to fetch teacher profile');
+      return rejectWithValue(
+        err?.response?.data?.message || err?.response?.data || 'Failed to fetch teacher profile'
+      );
     }
   }
 );
@@ -32,32 +27,23 @@ export const uploadTeacherImage = createAsyncThunk(
       const formData = new FormData();
       formData.append(type, file);
 
-      const endpoint = type === 'profileImage'
-        ? 'profile-picture'
-        : 'cover-image';
+      const endpoint = type === 'profileImage' ? 'profile-picture' : 'cover-image';
 
-      await axios.put(
-        `http://localhost:5000/api/teachers/${endpoint}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          withCredentials: true,
-        }
-      );
+      await API.put(`/teachers/${endpoint}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        withCredentials: true,
+      });
 
       // Re-fetch updated profile
-      const refreshed = await axios.get(
-        `http://localhost:5000/api/teachers/profile`,
-        {
-          withCredentials: true,
-        }
-      );
+      const refreshed = await API.get('/teachers/profile', {
+        withCredentials: true,
+      });
 
       return refreshed.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || 'Image upload failed');
+      return rejectWithValue(
+        err?.response?.data?.message || err?.response?.data || 'Image upload failed'
+      );
     }
   }
 );

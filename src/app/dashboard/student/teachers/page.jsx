@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import axios from 'axios';
 import Link from 'next/link';
 import Select from 'react-select';
 import Avatar from '@mui/material/Avatar';
 import Skeleton from '@mui/material/Skeleton';
 import { Star, StarBorder } from '@mui/icons-material';
+import API from '../../../api/axios'; // ← adjust the relative path if needed
 
 const ViewTeachers = () => {
   const [allTags, setAllTags] = useState([]);
@@ -26,8 +26,8 @@ const ViewTeachers = () => {
       primary: '#4F46E5',      // indigo-600
       primary25: '#EEF2FF',    // indigo-50
       primary50: '#E0E7FF',    // indigo-100
-      neutral20: '#E5E7EB',    // border default
-      neutral30: '#A5B4FC',    // border hover/focus (indigo-300)
+      neutral20: '#E5E7EB',
+      neutral30: '#A5B4FC',
     },
   });
 
@@ -40,43 +40,35 @@ const ViewTeachers = () => {
       borderRadius: '0.5rem',
       minHeight: '2.5rem',
     }),
-    multiValue: (base) => ({
-      ...base,
-      backgroundColor: '#EEF2FF',
-      borderRadius: '9999px',
-    }),
-    multiValueLabel: (base) => ({
-      ...base,
-      color: '#4338CA',
-      fontWeight: 500,
-    }),
+    multiValue: (base) => ({ ...base, backgroundColor: '#EEF2FF', borderRadius: '9999px' }),
+    multiValueLabel: (base) => ({ ...base, color: '#4338CA', fontWeight: 500 }),
     multiValueRemove: (base) => ({
       ...base,
       color: '#6366F1',
-      ':hover': {
-        backgroundColor: '#E0E7FF',
-        color: '#4338CA',
-      },
+      ':hover': { backgroundColor: '#E0E7FF', color: '#4338CA' },
       borderRadius: '9999px',
     }),
-    option: (base, state) => ({
-      ...base,
-      fontWeight: state.isSelected ? 600 : 400,
-    }),
+    option: (base, state) => ({ ...base, fontWeight: state.isSelected ? 600 : 400 }),
+  };
+
+  // Normalize image (support relative paths coming from backend)
+  const imgUrl = (src) => {
+    if (!src) return '';
+    return src.startsWith('http') ? src : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${src}`;
   };
 
   const fetchAllTags = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/posts');
+      const { data } = await API.get('/posts'); // env-driven
       const tagSet = new Set();
-      res.data.forEach((post) => {
+      data.forEach((post) => {
         if (Array.isArray(post.subjects)) {
           post.subjects.forEach((sub) => tagSet.add(sub));
         }
       });
       setAllTags([...tagSet]);
     } catch (err) {
-      console.error('Failed to fetch tags:', err);
+      console.error('Failed to fetch tags:', err?.response?.data || err.message);
     }
   };
 
@@ -94,10 +86,10 @@ const ViewTeachers = () => {
       if (maxPay) queryParams.push(`maxPay=${maxPay}`);
 
       const query = queryParams.length ? `?${queryParams.join('&')}` : '';
-      const res = await axios.get(`http://localhost:5000/api/posts${query}`);
-      setPosts(res.data);
+      const { data } = await API.get(`/posts${query}`); // env-driven
+      setPosts(data);
     } catch (err) {
-      console.error('Error fetching posts:', err);
+      console.error('Error fetching posts:', err?.response?.data || err.message);
     } finally {
       setLoading(false);
     }
@@ -106,25 +98,29 @@ const ViewTeachers = () => {
   useEffect(() => {
     fetchAllTags();
     fetchFilteredPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     fetchFilteredPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTags, searchQuery, location, mode, minPay, maxPay]);
 
   const tagOptions = allTags.map((tag) => ({ value: tag, label: tag }));
 
+  // Build teacher cards from posts
   const teacherMap = new Map();
-
   posts.forEach((post) => {
-    const tId = post.teacher._id;
+    const tId = post.teacher?._id;
+    if (!tId) return;
+
     const currentSubjects = teacherMap.get(tId)?.subjects || new Set();
     const filteredSubjects =
       selectedTags.length > 0
         ? post.subjects.filter((s) => selectedTags.some((tag) => tag.value === s))
         : post.subjects;
 
-    if (filteredSubjects.length === 0) return;
+    if (!filteredSubjects || filteredSubjects.length === 0) return;
 
     if (!teacherMap.has(tId)) {
       teacherMap.set(tId, {
@@ -229,14 +225,16 @@ const ViewTeachers = () => {
                   className="bg-white/95 rounded-2xl shadow-sm border border-gray-100 p-6"
                 >
                   <div className="flex flex-col sm:flex-row gap-6 sm:items-start">
-                    <Avatar alt={teacher.name} src={teacher.profileImage} sx={{ width: 80, height: 80 }} />
+                    <Avatar
+                      alt={teacher.name}
+                      src={imgUrl(teacher.profileImage)}
+                      sx={{ width: 80, height: 80 }}
+                    />
                     <div className="flex-1">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        {/* Name stays dark for readability; if you later make it a link, add hover styles there */}
                         <h3 className="text-xl font-semibold text-gray-900">{teacher.name}</h3>
                         <div className="text-sm font-semibold text-indigo-700">৳{hourlyRate} / hr</div>
                       </div>
-                      {/* <p className="text-sm text-gray-500 mb-1">📍 {location}</p> */}
 
                       {/* Ratings */}
                       <div className="flex items-center gap-1 mb-2">

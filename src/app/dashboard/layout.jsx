@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import MessengerPopup from './components/chat-components/MessengerPopup';
 import NotificationBellIcon from './components/notificationComponent/NotificationBellIcon';
+import API from '../api/axios'; // ✅ use env-driven axios instance
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -55,17 +56,14 @@ export default function DashboardLayout({ children }) {
     }
   }, [role]);
 
-  // Set active path
+  // Set active path (kept as-is with your router usage)
   useEffect(() => {
     setActivePath(router.pathname);
   }, [router.pathname]);
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:5000/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
+      await API.post('/auth/logout', {}, { withCredentials: true }); // ✅ no hardcoded URL
       dispatch(logout());
       router.push('/login');
     } catch (err) {
@@ -87,6 +85,13 @@ export default function DashboardLayout({ children }) {
     if (!href.includes('/dashboard')) return false;
     return router.pathname === href;
   };
+
+  const profileSrc =
+    profileImage?.startsWith('http')
+      ? profileImage
+      : profileImage
+      ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/${profileImage}` // ✅ env-based host
+      : '/default-avatar.png';
 
   return (
     <div className="w-screen h-screen flex flex-col bg-gray-50 ">
@@ -138,16 +143,10 @@ export default function DashboardLayout({ children }) {
           <MessengerPopup user={userInfo} role={userInfo?.role} />
           <NotificationBellIcon />
 
-          {/* Profile + Dropdown isolated so it doesn't affect flex layout */}
+          {/* Profile + Dropdown */}
           <div className="relative">
             <img
-              src={
-                profileImage?.startsWith('http')
-                  ? profileImage
-                  : profileImage
-                  ? `http://localhost:5000/${profileImage}`
-                  : '/default-avatar.png'
-              }
+              src={profileSrc}
               alt="Profile"
               className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 shadow-sm cursor-pointer ring-2 ring-transparent hover:ring-[oklch(0.62_0.2_310.02)] transition"
               onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -238,3 +237,4 @@ export default function DashboardLayout({ children }) {
     </div>
   );
 }
+// import AXIOS from '../api/axios' is the right import

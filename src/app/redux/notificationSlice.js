@@ -1,19 +1,17 @@
 // redux/notificationsSlice.js
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import API from '../api/axios'; // ✅ env-driven axios instance
 
 // Async thunk to fetch notifications
 export const fetchNotifications = createAsyncThunk(
   'notifications/fetchNotifications',
   async (_, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/notifications', {
-        credentials: 'include', // send cookies if your backend uses session cookies
-      });
-      if (!res.ok) throw new Error('Failed to fetch notifications');
-      return await res.json();
+      const { data } = await API.get('/notifications', { withCredentials: true });
+      return data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message);
     }
   }
 );
@@ -23,16 +21,14 @@ export const markNotificationsRead = createAsyncThunk(
   'notifications/markNotificationsRead',
   async (ids, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/notifications/mark-read', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // send cookies if your backend uses session cookies
-        body: JSON.stringify({ notificationIds: ids }),
-      });
-      if (!res.ok) throw new Error('Failed to mark notifications read');
-      return await res.json();
+      const { data } = await API.post(
+        '/notifications/mark-read',
+        { notificationIds: ids },
+        { withCredentials: true }
+      );
+      return data; // expect { readIds: [...] }
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message);
     }
   }
 );
@@ -44,32 +40,32 @@ const notificationsSlice = createSlice({
     loading: false,
     error: null,
   },
-reducers: {
-  addNotification: (state, action) => {
-  const notif = action.payload;
-  const exists = state.notifications.find(n => n._id === notif._id);
-  console.log('[notificationsSlice] addNotification called with:', notif);
-  if (exists) {
-    console.log('[notificationsSlice] Notification already exists:', notif._id);
-  } else {
-    state.notifications.unshift(notif);
-    console.log('[notificationsSlice] Notification added:', notif._id);
-  }
-},
-  markNotificationsReadOptimistic: (state, action) => {
-    const readIds = action.payload;
-    console.log('[notificationsSlice] Marking as read (optimistic):', readIds);
-    state.notifications = state.notifications.map((n) =>
-      readIds.includes(n._id || n.id) ? { ...n, read: true } : n
-    );
-  },
-  revertNotificationsRead: (state, action) => {
+  reducers: {
+    addNotification: (state, action) => {
+      const notif = action.payload;
+      const exists = state.notifications.find((n) => n._id === notif._id);
+      console.log('[notificationsSlice] addNotification called with:', notif);
+      if (exists) {
+        console.log('[notificationsSlice] Notification already exists:', notif._id);
+      } else {
+        state.notifications.unshift(notif);
+        console.log('[notificationsSlice] Notification added:', notif._id);
+      }
+    },
+    markNotificationsReadOptimistic: (state, action) => {
+      const readIds = action.payload;
+      console.log('[notificationsSlice] Marking as read (optimistic):', readIds);
+      state.notifications = state.notifications.map((n) =>
+        readIds.includes(n._id || n.id) ? { ...n, read: true } : n
+      );
+    },
+    revertNotificationsRead: (state, action) => {
       const idsToRevert = action.payload;
       state.notifications = state.notifications.map((n) =>
         idsToRevert.includes(n._id || n.id) ? { ...n, read: false } : n
       );
     },
-},
+  },
 
   extraReducers: (builder) => {
     builder
@@ -85,6 +81,7 @@ reducers: {
         state.loading = false;
         state.error = action.payload;
       })
+
       .addCase(markNotificationsRead.fulfilled, (state, action) => {
         const readIds = action.payload.readIds || [];
         state.notifications = state.notifications.map((n) =>
@@ -97,6 +94,10 @@ reducers: {
   },
 });
 
-export const { addNotification, markNotificationsReadOptimistic,revertNotificationsRead } = notificationsSlice.actions;
+export const {
+  addNotification,
+  markNotificationsReadOptimistic,
+  revertNotificationsRead,
+} = notificationsSlice.actions;
 
 export default notificationsSlice.reducer;

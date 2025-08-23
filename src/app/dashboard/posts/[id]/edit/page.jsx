@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import EditPostForm from '../../../../dashboard/teacher/components/EditPostForms';
+import API from '../../../../api/axios'; 
 
 export default function EditPostPage() {
   const { id } = useParams();
@@ -14,39 +15,59 @@ export default function EditPostPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
 
-  // Check if navigated from view page
+  // If navigated from the post "view" page
   const fromView = searchParams.get('from') === 'view';
 
   useEffect(() => {
+    // Guard for Next.js param readiness
     if (!id) return;
 
-    async function fetchData() {
+    // ⛔️ Important: do NOT abort in cleanup — StrictMode will cancel the first run.
+    // Instead, just ignore state updates after unmount with a flag.
+    let didCancel = false;
+
+    const load = async () => {
       setLoading(true);
       setFetchError(null);
       try {
-        const postRes = await fetch(`http://localhost:5000/api/posts/${id}`);
-        if (!postRes.ok) throw new Error('Post not found');
-        const postData = await postRes.json();
+        const [postRes, treeRes] = await Promise.all([
+          API.get(`/posts/${id}`),
+          API.get('/education-tree'),
+        ]);
 
-        const treeRes = await fetch('http://localhost:5000/api/education-tree');
-        if (!treeRes.ok) throw new Error('Failed to load education tree');
-        const treeData = await treeRes.json();
-
-        setPost(postData);
-        setEducationTree(treeData);
+        if (didCancel) return;
+        setPost(postRes.data);
+        setEducationTree(treeRes.data);
       } catch (err) {
-        setFetchError(err.message || 'Failed to load data');
+        if (didCancel) return;
+        const msg =
+          err?.normalizedMessage ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'Failed to load data';
+        setFetchError(msg);
       } finally {
-        setLoading(false);
+        if (!didCancel) setLoading(false);
       }
-    }
+    };
 
-    fetchData();
+    load();
+    return () => {
+      didCancel = true;
+    };
   }, [id]);
 
-  if (loading) return <p className="p-6 text-center text-gray-500">Loading post data...</p>;
-  if (fetchError) return <p className="p-6 text-center text-red-600">{fetchError}</p>;
-  if (!post) return <p className="p-6 text-center">No post found.</p>;
+  if (loading) {
+    return <p className="p-6 text-center text-gray-500">Loading post data...</p>;
+  }
+
+  if (fetchError) {
+    return <p className="p-6 text-center text-red-600">{fetchError}</p>;
+  }
+
+  if (!post) {
+    return <p className="p-6 text-center">No post found.</p>;
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white rounded shadow">
@@ -64,6 +85,7 @@ export default function EditPostPage() {
       </button>
 
       <h1 className="text-2xl font-bold mb-6">Edit Post: {post.title}</h1>
+
       <EditPostForm
         post={post}
         postId={id}

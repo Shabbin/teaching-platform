@@ -1,107 +1,81 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import API from '../api/axios';
 
-// 🔐 Login Thunk (unchanged)
+// 🔐 Login Thunk
 export const loginUser = createAsyncThunk(
   'user/loginUser',
   async (formData, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-        credentials: 'include',
+      const { data } = await API.post('/auth/login', formData, {
+        withCredentials: true,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
       return data.user;
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message);
     }
   }
 );
 
-// 🎓 Student Dashboard Thunk (unchanged)
+// 🎓 Student Dashboard Thunk
 export const getStudentDashboard = createAsyncThunk(
   'user/getStudentDashboard',
   async (_, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/students/dashboard', {
-        credentials: 'include',
+      const { data } = await API.get('/students/dashboard', {
+        withCredentials: true,
       });
-
-      console.log('getStudentDashboard response status:', res.status);
-
-      const data = await res.json();
-
-      console.log('getStudentDashboard response data:', data);
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Failed to fetch student dashboard');
-      }
-
       return data;
     } catch (error) {
-      console.error('getStudentDashboard error:', error);
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message);
     }
   }
 );
 
-// 🧑‍🏫 Teacher Dashboard Thunk (unchanged)
+// 🧑‍🏫 Teacher Dashboard Thunk
 export const getTeacherDashboard = createAsyncThunk(
   'user/getTeacherDashboard',
   async (_, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/teachers/dashboard', {
-        credentials: 'include',
+      const { data } = await API.get('/teachers/dashboard', {
+        withCredentials: true,
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Failed to fetch teacher dashboard');
-      }
-
       return data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message);
     }
   }
 );
 
-// 🧠 Get current logged-in user info (unchanged thunk code)
+// 🧠 Get current logged-in user info
 export const fetchCurrentUser = createAsyncThunk(
   'user/fetchCurrentUser',
   async (_, { rejectWithValue }) => {
     try {
-      const res = await fetch('http://localhost:5000/api/auth/me', {
-        credentials: 'include',
+      const res = await API.get('/auth/me', { withCredentials: true });
+      return res.data.user;
+    } catch (error) {
+      if (error?.response?.status === 401) return null;
+      return rejectWithValue(error?.response?.data?.message || error.message);
+    }
+  }
+);
+
+// 📷 Upload Profile Picture (FormData; no manual headers)
+export const uploadProfilePicture = createAsyncThunk(
+  'user/uploadProfilePicture',
+  async (file, { rejectWithValue }) => {
+    try {
+      const formData = new FormData();
+      formData.append('profileImage', file); // must match backend field
+
+      const { data } = await API.put('/teachers/profile-picture', formData, {
+        withCredentials: true,
+        // DO NOT set Content-Type here; Axios will set proper multipart boundary
       });
 
-      console.log('fetchCurrentUser response status:', res.status);
-
-      if (res.status === 401) {
-        // 401 means not authenticated, return null silently (no error)
-        return null;
-      }
-
-      const data = await res.json();
-
-      console.log('fetchCurrentUser data:', data);
-
-      if (!res.ok) {
-        throw new Error(data.message || 'Failed to fetch user');
-      }
-
-      return data.user;
+      return data.profileImage;
     } catch (error) {
-       return rejectWithValue(error.message);
-     
+      return rejectWithValue(error?.response?.data?.message || error.message);
     }
   }
 );
@@ -120,8 +94,8 @@ const initialState = {
   dashboardLoading: false,
   dashboardError: null,
 
-  isFetched: false,        // true once we attempted fetchCurrentUser (success or fail)
-  isAuthenticated: false,  // true if userInfo exists and valid
+  isFetched: false,
+  isAuthenticated: false,
 };
 
 // 🔧 Slice
@@ -132,9 +106,8 @@ const userSlice = createSlice({
   reducers: {
     logout: (state) => {
       state.userInfo = null;
-      // state.profileImage = '/default-avatar.png';
       state.isFetched = true;
-      state.isAuthenticated = false;  // reset auth state on logout
+      state.isAuthenticated = false;
       state.error = null;
       state.studentDashboard = null;
       state.teacherDashboard = null;
@@ -145,11 +118,14 @@ const userSlice = createSlice({
     },
 
     updateProfileImage: (state, action) => {
-      const newImg = action.payload;
-      state.profileImage = newImg;
+      const base = action.payload || '/default-avatar.png';
+      const newUrl = base + (base.includes('?') ? '&' : '?') + 'v=' + Date.now();
 
-      if (state.userInfo) {
-        state.userInfo.profileImage = newImg;
+      state.profileImage = newUrl;
+
+      if (state.userInfo) state.userInfo.profileImage = newUrl;
+      if (state.teacherDashboard?.teacher) {
+        state.teacherDashboard.teacher.profileImage = newUrl;
       }
     },
 
@@ -162,7 +138,7 @@ const userSlice = createSlice({
       state.profileImage =
         img?.startsWith('http') || !img
           ? img || '/default-avatar.png'
-          : `http://localhost:5000/${img}`;
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${img}`;
     },
 
     setTeacherData: (state, action) => {
@@ -174,7 +150,7 @@ const userSlice = createSlice({
       state.profileImage =
         img?.startsWith('http') || !img
           ? img || '/default-avatar.png'
-          : `http://localhost:5000/${img}`;
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${img}`;
     },
   },
 
@@ -193,10 +169,10 @@ const userSlice = createSlice({
         state.profileImage =
           img?.startsWith('http') || !img
             ? img || '/default-avatar.png'
-            : `http://localhost:5000/${img}`;
+            : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${img}`;
 
         state.isFetched = true;
-        state.isAuthenticated = true;  // user is logged in
+        state.isAuthenticated = true;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -217,10 +193,9 @@ const userSlice = createSlice({
         state.profileImage =
           img?.startsWith('http') || !img
             ? img || '/default-avatar.png'
-            : `http://localhost:5000/${img}`;
+            : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${img}`;
 
         if (action.payload === null) {
-          // Not authenticated
           state.error = null;
           state.isAuthenticated = false;
         } else {
@@ -250,7 +225,6 @@ const userSlice = createSlice({
         state.error = null;
       })
       .addCase(getStudentDashboard.fulfilled, (state, action) => {
-        console.log('Reducer received studentDashboard:', action.payload);
         state.loading = false;
         state.studentDashboard = action.payload;
       })
@@ -271,6 +245,22 @@ const userSlice = createSlice({
       .addCase(getTeacherDashboard.rejected, (state, action) => {
         state.dashboardLoading = false;
         state.dashboardError = action.payload;
+      })
+
+      // === Upload Profile Picture ===
+      .addCase(uploadProfilePicture.fulfilled, (state, action) => {
+        const base = action.payload;
+        const cacheBusted = base + (base.includes('?') ? '&' : '?') + 'v=' + Date.now();
+
+        state.profileImage = cacheBusted;
+
+        if (state.userInfo) state.userInfo.profileImage = cacheBusted;
+        if (state.teacherDashboard?.teacher) {
+          state.teacherDashboard.teacher.profileImage = cacheBusted;
+        }
+      })
+      .addCase(uploadProfilePicture.rejected, (state, action) => {
+        state.error = action.payload;
       });
   },
 });
@@ -282,4 +272,5 @@ export const {
   setTeacherData,
   clearError,
 } = userSlice.actions;
+
 export default userSlice.reducer;

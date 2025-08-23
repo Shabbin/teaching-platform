@@ -14,10 +14,10 @@ import {
 import {
   fetchConversationsThunk,
   approveRequestThunk,
-  // markThreadAsRead,  <-- removed import
 } from '../../../redux/chatThunks';
 import useSocket from '../../../hooks/useSocket';
 import { FiMessageCircle } from 'react-icons/fi';
+import API from '../../../api/axios'; // ✅ env-driven axios instance
 
 export default function MessengerPopup({ role: propRole }) {
   const user = useSelector((state) => state.user.userInfo);
@@ -192,7 +192,7 @@ export default function MessengerPopup({ role: propRole }) {
     if (pathname.includes('/messenger') && open) {
       setOpen(false);
     }
-  }, [pathname]);
+  }, [pathname, open]);
 
   const handleMessengerClick = () => {
     if (pathname.includes('/messenger')) return;
@@ -210,10 +210,7 @@ export default function MessengerPopup({ role: propRole }) {
 
   const handleReject = async (requestId) => {
     try {
-      await fetch(`http://localhost:5000/api/teacher-requests/${requestId}/reject`, {
-        method: 'POST',
-        credentials: 'include', // important to send cookies
-      });
+      await API.post(`/teacher-requests/${requestId}/reject`, {}, { withCredentials: true }); // ✅ no hardcoded host
       fetchConversations();
     } catch (err) {
       console.error('Reject request failed:', err);
@@ -224,23 +221,19 @@ export default function MessengerPopup({ role: propRole }) {
     if (conv.profileImage) return conv.profileImage;
 
     if (conv.participants && conv.participants.length) {
-      // Find participant other than current user
       const other = conv.participants.find(p => p._id.toString() !== userId);
       if (other && other.profileImage) return other.profileImage;
     }
 
-    // Fallback
     const fallbackId = conv.participantId || conv.studentId || conv.teacherId || 'unknown';
     return `https://i.pravatar.cc/150?u=${fallbackId}`;
   };
 
-  // Get the other participant's userId string for online check
   const getOtherParticipantId = (conv) => {
     if (!conv.participants || !userId) return null;
     return conv.participants.find(p => p._id.toString() !== userId)?._id.toString() || null;
   };
 
-  // Filter conversations by search term
   const filteredConversations = conversations.filter((conv) => {
     const displayName = conv.name || conv.teacherName || conv.studentName || '';
     const lastMessage = conv.lastMessage || '';
@@ -252,6 +245,7 @@ export default function MessengerPopup({ role: propRole }) {
 
   return (
     <>
+      {/* ✅ Button kept exactly as in your code */}
       <button
         onClick={handleMessengerClick}
         className="relative text-gray-600 hover:text-indigo-600 focus:outline-none"
@@ -337,15 +331,15 @@ export default function MessengerPopup({ role: propRole }) {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
-                       {(() => {
-  if (chat.name) return chat.name;
+                        {(() => {
+                          if (chat.name) return chat.name;
 
-  if (chat.participants && userId) {
-    const other = chat.participants.find(p => p._id.toString() !== userId);
-    if (other && other.name) return other.name;
-  }
-  return chat.studentName || chat.teacherName || 'Unknown';
-})()}
+                          if (chat.participants && userId) {
+                            const other = chat.participants.find(p => p._id.toString() !== userId);
+                            if (other && other.name) return other.name;
+                          }
+                          return chat.studentName || chat.teacherName || 'Unknown';
+                        })()}
                         {chat.unreadCount > 0 && (
                           <span className="text-xs bg-red-600 text-white rounded-full px-2 py-0.5">
                             {chat.unreadCount}

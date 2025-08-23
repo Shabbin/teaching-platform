@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import API from '../../api/axios'; // ← adjust the relative path if needed
 
 export default function PostsListPage() {
   const [posts, setPosts] = useState([]);
@@ -10,8 +11,7 @@ export default function PostsListPage() {
   useEffect(() => {
     const fetchPosts = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/posts/mine');
-        const data = await res.json();
+        const { data } = await API.get('/posts/mine', { withCredentials: true });
         setPosts(data);
       } catch (err) {
         console.error('Failed to fetch posts:', err);

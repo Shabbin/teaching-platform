@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
-import { updateProfileImage, getTeacherDashboard } from './../../redux/userSlice';
+import { uploadProfilePicture, getTeacherDashboard } from './../../redux/userSlice';
 
 import ViewedPostsTimeline from './ViewedPostsTimeline';
 import { fetchPostViewEvents } from '../../redux/postViewEventSlice';
@@ -49,26 +49,11 @@ export default function TeacherDashboardInner() {
 
   const handleImageClick = () => fileInputRef.current && fileInputRef.current.click();
 
-  const handleFileChange = async (e) => {
+  const handleFileChange = (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-
-    const formData = new FormData();
-    formData.append('profileImage', file);
-
-    try {
-      const res = await fetch('http://localhost:5000/api/teachers/profile-picture', {
-        method: 'PUT',
-        credentials: 'include',
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
-      dispatch(updateProfileImage(data.profileImage));
-    } catch (err) {
-      console.error(err);
-    }
+    // use redux thunk so cookies/response handling stay centralized
+    dispatch(uploadProfilePicture(file));
   };
 
   if (dashboardLoading)
@@ -107,7 +92,7 @@ export default function TeacherDashboardInner() {
     teacher && teacher.profileImage
       ? (String(teacher.profileImage).startsWith('http')
           ? teacher.profileImage
-          : `http://localhost:5000/${teacher.profileImage}`)
+          : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${teacher.profileImage}`)
       : '/default-avatar.png';
 
   return (

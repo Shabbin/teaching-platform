@@ -1,37 +1,61 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import API from '../api/axios'; // ✅ centralized axios (env-driven)
 
-// Thunk to fetch recent view events for teacher
+// -------------------------------------------------------------------
+// Thunks
+// -------------------------------------------------------------------
+
+// Fetch recent view events for a teacher
 export const fetchPostViewEvents = createAsyncThunk(
   'postViewEvents/fetch',
   async (teacherId, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/posts/recent-views/${teacherId}`);
-      console.log('fetchPostViewEvents response:', response)
+      const response = await API.get(`/posts/recent-views/${teacherId}`, {
+        withCredentials: true,
+      });
+      console.log('fetchPostViewEvents response:', response);
       return response.data.events;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return rejectWithValue(err?.response?.data || err.message);
     }
   }
 );
 
-// Thunk to fetch full post details by postId
+// Fetch full post details by postId
 export const fetchPostById = createAsyncThunk(
   'postViewEvents/fetchPostById',
-  async (postId, thunkAPI) => {
+  async (postId, { rejectWithValue }) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/posts/${postId}`, {
-        credentials: 'include',
+      const { data } = await API.get(`/posts/${postId}`, {
+        withCredentials: true,
       });
-      if (!res.ok) throw new Error('Failed to fetch post');
-      const data = await res.json();
-      return data;  // data must include description here from backend
+      console.log("Response the data", data);
+      return data; // should include description from backend
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.message);
+      return rejectWithValue(error?.response?.data?.message || error.message);
     }
   }
 );
 
+// ✅ Increment post view (student visiting a post)
+export const incrementPostView = createAsyncThunk(
+  'postViewEvents/incrementView',
+  async (postId, { rejectWithValue }) => {
+    try {
+      const { data } = await API.post(`/posts/${postId}/view`, {}, {
+        withCredentials: true,
+      });
+      console.log("incrementPostView response:", data);
+      return { postId, ...data };
+    } catch (error) {
+      return rejectWithValue(error?.response?.data?.message || error.message);
+    }
+  }
+);
+
+// -------------------------------------------------------------------
+// Slice
+// -------------------------------------------------------------------
 const postViewEventsSlice = createSlice({
   name: 'postViewEvents',
   initialState: {
@@ -42,9 +66,10 @@ const postViewEventsSlice = createSlice({
   },
   reducers: {
     addPostViewEvent: (state, action) => {
-      const postIdKey = typeof action.payload.postId === 'object'
-        ? action.payload.postId._id?.toString() || JSON.stringify(action.payload.postId)
-        : action.payload.postId;
+      const postIdKey =
+        typeof action.payload.postId === 'object'
+          ? action.payload.postId._id?.toString() || JSON.stringify(action.payload.postId)
+          : action.payload.postId;
 
       // Add event immutably at the front:
       state.events = [action.payload, ...state.events].slice(0, 20);
@@ -83,6 +108,7 @@ const postViewEventsSlice = createSlice({
 
   extraReducers: (builder) => {
     builder
+      // Fetch events
       .addCase(fetchPostViewEvents.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -95,13 +121,30 @@ const postViewEventsSlice = createSlice({
         state.loading = false;
         state.error = action.payload || 'Failed to fetch post view events';
       })
+
+      // Fetch post by ID
       .addCase(fetchPostById.fulfilled, (state, action) => {
-        // This post object should include `description` field from backend
         state.posts[action.payload._id] = action.payload;
+      })
+
+      // ✅ Increment post view
+      .addCase(incrementPostView.fulfilled, (state, action) => {
+        const { postId, viewsCount } = action.payload;
+        if (state.posts[postId]) {
+          state.posts[postId] = {
+            ...state.posts[postId],
+            viewsCount,
+          };
+        }
+      })
+      .addCase(incrementPostView.rejected, (state, action) => {
+        state.error = action.payload || 'Failed to increment post view';
       });
   },
 });
 
-export const { addPostViewEvent, clearPostViewEvents, updatePostViewsCount } = postViewEventsSlice.actions;
+// -------------------------------------------------------------------
+export const { addPostViewEvent, clearPostViewEvents, updatePostViewsCount } =
+  postViewEventsSlice.actions;
 
 export default postViewEventsSlice.reducer;

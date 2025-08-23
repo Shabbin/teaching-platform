@@ -1,51 +1,76 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Star, StarBorder } from '@mui/icons-material';
 import DOMPurify from 'isomorphic-dompurify';
+import API from '../../../api/axios'; 
 
 const TeacherPostsPage = () => {
   const { id } = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const subjectParams = searchParams.getAll('subject');
+  // Subjects from query (?subject=Math&subject=Physics)
+  const subjectParams = useMemo(() => searchParams.getAll('subject'), [searchParams]);
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchErr, setFetchErr] = useState(null);
 
   useEffect(() => {
     if (!id) return;
 
-    const queryParams = new URLSearchParams();
-    queryParams.append('teacher', id);
-    subjectParams.forEach((s) => queryParams.append('subject', s));
+    // Don’t abort in StrictMode; just ignore state after unmount
+    let didCancel = false;
 
     const fetchPosts = async () => {
+      setLoading(true);
+      setFetchErr(null);
+
       try {
-        const res = await fetch(`http://localhost:5000/api/posts?${queryParams.toString()}`);
-        const data = await res.json();
-        setPosts(data);
+        // Build query as repeated params to match backend
+        const qp = new URLSearchParams();
+        qp.append('teacher', id);
+        subjectParams.forEach((s) => qp.append('subject', s));
+
+        const { data } = await API.get(`/posts?${qp.toString()}`);
+        if (!didCancel) setPosts(Array.isArray(data) ? data : []);
       } catch (err) {
-        console.error('Error fetching teacher posts:', err);
+        if (didCancel) return;
+        const msg =
+          err?.normalizedMessage ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'Failed to fetch posts';
+        setFetchErr(msg);
       } finally {
-        setLoading(false);
+        if (!didCancel) setLoading(false);
       }
     };
 
     fetchPosts();
-  }, [id, subjectParams.join(',')]);
+    return () => {
+      didCancel = true;
+    };
+  }, [id, subjectParams.join('|')]);
 
-  if (loading) return <p className="p-6 text-center text-gray-400 animate-pulse">Loading posts...</p>;
-  if (posts.length === 0) return <p className="p-6 text-center text-red-500">No posts found for this teacher.</p>;
+  if (loading) {
+    return <p className="p-6 text-center text-gray-400 animate-pulse">Loading posts...</p>;
+  }
 
-  const teacher = posts[0].teacher;
+  if (fetchErr) {
+    return <p className="p-6 text-center text-red-600">{fetchErr}</p>;
+  }
 
-  // Dummy ratings/reviews (replace with backend data if available)
-  const rating = teacher.rating || Math.floor(Math.random() * 5) + 1;
-  const reviews = teacher.reviews || Math.floor(Math.random() * 20) + 1;
+  if (!posts.length) {
+    return <p className="p-6 text-center text-red-500">No posts found for this teacher.</p>;
+  }
+
+  const teacher = posts[0]?.teacher || {};
+  const rating = teacher.rating || Math.floor(Math.random() * 5) + 1;   // demo fallback
+  const reviews = teacher.reviews || Math.floor(Math.random() * 20) + 1; // demo fallback
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10">
@@ -57,20 +82,21 @@ const TeacherPostsPage = () => {
         All Teachers
       </button>
 
-      {/* Teacher Name with Profile Image */}
+      {/* Teacher header */}
       <div className="flex flex-col sm:flex-row items-center gap-4 mb-6">
         <img
           src={teacher.profileImage || '/default.png'}
-          alt={teacher.name}
+          alt={teacher.name || 'Teacher'}
           className="w-20 h-20 rounded-full object-cover shadow-lg ring-2 ring-indigo-500/60"
         />
         <div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-wide text-gray-900">
-            <span className="text-gray-900 ">
-              {teacher.name}
-            </span>
+            <span className="text-gray-900 ">{teacher.name || 'Teacher'}</span>
             {subjectParams.length > 0 && (
-              <span className="text-indigo-700 font-semibold"> (Filtered by {subjectParams.join(', ')})</span>
+              <span className="text-indigo-700 font-semibold">
+                {' '}
+                (Filtered by {subjectParams.join(', ')})
+              </span>
             )}
           </h1>
 
@@ -88,6 +114,7 @@ const TeacherPostsPage = () => {
         </div>
       </div>
 
+      {/* Posts grid */}
       <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         {posts.map((post) => {
           const cleanDesc = DOMPurify.sanitize(post.description || '', {
@@ -101,12 +128,10 @@ const TeacherPostsPage = () => {
               style={{ minHeight: '360px' }}
             >
               <div>
-                {/* Title: dark for readability, turns indigo on hover/focus */}
                 <h2 className="text-2xl font-semibold text-gray-900 mb-2 transition-colors group-hover:text-indigo-700">
                   {post.title}
                 </h2>
 
-                {/* Description: neutral, clamped to 3 lines; render sanitized HTML */}
                 <div
                   className="text-gray-600 leading-relaxed mt-1 prose prose-sm max-w-none line-clamp-3 overflow-hidden"
                   dangerouslySetInnerHTML={{ __html: cleanDesc }}
@@ -128,10 +153,9 @@ const TeacherPostsPage = () => {
                   <span className="flex items-center gap-1">📍 {post.location}</span>
                 </div>
 
-                {/* Views & Enrollments */}
                 <div className="text-sm text-gray-700 mt-3 flex justify-between items-center">
                   <span>👁️ {post.viewsCount || 0} views</span>
-                  <span>📝 {5} enrollments</span> {/* dummy value */}
+                  <span>📝 {5} enrollments</span> {/* demo */}
                 </div>
               </div>
 

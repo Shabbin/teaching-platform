@@ -1,20 +1,23 @@
-//requests\page.jsx
+// app/dashboard/teacher/requests/page.jsx
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useRouter } from 'next/navigation';
+import API from '../../../../api/axios'; // env-driven axios (withCredentials enabled)
 
 export default function RequestsPage() {
+  const router = useRouter();
+  const userInfo = useSelector((state) => state.user.userInfo);
+  const teacherId = userInfo?.id || userInfo?._id;
+
   const [requests, setRequests] = useState([]);
   const [loadingIds, setLoadingIds] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const userInfo = useSelector((state) => state.user.userInfo);
-  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const teacherId = userInfo?.id;
-console.log(requests,"REQUESTS")
   useEffect(() => {
-    if (!teacherId || !token) {
+    if (!teacherId) {
       setError('You must be logged in as a teacher.');
       return;
     }
@@ -23,67 +26,45 @@ console.log(requests,"REQUESTS")
       setError(null);
       setLoading(true);
       try {
-        const res = await fetch('http://localhost:5000/api/teacher-requests', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error('Failed to fetch requests');
-        const data = await res.json();
-        setRequests(data);
+        const res = await API.get('/teacher-requests');
+        setRequests(res.data || []);
       } catch (err) {
-        setError(err.message);
+        setError(err.normalizedMessage || err.message || 'Failed to fetch requests');
       } finally {
         setLoading(false);
       }
     }
 
     fetchRequests();
-  }, [teacherId, token]);
+  }, [teacherId]);
 
   async function updateRequestStatus(id, action) {
     setError(null);
     setLoadingIds((prev) => [...prev, id]);
 
     try {
-      const res = await fetch(
-        `http://localhost:5000/api/teacher-requests/${id}/${action}`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-console.log(res,"RES")
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.message || 'Failed to update request');
+      const res = await API.post(`/teacher-requests/${id}/${action}`, {});
+      const data = res.data;
+
+      if (action === 'approve' && data?.threadId) {
+        // Navigate to the messenger thread
+        router.push(`/dashboard/teacher/messenger/${data.threadId}`);
       }
 
-      const data = await res.json();
-
-      if (action === 'approve' && data.threadId) {
-      
-window.location.href = `/dashboard/teacher/chat/${data.threadId}`;
-       
-      }
-
+      // Optimistically update list
       setRequests((prev) =>
         prev.map((r) =>
           r._id === id ? { ...r, status: action === 'approve' ? 'approved' : 'rejected' } : r
         )
       );
     } catch (err) {
-      setError(err.message);
+      setError(err.normalizedMessage || err.message || 'Failed to update request');
     } finally {
       setLoadingIds((prev) => prev.filter((loadingId) => loadingId !== id));
     }
   }
 
-  if (!teacherId || !token) return <p>Please log in as a teacher.</p>;
+  if (!teacherId) return <p>Please log in as a teacher.</p>;
   if (loading) return <p>Loading requests...</p>;
   if (error) return <p style={{ color: 'red' }}>Error: {error}</p>;
   if (requests.length === 0) return <p>No tuition requests found.</p>;
@@ -95,10 +76,10 @@ window.location.href = `/dashboard/teacher/chat/${data.threadId}`;
         {requests.map((req) => {
           const isLoading = loadingIds.includes(req._id);
           return (
-            <li key={req._id}>
+            <li key={req._id} style={{ marginBottom: 12 }}>
               <strong>{req.studentName}</strong> wants help on <em>{req.topic || 'tuition'}</em>
               <br />
-              Status: <b>{req.status}</b>
+              Status: <b>{req.status}</b>{' '}
               {req.status === 'pending' && (
                 <>
                   <button

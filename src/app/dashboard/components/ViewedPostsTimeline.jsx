@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchPostViewEvents, fetchPostById } from '../../redux/postViewEventSlice';
 import DOMPurify from 'isomorphic-dompurify';
 import { Eye } from 'lucide-react';
+import { videoUrlFromStoredPath } from '../../api/axios'; 
 
 export default function ViewedPostsTimeline() {
   const dispatch = useDispatch();
@@ -110,7 +111,8 @@ export default function ViewedPostsTimeline() {
     if (post.videoFile) {
       return (
         <video controls className="w-full max-w-[400px] aspect-video rounded-lg mt-2">
-          <source src={`http://localhost:5000${post.videoFile}`} type="video/mp4" />
+       
+          <source src={videoUrlFromStoredPath(post.videoFile)} type="video/mp4" />
           Your browser does not support the video tag.
         </video>
       );
@@ -173,7 +175,7 @@ export default function ViewedPostsTimeline() {
             key={post._id}
             className="bg-white/95 shadow-sm rounded-2xl p-6 border border-gray-100 cursor-default"
           >
-            {/* Title (static color) */}
+            {/* Title */}
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {post.title}
             </h3>

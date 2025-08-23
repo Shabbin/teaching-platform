@@ -8,10 +8,8 @@ import {
 } from '../../../api/schedules';
 
 export default function FixScheduleModal({ open, onClose }) {
-  // ---- theme (your requested color) ----
   const brand = 'oklch(0.49 0.25 277)';
 
-  // ---- state ----
   const [posts, setPosts] = useState([]);
   const [students, setStudents] = useState([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
@@ -41,7 +39,7 @@ export default function FixScheduleModal({ open, onClose }) {
       .finally(() => setLoadingPosts(false));
   }, [open]);
 
-  // ---- load approved students for selected post ----
+  // ---- load eligible students for selected post + type ----
   useEffect(() => {
     let active = true;
     (async () => {
@@ -51,8 +49,13 @@ export default function FixScheduleModal({ open, onClose }) {
       }
       setLoadingStudents(true);
       try {
-        const list = await getApprovedStudentsForPost(form.postId);
-        if (active) setStudents(Array.isArray(list) ? list : []);
+        // ⬇️ pass the selected type so backend can filter (demo=unpaid, regular=paid)
+        const list = await getApprovedStudentsForPost(form.postId, form.type);
+        if (active) {
+          setStudents(Array.isArray(list) ? list : []);
+          // clear selections when switching post or type to avoid mixing
+          setForm((f) => ({ ...f, studentIds: [] }));
+        }
       } finally {
         if (active) setLoadingStudents(false);
       }
@@ -60,32 +63,29 @@ export default function FixScheduleModal({ open, onClose }) {
     return () => {
       active = false;
     };
-  }, [form.postId]);
+  }, [form.postId, form.type]);
 
-  // ---- default subject from post ----
-  useEffect(() => {
-    const p = posts.find((x) => x._id === form.postId);
-    setForm((f) => ({
-      ...f,
-      subject: p?.subjects?.[0] || '',
-      studentIds: [], // reset selection when post changes
-    }));
-  }, [form.postId, posts]);
-
-  // ---- debounce search ----
-  useEffect(() => {
-    const t = setTimeout(
-      () => setSearch(searchRaw.trim().toLowerCase()),
-      160
-    );
-    return () => clearTimeout(t);
-  }, [searchRaw]);
-
-  // ---- derived lists ----
+  // ---- subjects for the selected post ----
   const subjects = useMemo(() => {
     const p = posts.find((x) => x._id === form.postId);
     return Array.isArray(p?.subjects) ? p.subjects : [];
   }, [posts, form.postId]);
+
+  // ---- when post changes, set ONE combined subject string ----
+  useEffect(() => {
+    const combined = subjects.length ? subjects.join(' | ') : '';
+    setForm((f) => ({
+      ...f,
+      subject: combined,
+      studentIds: [],
+    }));
+  }, [subjects]);
+
+  // ---- debounce search ----
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchRaw.trim().toLowerCase()), 160);
+    return () => clearTimeout(t);
+  }, [searchRaw]);
 
   const filteredStudents = useMemo(() => {
     if (!search) return students;
@@ -143,7 +143,7 @@ export default function FixScheduleModal({ open, onClose }) {
         subject: form.subject,
         date: form.date,
         durationMinutes: Number(form.durationMinutes),
-        type: form.type,
+        type: form.type, // ← keep sending type
       });
       onClose();
       alert('✅ Schedule created!');
@@ -158,9 +158,8 @@ export default function FixScheduleModal({ open, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55">
-      {/* CONTAINER: fixed height, column, sticky footer */}
       <div className="w-full max-w-[940px] max-h-[90vh] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
-        {/* HEADER (non-scrolling) */}
+        {/* HEADER */}
         <div
           className="px-6 py-5 text-white"
           style={{
@@ -168,14 +167,10 @@ export default function FixScheduleModal({ open, onClose }) {
           }}
         >
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-white/20 grid place-items-center">
-              📅
-            </div>
+            <div className="h-9 w-9 rounded-lg bg-white/20 grid place-items-center">📅</div>
             <div className="min-w-0">
               <h2 className="text-lg font-semibold">Create a Class</h2>
-              <p className="text-xs/5 opacity-90">
-                Pick post, students, time — done.
-              </p>
+              <p className="text-xs/5 opacity-90">Pick post, students, time — done.</p>
             </div>
             <button
               onClick={onClose}
@@ -186,14 +181,12 @@ export default function FixScheduleModal({ open, onClose }) {
           </div>
         </div>
 
-        {/* BODY (scrolls) */}
+        {/* BODY */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Class details */}
           <section className="rounded-xl border border-slate-200 bg-white">
             <div className="p-4">
-              <h3 className="text-sm font-semibold text-slate-800 mb-3">
-                Class Details
-              </h3>
+              <h3 className="text-sm font-semibold text-slate-800 mb-3">Class Details</h3>
               <div className="grid gap-3 md:grid-cols-3">
                 {/* Post */}
                 <label className="block">
@@ -201,9 +194,7 @@ export default function FixScheduleModal({ open, onClose }) {
                   <select
                     name="postId"
                     value={form.postId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, postId: e.target.value }))
-                    }
+                    onChange={(e) => setForm((f) => ({ ...f, postId: e.target.value }))}
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2"
                     style={{ '--tw-ring-color': brand }}
                   >
@@ -218,27 +209,16 @@ export default function FixScheduleModal({ open, onClose }) {
                   </select>
                 </label>
 
-                {/* Subject */}
+                {/* Subject (combined, read-only) */}
                 <label className="block">
                   <span className="text-[11px] text-slate-500">Subject</span>
-                  <select
+                  <input
                     name="subject"
                     value={form.subject}
-                    onChange={updateField}
-                    disabled={!subjects.length}
-                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2 disabled:bg-slate-50"
-                    style={{ '--tw-ring-color': brand }}
-                  >
-                    {subjects.length === 0 ? (
-                      <option value="">—</option>
-                    ) : (
-                      subjects.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                    readOnly
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                    title="Combined subjects"
+                  />
                 </label>
 
                 {/* Type */}
@@ -275,7 +255,9 @@ export default function FixScheduleModal({ open, onClose }) {
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-slate-800">
-                  Students (approved)
+                  {form.type === 'demo'
+                    ? 'Students (approved & unpaid)'
+                    : 'Students (paid)'}
                 </h3>
                 {loadingStudents && (
                   <span className="text-xs text-slate-500">Loading…</span>
@@ -292,9 +274,7 @@ export default function FixScheduleModal({ open, onClose }) {
                     className="w-full rounded-lg border border-slate-300 px-10 py-2 outline-none focus:ring-2"
                     style={{ '--tw-ring-color': brand }}
                   />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    🔎
-                  </span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">🔎</span>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -349,11 +329,13 @@ export default function FixScheduleModal({ open, onClose }) {
                 </div>
               )}
 
-              {/* list (scrolls) */}
+              {/* list */}
               <div className="rounded-lg border border-slate-200 max-h-72 overflow-y-auto">
                 {(!students.length && !loadingStudents) ? (
                   <div className="px-3 py-4 text-xs text-slate-500">
-                    No approved students for this post.
+                    {form.type === 'demo'
+                      ? 'No approved unpaid students for this post.'
+                      : 'No paid students for this post.'}
                   </div>
                 ) : (
                   <ul className="divide-y divide-slate-100">
@@ -380,7 +362,7 @@ export default function FixScheduleModal({ open, onClose }) {
                                 {s.studentId.name}
                               </div>
                               <div className="text-[11px] text-slate-500">
-                                Approved
+                                {form.type === 'demo' ? 'Approved • unpaid' : 'Approved • paid'}
                               </div>
                             </div>
                             {selected && (
@@ -404,9 +386,7 @@ export default function FixScheduleModal({ open, onClose }) {
           {/* schedule */}
           <section className="rounded-xl border border-slate-200 bg-white">
             <div className="p-4">
-              <h3 className="text-sm font-semibold text-slate-800 mb-3">
-                Schedule
-              </h3>
+              <h3 className="text-sm font-semibold text-slate-800 mb-3">Schedule</h3>
               <div className="grid gap-3 md:grid-cols-3">
                 <label className="block md:col-span-2">
                   <span className="text-[11px] text-slate-500">Date & Time</span>
@@ -442,7 +422,7 @@ export default function FixScheduleModal({ open, onClose }) {
           </section>
         </div>
 
-        {/* FOOTER (sticky, never scrolls out) */}
+        {/* FOOTER */}
         <div className="px-6 py-4 border-t bg-white">
           <div className="flex items-center justify-end gap-3">
             <button

@@ -3,8 +3,8 @@ import API from "./axios";
 
 // ✅ Get all schedules for the logged-in teacher
 export async function getTeacherSchedules() {
-  const { data } = await API.get("/schedules/teacher");
-  return data;
+  const { data } = await API.get("/schedules/mine");
+  return data || [];
 }
 
 // ✅ Create a new schedule
@@ -15,17 +15,16 @@ export async function createSchedule(payload) {
 
 // ✅ Cancel a schedule
 export async function cancelSchedule(id) {
-  const { data } = await API.put(`/schedules/${id}/cancel`);
+  const { data } = await API.post(`/schedules/${id}/cancel`);
   return data;
 }
 
 // ✅ Get approved students for a given post (teacher-only)
-export async function getApprovedStudentsForPost(postId) {
-  if (!postId) return [];
-  const { data } = await API.get(
-    `/teacher-requests/approved?postId=${encodeURIComponent(postId)}`
-  ); // <-- dashed path
-  return data;
+export async function getApprovedStudentsForPost(postId, type) {
+  const { data } = await API.get("/schedules/eligible-students", {
+    params: { postId, type }, // backend filters by type
+  });
+  return data || [];
 }
 
 // keep the alias if you’re using it elsewhere

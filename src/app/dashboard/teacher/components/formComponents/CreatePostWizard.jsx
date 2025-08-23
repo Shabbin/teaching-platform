@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useForm, FormProvider } from "react-hook-form";
 import { AnimatePresence, motion } from "framer-motion";
 import { useDispatch, useSelector } from "react-redux";
-import axios from "axios";
 
 import {
   step1Schema,
@@ -15,7 +14,14 @@ import {
 } from "../../../../hooks/zodSchemas/teacherPostSchema";
 import { applyZodErrors } from "@/lib/zodToRHF";
 
-import { createTeacherPost, updateTeacherPost, resetError } from "../../../../redux/teacherPostSlice";
+import {
+  createTeacherPost,
+  updateTeacherPost,
+  resetError,
+} from "../../../../redux/teacherPostSlice";
+
+// ✅ use env-driven axios wrapper instead of raw axios
+import API from "../../../../api/axios";
 
 import Step1_EducationSystem from "./Step1_EducationSystem";
 import Step2_BoardGroup from "./Step2_BoardGroup";
@@ -69,7 +75,8 @@ export default function CreatePostWizard({
   useEffect(() => {
     async function fetchTree() {
       try {
-        const res = await axios.get("http://localhost:5000/api/education-tree");
+        // ✅ now uses API client (baseURL/env aware)
+        const res = await API.get("/education-tree");
         setEducationTree(res.data);
       } catch {
         setTreeError("Failed to load education data.");
@@ -128,29 +135,20 @@ export default function CreatePostWizard({
     const board = data.board;
 
     if (curr === 0) {
-      // GED: skip board/group and level
-      if (es === "GED") return 3; // Subjects
+      if (es === "GED") return 3;
       return 1;
     }
-
     if (curr === 1) {
-      // BCS: stage-only -> Post Details
       if (es === "BCS") return 4;
-      // GED safety
       if (es === "GED") return 3;
-      // Entrance-Exams: no Level step
       if (es === "Entrance-Exams") return 3;
-      // UA: Level only for Public-University
       if (es === "University-Admission" && board !== "Public-University") return 3;
-      // Otherwise (English/Bangla + UA PU): go Level
       return 2;
     }
-
-    if (curr === 2) return 3; // Level -> Subjects
-    if (curr === 3) return 4; // Subjects -> Post Details
-    if (curr === 4) return 5; // Post Details -> Extras
-    if (curr === 5) return 6; // Extras -> Review
-
+    if (curr === 2) return 3;
+    if (curr === 3) return 4;
+    if (curr === 4) return 5;
+    if (curr === 5) return 6;
     return Math.min(curr + 1, steps.length - 1);
   }
 
@@ -160,23 +158,20 @@ export default function CreatePostWizard({
     const board = data.board;
 
     if (curr === 3) {
-      if (es === "GED") return 0;                           // Education System
-      if (es === "Entrance-Exams") return 1;                // Board
-      if (es === "University-Admission" && board !== "Public-University") return 1;
-      return 2;                                             // Level
-    }
-
-    if (curr === 4) {
-      if (es === "BCS") return 1;                           // Board (stage)
       if (es === "GED") return 0;
       if (es === "Entrance-Exams") return 1;
       if (es === "University-Admission" && board !== "Public-University") return 1;
-      return 3;                                             // Subjects
+      return 2;
     }
-
-    if (curr === 5) return 4; // Extras -> Post Details
-    if (curr === 6) return 5; // Review -> Extras
-
+    if (curr === 4) {
+      if (es === "BCS") return 1;
+      if (es === "GED") return 0;
+      if (es === "Entrance-Exams") return 1;
+      if (es === "University-Admission" && board !== "Public-University") return 1;
+      return 3;
+    }
+    if (curr === 5) return 4;
+    if (curr === 6) return 5;
     return Math.max(curr - 1, 0);
   }
 
@@ -184,7 +179,6 @@ export default function CreatePostWizard({
     const data = methods.getValues();
     const es = data.educationSystem;
 
-    // Clean fields that shouldn't apply for the chosen path
     if (es !== "Bangla-Medium") {
       methods.setValue("group", "");
     }
@@ -202,20 +196,15 @@ export default function CreatePostWizard({
       methods.setValue("subLevel", "");
     }
     if (es === "BCS") {
-      // stage-only flow: ensure no stray fields/tags/subjects
       methods.setValue("group", "");
       methods.setValue("level", "");
       methods.setValue("subLevel", "");
       methods.setValue("tags", []);
-      methods.setValue("subjects", []); // ← IMPORTANT: do NOT inject stage as a subject
+      methods.setValue("subjects", []);
     }
 
-    // Validate current step
     const ok = await validateCurrentStep();
     if (!ok) return;
-
-    // NOTE: removed previous code that auto-added [stage] into subjects for BCS.
-    // We intentionally keep subjects empty for BCS.
 
     const next = computeNextIndex(step, methods.getValues());
     setStep(next);
@@ -239,7 +228,9 @@ export default function CreatePostWizard({
 
     let resultAction;
     if (initialData && initialData._id) {
-      resultAction = await dispatch(updateTeacherPost({ id: initialData._id, data: payload }));
+      resultAction = await dispatch(
+        updateTeacherPost({ id: initialData._id, data: payload })
+      );
     } else {
       resultAction = await dispatch(createTeacherPost(payload));
     }
@@ -251,7 +242,10 @@ export default function CreatePostWizard({
       if (initialData && onPostUpdated) onPostUpdated(resultAction.payload);
       if (!initialData && onPostCreated) onPostCreated(resultAction.payload);
     } else {
-      const msg = resultAction?.payload?.message || resultAction?.error?.message || "Server error";
+      const msg =
+        resultAction?.payload?.message ||
+        resultAction?.error?.message ||
+        "Server error";
       methods.setError("root", { type: "server", message: msg });
     }
   }
@@ -260,14 +254,15 @@ export default function CreatePostWizard({
 
   const leftPanel = (
     <div className="space-y-6">
-      <HelperBlock title={editMode ? t(lang, "edit") : t(lang, "goodToKnow")} icon={editMode ? "✏️" : "😊"}>
+      <HelperBlock
+        title={editMode ? t(lang, "edit") : t(lang, "goodToKnow")}
+        icon={editMode ? "✏️" : "😊"}
+      >
         {step < steps.length - 1 ? (
-          <>
-            <p className="mb-2">
-              {t(lang, "stepXofY", { x: step + 1, y: steps.length })} —{" "}
-              <span className="font-medium">{steps[step].label}</span>
-            </p>
-          </>
+          <p className="mb-2">
+            {t(lang, "stepXofY", { x: step + 1, y: steps.length })} —{" "}
+            <span className="font-medium">{steps[step].label}</span>
+          </p>
         ) : (
           <p>{t(lang, "almost")}</p>
         )}
@@ -282,10 +277,16 @@ export default function CreatePostWizard({
       </div>
 
       <FormProvider {...methods}>
-        <form onSubmit={methods.handleSubmit(onSubmit)} className="px-6 md:px-10 py-8" encType="multipart/form-data">
+        <form
+          onSubmit={methods.handleSubmit(onSubmit)}
+          className="px-6 md:px-10 py-8"
+          encType="multipart/form-data"
+        >
           <StepTitle
             prefix={editMode ? t(lang, "updateYour") : t(lang, "createYour")}
-            highlight={step === steps.length - 1 ? t(lang, "reviewing") : steps[step].label}
+            highlight={
+              step === steps.length - 1 ? t(lang, "reviewing") : steps[step].label
+            }
           />
 
           <AnimatePresence mode="wait">

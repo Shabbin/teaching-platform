@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import ViewPostDetails from '../../student/components/viewPostDetails';
+import API from '../../../api/axios'; // ← adjust path if needed
 
 const PostDetailPage = () => {
   const { id } = useParams();
@@ -14,9 +15,7 @@ const PostDetailPage = () => {
 
     const fetchPost = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/posts/${id}`);
-        if (!res.ok) throw new Error('Post not found');
-        const data = await res.json();
+        const { data } = await API.get(`/posts/${id}`, { withCredentials: true });
         setPost(data);
       } catch (error) {
         console.error(error);

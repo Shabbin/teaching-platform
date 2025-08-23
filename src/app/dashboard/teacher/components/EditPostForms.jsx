@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useDispatch } from 'react-redux';
 import { updateTeacherPost } from '../../../redux/teacherPostSlice';
-import { teacherPostSchema } from '../../../hooks/zodSchemas/teacherPostSchema';
+import { finalTeacherPostSchema, finalTeacherPostSchema as teacherPostSchema } from '../../../hooks/zodSchemas/teacherPostSchema';
 
 export default function EditPostForm({ post, postId, educationTree, onSuccess }) {
   const dispatch = useDispatch();
@@ -19,7 +19,7 @@ export default function EditPostForm({ post, postId, educationTree, onSuccess })
     setValue,
     formState: { errors, isSubmitting },
   } = useForm({
-    resolver: zodResolver(teacherPostSchema),
+    resolver: zodResolver(finalTeacherPostSchema),
     defaultValues: post,
   });
 

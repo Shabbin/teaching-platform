@@ -8,9 +8,7 @@ import {
   setCurrentUserId,
   setError,
 } from './chatSlice';
-import axios from 'axios';
-
-const BACKEND_URL = 'http://localhost:5000';
+import API from '../api/axios'; // ✅ env-driven axios instance
 
 // 🔁 Fetch all conversations for current user (teacher or student)
 export const fetchConversationsThunk = createAsyncThunk(
@@ -22,8 +20,7 @@ export const fetchConversationsThunk = createAsyncThunk(
 
       thunkAPI.dispatch(setCurrentUserId(userId)); // <-- Set currentUserId here
 
-      const endpoint = `${BACKEND_URL}/api/chat/conversations/${userId}`;
-      const res = await axios.get(endpoint, {
+      const res = await API.get(`/chat/conversations/${userId}`, {
         withCredentials: true,
       });
 
@@ -54,16 +51,16 @@ export const fetchConversationsThunk = createAsyncThunk(
       thunkAPI.dispatch(setConversationsLoaded(true));
       return normalized;
     } catch (err) {
-      thunkAPI.dispatch(setError(err.message));
-      return thunkAPI.rejectWithValue(err.message);
+      const msg = err?.response?.data?.message || err?.message || 'Failed to fetch conversations';
+      thunkAPI.dispatch(setError(msg));
+      return thunkAPI.rejectWithValue(msg);
     } finally {
       thunkAPI.dispatch(setLoading(false));
     }
   }
 );
 
-
-// 💬 Load messages for a given threadId
+// 💬 Normalize a single message object
 export function normalizeMessage(msg) {
   let senderObj = msg.sender || msg.senderId;
 
@@ -87,12 +84,14 @@ export function normalizeMessage(msg) {
   };
 }
 
+// 💬 Load messages for a given threadId
 export const fetchMessagesThunk = createAsyncThunk(
   'chat/fetchMessages',
   async (threadId, thunkAPI) => {
     try {
       thunkAPI.dispatch(setLoading(true));
-      const res = await axios.get(`${BACKEND_URL}/api/chat/messages/${threadId}`, {
+
+      const res = await API.get(`/chat/messages/${threadId}`, {
         withCredentials: true,
       });
 
@@ -118,8 +117,9 @@ export const fetchMessagesThunk = createAsyncThunk(
 
       return fetchedMessages;
     } catch (err) {
-      thunkAPI.dispatch(setError(err.message));
-      return thunkAPI.rejectWithValue(err.message);
+      const msg = err?.response?.data?.message || err?.message || 'Failed to fetch messages';
+      thunkAPI.dispatch(setError(msg));
+      return thunkAPI.rejectWithValue(msg);
     } finally {
       thunkAPI.dispatch(setLoading(false));
     }
@@ -131,15 +131,16 @@ export const sendMessageThunk = createAsyncThunk(
   'chat/sendMessage',
   async ({ threadId, messageData }, thunkAPI) => {
     try {
-      const res = await axios.post(`${BACKEND_URL}/api/chat/messages`, messageData, {
+      const res = await API.post('/chat/messages', messageData, {
         withCredentials: true,
       });
 
       // Socket will handle adding message to Redux
       return res.data;
     } catch (err) {
-      thunkAPI.dispatch(setError(err.message));
-      return thunkAPI.rejectWithValue(err.message);
+      const msg = err?.response?.data?.message || err?.message || 'Failed to send message';
+      thunkAPI.dispatch(setError(msg));
+      return thunkAPI.rejectWithValue(msg);
     }
   }
 );
@@ -149,7 +150,7 @@ export const refreshConversationThunk = createAsyncThunk(
   'chat/refreshConversation',
   async (requestId, thunkAPI) => {
     try {
-      const res = await axios.get(`${BACKEND_URL}/api/teacher-requests/request/${requestId}`, {
+      const res = await API.get(`/teacher-requests/request/${requestId}`, {
         withCredentials: true,
       });
       const data = res.data;
@@ -175,25 +176,22 @@ export const refreshConversationThunk = createAsyncThunk(
       thunkAPI.dispatch(addOrUpdateConversation(normalizedConvo));
       return normalizedConvo;
     } catch (err) {
-      thunkAPI.dispatch(setError(err.message));
-      return thunkAPI.rejectWithValue(err.message);
+      const msg = err?.response?.data?.message || err?.message || 'Failed to refresh conversation';
+      thunkAPI.dispatch(setError(msg));
+      return thunkAPI.rejectWithValue(msg);
     }
   }
 );
 
+// ✅ Approve request (kept as POST to match your existing usage)
 export const approveRequestThunk = createAsyncThunk(
   'chat/approveRequest',
   async (requestId, thunkAPI) => {
     try {
-      // Use PUT instead of POST to match backend updateRequestStatus route
-      await axios.post(
-        `${BACKEND_URL}/api/teacher-requests/${requestId}/approve`,
-        {},
-        { withCredentials: true }
-      );
+      await API.post(`/teacher-requests/${requestId}/approve`, {}, { withCredentials: true });
 
       // Fetch the full thread after approval
-      const threadRes = await axios.get(`${BACKEND_URL}/api/chat/thread/${requestId}`, {
+      const threadRes = await API.get(`/chat/thread/${requestId}`, {
         withCredentials: true,
       });
 
@@ -226,8 +224,9 @@ export const approveRequestThunk = createAsyncThunk(
       thunkAPI.dispatch(addOrUpdateConversation(normalizedConvo));
       return normalizedConvo;
     } catch (err) {
-      thunkAPI.dispatch(setError(err.message));
-      return thunkAPI.rejectWithValue(err.message);
+      const msg = err?.response?.data?.message || err?.message || 'Failed to approve request';
+      thunkAPI.dispatch(setError(msg));
+      return thunkAPI.rejectWithValue(msg);
     }
   }
 );

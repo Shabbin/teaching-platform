@@ -1,42 +1,40 @@
 'use client';
 import { useState } from 'react';
+import API from '../api/axios'; // ✅ env-driven axios instance
 
 export default function ChatInput({ threadId, userId, token }) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!text.trim()) return;
 
     setSending(true);
     setError(null);
 
-    fetch('http://localhost:5000/api/chat/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token || ''}`,
-      },
-      body: JSON.stringify({
-        threadId,
-        senderId: userId,
-        text: text.trim(),
-      }),
-    })
-      .then(res => {
-        if (!res.ok) throw new Error(`Error sending message: ${res.status}`);
-        return res.json();
-      })
-      .then(() => {
-        // No need to call onSendMessage here — socket will handle it
-        setText('');
-        setSending(false);
-      })
-      .catch(err => {
-        setError(err.message);
-        setSending(false);
-      });
+    try {
+      await API.post(
+        '/chat/messages',
+        {
+          threadId,
+          senderId: userId,
+          text: text.trim(),
+        },
+        {
+          withCredentials: true,
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
+      );
+
+      // socket will add the message to the UI
+      setText('');
+    } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Error sending message';
+      setError(msg);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -49,8 +47,8 @@ export default function ChatInput({ threadId, userId, token }) {
           placeholder="Type a message..."
           className="flex-grow border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
           value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={e => {
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
             if (e.key === 'Enter' && !sending) {
               e.preventDefault();
               sendMessage();
