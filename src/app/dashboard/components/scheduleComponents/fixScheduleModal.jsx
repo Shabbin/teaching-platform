@@ -24,7 +24,7 @@ export default function FixScheduleModal({ open, onClose }) {
     postId: '',
     subject: '',
     studentIds: [],
-    type: 'regular', // 'regular' | 'demo'
+    type: 'demo', // default to demo, but now UNLOCKED
     date: '',
     durationMinutes: '',
   });
@@ -49,12 +49,11 @@ export default function FixScheduleModal({ open, onClose }) {
       }
       setLoadingStudents(true);
       try {
-        // ⬇️ pass the selected type so backend can filter (demo=unpaid, regular=paid)
+        // pass the selected type: 'demo' (unpaid) or 'regular' (paid)
         const list = await getApprovedStudentsForPost(form.postId, form.type);
         if (active) {
           setStudents(Array.isArray(list) ? list : []);
-          // clear selections when switching post or type to avoid mixing
-          setForm((f) => ({ ...f, studentIds: [] }));
+          setForm((f) => ({ ...f, studentIds: [] })); // clear selection when switching
         }
       } finally {
         if (active) setLoadingStudents(false);
@@ -143,10 +142,10 @@ export default function FixScheduleModal({ open, onClose }) {
         subject: form.subject,
         date: form.date,
         durationMinutes: Number(form.durationMinutes),
-        type: form.type, // ← keep sending type
+        type: form.type, // 'demo' or 'regular'
       });
       onClose();
-      alert('✅ Schedule created!');
+      alert(`✅ ${form.type === 'demo' ? 'Demo' : 'Regular'} class created!`);
     } catch (e) {
       setErrorMsg(e?.response?.data?.message || 'Failed to create schedule.');
     } finally {
@@ -198,9 +197,7 @@ export default function FixScheduleModal({ open, onClose }) {
                     className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 outline-none focus:ring-2"
                     style={{ '--tw-ring-color': brand }}
                   >
-                    <option value="">
-                      {loadingPosts ? 'Loading…' : '— Select a post —'}
-                    </option>
+                    <option value="">{loadingPosts ? 'Loading…' : '— Select a post —'}</option>
                     {posts.map((p) => (
                       <option key={p._id} value={p._id}>
                         {p.title || 'Untitled Post'}
@@ -221,7 +218,7 @@ export default function FixScheduleModal({ open, onClose }) {
                   />
                 </label>
 
-                {/* Type */}
+                {/* Type (UNLOCKED) */}
                 <div className="block">
                   <span className="text-[11px] text-slate-500">Type</span>
                   <div className="mt-1 grid grid-cols-2 gap-2">
@@ -437,7 +434,7 @@ export default function FixScheduleModal({ open, onClose }) {
               className="rounded-lg px-4 py-2 text-white shadow disabled:opacity-60"
               style={{ backgroundColor: brand }}
             >
-              {isSubmitting ? 'Creating…' : 'Create class'}
+              {isSubmitting ? 'Creating…' : (form.type === 'demo' ? 'Create demo class' : 'Create regular class')}
             </button>
           </div>
         </div>

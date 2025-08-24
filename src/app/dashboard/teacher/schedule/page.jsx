@@ -1,10 +1,11 @@
+// src/app/dashboard/teacher/schedule/page.jsx
 'use client';
 import React, { useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import FixScheduleModal from '../../components/scheduleComponents/fixScheduleModal'; // ⬅️ your path
-import { useTeacherSchedules } from '../../../hooks/useSchedules'; // ⬅️ new hook
+import FixScheduleModal from '../../components/scheduleComponents/fixScheduleModal';
+import { useTeacherSchedules } from '../../../hooks/useSchedules';
 
-// --- Your original static bits (unchanged) ---
+// --- Static demo cards (unchanged) ---
 const SUBJECTS = [
   { name: 'Physics', studentsCount: 3 },
   { name: 'Chemistry', studentsCount: 4 },
@@ -87,18 +88,39 @@ const StudentList = ({ students }) => (
   </section>
 );
 
-// Right sidebar now fetches teacher schedules and shows TODAY
+/* ---------------- Right sidebar (grouped) ---------------- */
 function RightSidebarDynamic({ announcements }) {
   const schedulesQ = useTeacherSchedules();
 
-  const todayItems = useMemo(() => {
-    const all = schedulesQ.data || [];
-    const start = new Date(); start.setHours(0,0,0,0);
-    const end = new Date();   end.setHours(23,59,59,999);
-    return all.filter(s => {
+  const groupedToday = useMemo(() => {
+    const all = Array.isArray(schedulesQ.data) ? schedulesQ.data : [];
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const end = new Date();   end.setHours(23, 59, 59, 999);
+
+    // group by minute+subject+type+post
+    const groups = new Map();
+    for (const s of all) {
+      if (s.status !== 'scheduled') continue;
       const d = new Date(s.date);
-      return s.status === 'scheduled' && d >= start && d <= end;
-    });
+      if (isNaN(d) || d < start || d > end) continue;
+
+      const minuteKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`; // local minute
+      const postKey = typeof s.postId === 'object' && s.postId?._id ? s.postId._id : (s.postId || '');
+      const key = `${minuteKey}|${s.subject}|${s.type || 'regular'}|${postKey}`;
+
+      const current = groups.get(key) || {
+        date: d,
+        subject: s.subject,
+        type: s.type || 'regular',
+        postId: postKey,
+        count: 0,
+      };
+      const added = Array.isArray(s.studentIds) ? s.studentIds.length : 1;
+      current.count += added; // demo-per-student => +1 each; regular => +n
+      groups.set(key, current);
+    }
+
+    return Array.from(groups.values()).sort((a, b) => a.date - b.date);
   }, [schedulesQ.data]);
 
   return (
@@ -118,7 +140,7 @@ function RightSidebarDynamic({ announcements }) {
         </div>
       </div>
 
-      {/* Today's Schedule */}
+      {/* Today's Schedule (grouped) */}
       <div>
         <div className="flex items-center mb-3">
           <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 mr-2">📅</span>
@@ -127,20 +149,32 @@ function RightSidebarDynamic({ announcements }) {
 
         {schedulesQ.isLoading ? (
           <div className="text-sm text-slate-500">Loading…</div>
+        ) : groupedToday.length === 0 ? (
+          <div className="text-sm text-slate-500">No classes scheduled today.</div>
         ) : (
           <div className="space-y-3">
-            {todayItems.length === 0 ? (
-              <div className="text-sm text-slate-500">No classes scheduled today.</div>
-            ) : (
-              todayItems.map((item) => (
-                <div key={item._id} className="flex items-center justify-between p-3 rounded-lg bg-white shadow-sm border border-indigo-100 hover:shadow-md transition">
-                  <span className="text-sm font-medium text-gray-800">
-                    {new Date(item.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — {item.subject}
-                  </span>
-                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+            {groupedToday.map((g, idx) => (
+              <div
+                key={`${g.postId}-${g.subject}-${g.type}-${g.date.getTime()}-${idx}`}
+                className="flex items-center justify-between p-3 rounded-lg bg-white shadow-sm border border-indigo-100 hover:shadow-md transition"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-gray-800 truncate">
+                    {g.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — {g.subject}
+                  </div>
+                  {g.type === 'demo' && (
+                    <div className="text-[11px] text-slate-500">Demo class</div>
+                  )}
                 </div>
-              ))
-            )}
+                <span
+                  className="ml-3 inline-flex items-center justify-center text-xs font-semibold rounded-full w-6 h-6 text-white"
+                  title={`${g.count} student${g.count > 1 ? 's' : ''}`}
+                  style={{ backgroundColor: 'rgb(99 102 241)' }} // indigo-500
+                >
+                  {g.count}
+                </span>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -164,7 +198,6 @@ export default function TeacherClassroom() {
           </div>
         </main>
         <RightSidebarDynamic announcements={ANNOUNCEMENTS} />
-
         <FixScheduleModal open={open} onClose={() => setOpen(false)} />
       </div>
     </QueryClientProvider>

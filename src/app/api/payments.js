@@ -51,3 +51,10 @@ export async function settleSolve({ questionId, studentId, teacherId }) {
   });
   return data; // { ok, creditsLeft, gross, platformFee, teacherNet }
 }
+
+export async function getTeacherSummary() {
+  const url = absUrl('/pay/teacher/summary'); // ✅ use the same builder as other calls
+  const res = await axios.get(url, { withCredentials: true });
+  return res.data; // { payments: [...], summary: {...} }
+}
+//src\app\api\payments.js
