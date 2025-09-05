@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import ViewPostDetails from '../../student/components/viewPostDetails';
-import API from '../../../api/axios'; // ← adjust path if needed
+import API from '../../../../api/axios'; // ← adjust path if needed
 
 const PostDetailPage = () => {
   const { id } = useParams();

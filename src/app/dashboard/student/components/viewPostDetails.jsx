@@ -9,11 +9,11 @@ import TuitionRequestModal from './tuitionRequestComponent';
 import TopicHelpModal from './topicHelpModal';
 import { updatePostViewsCount } from '../../../redux/postViewEventSlice';
 import DOMPurify from 'isomorphic-dompurify';
-import API, { videoUrlFromStoredPath, API_BASE_URL_LOG } from '../../../api/axios';
+import API, { videoUrlFromStoredPath, API_BASE_URL_LOG } from '../../../../api/axios';
 
 // ✅ tiny API helpers
-import { canTopicHelp } from '../../../api/tuition';
-import { getTopicCredits, startTopicPack } from '../../../api/payments';
+import { canTopicHelp } from '../../../../api/tuition';
+import { getTopicCredits, startTopicPack } from '../../../../api/payments';
 
 const ViewPostDetails = ({ post }) => {
   const router = useRouter();

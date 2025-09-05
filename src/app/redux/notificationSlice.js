@@ -1,7 +1,7 @@
 // redux/notificationsSlice.js
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import API from '../api/axios'; // ✅ env-driven axios instance
+import API from '../../api/axios'; // ✅ env-driven axios instance
 
 // Async thunk to fetch notifications
 export const fetchNotifications = createAsyncThunk(

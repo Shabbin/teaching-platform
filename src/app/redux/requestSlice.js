@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import API from '../api/axios'; // ✅ centralized axios
+import API from '../../api/axios'; // ✅ centralized axios
 
 // ===============================
 // SEND TUITION REQUEST

@@ -5,7 +5,7 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Star, StarBorder } from '@mui/icons-material';
 import DOMPurify from 'isomorphic-dompurify';
-import API from '../../../api/axios'; 
+import API from '../../../../api/axios'; 
 
 const TeacherPostsPage = () => {
   const { id } = useParams();

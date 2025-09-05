@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import MessengerPopup from './components/chat-components/MessengerPopup';
 import NotificationBellIcon from './components/notificationComponent/NotificationBellIcon';
-import API from '../api/axios'; // ✅ use env-driven axios instance
+import API from '../../api/axios'; // ✅ use env-driven axios instance
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();

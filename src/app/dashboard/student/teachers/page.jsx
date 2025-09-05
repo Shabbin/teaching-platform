@@ -5,7 +5,7 @@ import Select from 'react-select';
 import Avatar from '@mui/material/Avatar';
 import Skeleton from '@mui/material/Skeleton';
 import { Star, StarBorder } from '@mui/icons-material';
-import API from '../../../api/axios'; // ← adjust the relative path if needed
+import API from '../../../../api/axios'; // ← adjust the relative path if needed
 
 const ViewTeachers = () => {
   const [allTags, setAllTags] = useState([]);

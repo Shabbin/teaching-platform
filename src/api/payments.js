@@ -38,6 +38,21 @@ export async function startTuition({ requestId, monthlyFee, phase, fraction, mon
   return data; // { url, tran_id }
 }
 
+// ✅ NEW — Enrollment Invite upfront payment (redirect to SSLCommerz)
+export async function startInvitePayment({ inviteId, returnUrl }) {
+  const url = absUrl("/pay/invite/initiate"); // -> http://localhost:5000/pay/invite/initiate
+  const { data } = await axios.post(
+    url,
+    {
+      inviteId,
+      // 👇 where to return after success/fail/cancel
+      returnUrl,
+    },
+    { withCredentials: true }
+  );
+  return data; // { url, tran_id }
+}
+
 // --- Credits badge (uses your /api prefix axios instance) ---
 export async function getTopicCredits(studentId) {
   const { data } = await API.get(`/students/${studentId}/credits`);
@@ -57,4 +72,3 @@ export async function getTeacherSummary() {
   const res = await axios.get(url, { withCredentials: true });
   return res.data; // { payments: [...], summary: {...} }
 }
-//src\app\api\payments.js

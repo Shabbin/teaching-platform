@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import API from '../api/axios'; // ✅ use the shared axios instance
+import API from '../../api/axios'; // ✅ use the shared axios instance
 import { logout } from './userSlice';
 
 // Async thunk to create a teacher post

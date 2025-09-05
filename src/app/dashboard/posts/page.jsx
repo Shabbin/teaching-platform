@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import API from '../../api/axios'; // ← adjust the relative path if needed
+import API from '../../../../api/axios'; // ← adjust the relative path if needed
 
 export default function PostsListPage() {
   const [posts, setPosts] = useState([]);

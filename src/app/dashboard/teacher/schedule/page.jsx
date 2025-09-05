@@ -1,8 +1,10 @@
 // src/app/dashboard/teacher/schedule/page.jsx
 'use client';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import FixScheduleModal from '../../components/scheduleComponents/fixScheduleModal';
+import FixScheduleModal from '../../components/scheduleComponents/FixScheduleModal';
 import { useTeacherSchedules } from '../../../hooks/useSchedules';
 
 // --- Static demo cards (unchanged) ---
@@ -19,35 +21,57 @@ const STUDENTS = [
 ];
 const ANNOUNCEMENTS = ['Physics class moved to Friday', 'New video uploaded: Motion'];
 
-const Sidebar = ({ onOpen }) => (
-  <aside className="w-[250px] bg-gradient-to-b from-indigo-600 to-indigo-700 text-white p-5 flex flex-col flex-shrink-0">
-    <div className="text-center mb-8">
-      <img
-        src="https://i.pravatar.cc/100"
-        alt="Profile"
-        className="w-20 h-20 rounded-full border-2 border-white object-cover mx-auto ring-2 ring-white/30"
-      />
-      <h3 className="mt-2 text-lg font-medium">Mr. Ahmed</h3>
-    </div>
-    <nav className="flex flex-col gap-2 mt-5">
+/* ---------------- Sidebar with real links + active state ---------------- */
+const Sidebar = ({ onOpen }) => {
+  const pathname = usePathname();
+
+  const links = [
+    { label: 'Schedule (Today)', href: '/dashboard/teacher/schedule' },
+    { label: 'Routines', href: '/dashboard/teacher/schedule/routines' },
+  ];
+
+  const isActive = (href) =>
+    pathname === href || (href !== '/dashboard/teacher/schedule' && pathname?.startsWith(href));
+
+  return (
+    <aside className="w-[250px] bg-gradient-to-b from-indigo-600 to-indigo-700 text-white p-5 flex flex-col flex-shrink-0">
+      <div className="text-center mb-8">
+        <img
+          src="https://i.pravatar.cc/100"
+          alt="Profile"
+          className="w-20 h-20 rounded-full border-2 border-white object-cover mx-auto ring-2 ring-white/30"
+        />
+        <h3 className="mt-2 text-lg font-medium">Mr. Ahmed</h3>
+      </div>
+
       <button
         onClick={onOpen}
         className="bg-white/10 hover:bg-white/20 rounded-lg px-4 py-2 text-sm text-slate-200 hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-300"
       >
         Fix Schedule
       </button>
-      {['Students', 'Exam Scheduler', 'Classroom Settings'].map((item) => (
-        <a
-          key={item}
-          href="#"
-          className="bg-white/10 hover:bg-white/20 rounded-lg px-4 py-2 text-sm text-slate-200 hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-300"
-        >
-          {item}
-        </a>
-      ))}
-    </nav>
-  </aside>
-);
+
+      <nav className="flex flex-col gap-2 mt-5">
+        {links.map((item) => {
+          const active = isActive(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`rounded-lg px-4 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
+                active
+                  ? 'bg-white text-indigo-700'
+                  : 'bg-white/10 text-slate-200 hover:bg-white/20 hover:text-white'
+              }`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+    </aside>
+  );
+};
 
 const ClassOverview = ({ subjects }) => (
   <section className="mb-8">
@@ -97,14 +121,13 @@ function RightSidebarDynamic({ announcements }) {
     const start = new Date(); start.setHours(0, 0, 0, 0);
     const end = new Date();   end.setHours(23, 59, 59, 999);
 
-    // group by minute+subject+type+post
     const groups = new Map();
     for (const s of all) {
       if (s.status !== 'scheduled') continue;
       const d = new Date(s.date);
       if (isNaN(d) || d < start || d > end) continue;
 
-      const minuteKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`; // local minute
+      const minuteKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}`;
       const postKey = typeof s.postId === 'object' && s.postId?._id ? s.postId._id : (s.postId || '');
       const key = `${minuteKey}|${s.subject}|${s.type || 'regular'}|${postKey}`;
 
@@ -116,7 +139,7 @@ function RightSidebarDynamic({ announcements }) {
         count: 0,
       };
       const added = Array.isArray(s.studentIds) ? s.studentIds.length : 1;
-      current.count += added; // demo-per-student => +1 each; regular => +n
+      current.count += added;
       groups.set(key, current);
     }
 
@@ -169,7 +192,7 @@ function RightSidebarDynamic({ announcements }) {
                 <span
                   className="ml-3 inline-flex items-center justify-center text-xs font-semibold rounded-full w-6 h-6 text-white"
                   title={`${g.count} student${g.count > 1 ? 's' : ''}`}
-                  style={{ backgroundColor: 'rgb(99 102 241)' }} // indigo-500
+                  style={{ backgroundColor: 'rgb(99 102 241)' }}
                 >
                   {g.count}
                 </span>
@@ -186,6 +209,61 @@ function RightSidebarDynamic({ announcements }) {
 export default function TeacherClassroom() {
   const [open, setOpen] = useState(false);
   const [client] = useState(() => new QueryClient());
+
+  // 🔄 live-refresh schedules via socket
+  useEffect(() => {
+    let detach = () => {};
+    let tries = 0;
+    const maxTries = 20;
+
+    const attach = () => {
+      const s = typeof window !== 'undefined' ? window.socket : null;
+      if (!s) return false;
+
+      const shouldRefresh = (t) =>
+        t === 'new_schedule' ||
+        t === 'schedule_cancelled' ||
+        t === 'schedule_updated' ||
+        t === 'schedule_proposal_update' ||
+        t === 'schedule_response' ||
+        (typeof t === 'string' && t.startsWith('routine_')) ||
+        t === 'schedules_refresh';
+
+      const onNotif = (payload = {}) => {
+        const t = payload?.type;
+        if (shouldRefresh(t)) {
+          client.invalidateQueries({ queryKey: ['schedules'] });
+        }
+      };
+
+      const onRefresh = () => {
+        client.invalidateQueries({ queryKey: ['schedules'] });
+      };
+
+      s.on('new_notification', onNotif);
+      s.on('schedules_refresh', onRefresh);
+
+      detach = () => {
+        s.off('new_notification', onNotif);
+        s.off('schedules_refresh', onRefresh);
+      };
+
+      return true;
+    };
+
+    if (!attach()) {
+      const id = setInterval(() => {
+        tries += 1;
+        if (attach() || tries >= maxTries) clearInterval(id);
+      }, 500);
+      return () => {
+        clearInterval(id);
+        detach();
+      };
+    }
+
+    return () => detach();
+  }, [client]);
 
   return (
     <QueryClientProvider client={client}>

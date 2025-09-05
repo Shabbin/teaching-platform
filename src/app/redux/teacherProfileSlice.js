@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import API from '../api/axios'; // ✅ centralized axios (reads env)
+import API from '../../api/axios'; // ✅ centralized axios (reads env)
 import { logout } from './userSlice';
 
 // Async: Fetch teacher profile (with posts)

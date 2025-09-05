@@ -1,3 +1,4 @@
+// hooks/useSocket.js
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useDispatch, useSelector } from 'react-redux';
@@ -8,7 +9,7 @@ import {
   incrementUnreadCount,
   resetUnreadCount,
   setOnlineUserIds,
-  setCurrentThreadId, // ✅ needed for request_update handler
+  setCurrentThreadId,
 } from '../redux/chatSlice';
 import { normalizeMessage } from '../redux/chatThunks';
 import { addPostViewEvent, updatePostViewsCount } from '../redux/postViewEventSlice';
@@ -20,7 +21,13 @@ const SOCKET_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   'http://localhost:5000';
 
-export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessageAlert) {
+export default function useSocket(
+  userId,
+  onNewMessage,
+  onRequestUpdate,
+  onMessageAlert,
+  onNotification // ✅ existing optional callback
+) {
   const socketRef = useRef();
   const dispatch = useDispatch();
 
@@ -49,20 +56,39 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
   useEffect(() => {
     if (!userId) return;
 
-    socketRef.current = io(SOCKET_URL, {
-      withCredentials: true,
+    // OPTIONAL auth fallback: forward client token if you store one (otherwise cookies are used)
+    let tokenFromStorage;
+    try {
+      tokenFromStorage =
+        typeof window !== 'undefined' &&
+        (localStorage.getItem('token') || localStorage.getItem('jwt') || null);
+    } catch (_) {}
+
+    // ✅ Create (or reuse) the socket
+    socketRef.current =
+      (typeof window !== 'undefined' && window.socket) ||
+      io(SOCKET_URL, {
+        withCredentials: true,
+        auth: tokenFromStorage ? { token: tokenFromStorage } : undefined,
+      });
+
+    // ✅ EXPOSE the shared socket globally so NotificationBell / pages can use it
+    if (typeof window !== 'undefined') {
+      window.socket = socketRef.current;
+    }
+
+    const s = socketRef.current;
+
+    s.on('connect', () => {
+      console.log('[useSocket] connected:', s.id);
     });
 
-    socketRef.current.on('connect', () => {
-      console.log('[useSocket] connected:', socketRef.current.id);
-    });
-
-    socketRef.current.on('online_users', (onlineUserIds) => {
+    s.on('online_users', (onlineUserIds) => {
       console.log('[socket] online_users received:', onlineUserIds);
       dispatch(setOnlineUserIds(onlineUserIds));
     });
 
-    socketRef.current.on('new_message', (message) => {
+    s.on('new_message', (message) => {
       const normalizedMessage = normalizeMessage(message);
       if (!normalizedMessage) return;
 
@@ -104,34 +130,36 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
       }
     });
 
-    socketRef.current.on('new_notification', (notification) => {
+    s.on('new_notification', (notification) => {
       if (notification.read === undefined) notification.read = false;
       dispatch(addNotification(notification));
+      if (typeof onNotification === 'function') onNotification(notification);
     });
 
-    socketRef.current.on('conversation_list_updated', (fullThread) => {
+    // lightweight schedule refresh signal
+    s.on('schedules_refresh', (payload) => {
+      console.log('[socket] schedules_refresh', payload);
+      if (typeof onNotification === 'function') {
+        onNotification({ type: 'schedules_refresh', payload });
+      }
+    });
+
+    s.on('conversation_list_updated', (fullThread) => {
       console.log('[socket] conversation_list_updated received:', fullThread);
       dispatch(addOrUpdateConversation(fullThread));
     });
 
-    socketRef.current.on('new_message_alert', (alert) => {
-      if (typeof onMessageAlert === 'function') {
-        onMessageAlert(alert);
-      }
+    s.on('new_message_alert', (alert) => {
+      if (typeof onMessageAlert === 'function') onMessageAlert(alert);
     });
 
-    socketRef.current.on('post_view_event', (event) => {
+    s.on('post_view_event', (event) => {
       console.log('[socket] post_view_event received:', event);
       dispatch(addPostViewEvent(event));
-      dispatch(
-        updatePostViewsCount({
-          postId: event.postId,
-          viewsCount: event.viewsCount,
-        })
-      );
+      dispatch(updatePostViewsCount({ postId: event.postId, viewsCount: event.viewsCount }));
     });
 
-    socketRef.current.on('new_tuition_request', (data) => {
+    s.on('new_tuition_request', (data) => {
       console.log('[socket] new_tuition_request received:', data);
 
       const lastMsgText = data.lastMessageText?.trim() || 'New tuition request received';
@@ -177,22 +205,17 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
 
       playKnock();
 
-      if (typeof onNewMessage === 'function') {
-        onNewMessage(realMessage);
-      }
-
-      if (typeof onRequestUpdate === 'function') {
-        onRequestUpdate({ type: 'new', ...data });
-      }
+      if (typeof onNewMessage === 'function') onNewMessage(realMessage);
+      if (typeof onRequestUpdate === 'function') onRequestUpdate({ type: 'new', ...data });
     });
 
-    socketRef.current.on('request_update', (data) => {
+    s.on('request_update', (data) => {
       if (data.type === 'approved' && data.studentId === userId) {
         dispatch(setCurrentThreadId(data.threadId));
       }
     });
 
-    socketRef.current.on('request_approved', (data) => {
+    s.on('request_approved', (data) => {
       console.log('[socket] request_approved received:', data);
 
       const { threadId, requestId, timestamp } = data;
@@ -227,7 +250,7 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
       playKnock();
     });
 
-    socketRef.current.on('mark_thread_read', ({ threadId, userId: senderUserId }) => {
+    s.on('mark_thread_read', ({ threadId, userId: senderUserId }) => {
       const myUserId = userId?.toString();
       if (senderUserId === myUserId && threadId === currentThreadId) {
         console.log(`[socket] mark_thread_read received for thread ${threadId}`);
@@ -235,7 +258,7 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
       }
     });
 
-    socketRef.current.on('request_rejected', (data) => {
+    s.on('request_rejected', (data) => {
       console.log('[socket] request_rejected received:', data);
 
       const { threadId, requestId, timestamp, rejectionMessage } = data;
@@ -268,30 +291,36 @@ export default function useSocket(userId, onNewMessage, onRequestUpdate, onMessa
       }
     });
 
-    socketRef.current.on('disconnect', (reason) => {
+    s.on('disconnect', (reason) => {
       console.log('[useSocket] disconnected:', reason);
     });
 
-    // Cleanup all listeners on unmount or userId change
+    // Cleanup: remove this hook's listeners but DON'T disconnect the shared socket
     return () => {
-      if (socketRef.current) {
-        socketRef.current.off('connect');
-        socketRef.current.off('online_users');
-        socketRef.current.off('new_message');
-        socketRef.current.off('new_notification'); // ✅ cleanup added
-        socketRef.current.off('conversation_list_updated');
-        socketRef.current.off('new_message_alert');
-        socketRef.current.off('post_view_event');
-        socketRef.current.off('new_tuition_request');
-        socketRef.current.off('request_update');
-        socketRef.current.off('request_approved');
-        socketRef.current.off('request_rejected'); // ✅ cleanup added
-        socketRef.current.off('mark_thread_read');
-        socketRef.current.off('disconnect');
-        socketRef.current.disconnect();
+      if (!socketRef.current) return;
+      const sc = socketRef.current;
+
+      sc.off('connect');
+      sc.off('online_users');
+      sc.off('new_message');
+      sc.off('new_notification');
+      sc.off('schedules_refresh');
+      sc.off('conversation_list_updated');
+      sc.off('new_message_alert');
+      sc.off('post_view_event');
+      sc.off('new_tuition_request');
+      sc.off('request_update');
+      sc.off('request_approved');
+      sc.off('request_rejected');
+      sc.off('mark_thread_read');
+      sc.off('disconnect');
+
+      // ❌ don't call sc.disconnect() if it's the shared global socket
+      if (typeof window === 'undefined' || window.socket !== sc) {
+        sc.disconnect();
       }
     };
-  }, [userId, dispatch, onNewMessage, onRequestUpdate, onMessageAlert, currentThreadId]);
+  }, [userId, dispatch, onNewMessage, onRequestUpdate, onMessageAlert, onNotification, currentThreadId]);
 
   const joinThread = (threadId) => {
     if (socketRef.current && threadId) {

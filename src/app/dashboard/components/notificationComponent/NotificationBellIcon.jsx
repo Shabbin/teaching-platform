@@ -1,3 +1,4 @@
+// src/app/dashboard/components/notificationComponent/NotificationBellIcon.jsx
 'use client';
 
 import { useEffect, useRef, useState, useMemo } from 'react';
@@ -13,14 +14,99 @@ import {
   revertNotificationsRead,
 } from '../../../redux/notificationSlice';
 
+/* ---------------- date utils (robust parsing) ---------------- */
+function parseAnyDate(raw) {
+  if (!raw) return null;
+
+  // Date object
+  if (raw instanceof Date) return isNaN(raw) ? null : raw;
+
+  // Number (epoch ms or seconds)
+  if (typeof raw === 'number') {
+    // Heuristic: seconds vs ms
+    const ms = raw < 10_000_000_000 ? raw * 1000 : raw;
+    const d = new Date(ms);
+    return isNaN(d) ? null : d;
+  }
+
+  // String
+  if (typeof raw === 'string') {
+    // Try native first (ISO handles fine)
+    let d = new Date(raw);
+    if (!isNaN(d)) return d;
+
+    // Common non-ISO formats like "YYYY-MM-DD HH:mm" (space instead of 'T')
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(raw)) {
+      d = new Date(raw.replace(' ', 'T'));
+      if (!isNaN(d)) return d;
+      // try as UTC
+      d = new Date(raw.replace(' ', 'T') + 'Z');
+      if (!isNaN(d)) return d;
+    }
+
+    // Date-only "YYYY-MM-DD"
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      d = new Date(raw + 'T00:00:00');
+      if (!isNaN(d)) return d;
+    }
+  }
+
+  return null;
+}
+
+function pickWhen(n) {
+  // Accept a bunch of potential fields from various backends
+  return (
+    n?.createdAt ??
+    n?.created_at ??
+    n?.date ??
+    n?.timestamp ??
+    n?.time ??
+    n?.ts ??
+    null
+  );
+}
+
+function formatWhen(n) {
+  const d = parseAnyDate(pickWhen(n));
+  if (!d) return ''; // fallback to empty instead of "Invalid Date"
+  return d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/* ---------------- normalize incoming notifications ---------------- */
+function normalizeNotification(raw) {
+  const id =
+    raw?._id ||
+    raw?.id ||
+    raw?.notificationId ||
+    `notif_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  const when = parseAnyDate(pickWhen(raw)) || new Date();
+
+  return {
+    // keep everything, but fix a few fields
+    ...raw,
+    _id: id,
+    read: raw?.read ?? false,
+    createdAt: when.toISOString(),
+    senderName: raw?.senderName || raw?.data?.senderName || 'Someone',
+    profileImage: raw?.profileImage || raw?.data?.profileImage || '/default-avatar.png',
+    message: raw?.message || raw?.text || raw?.title || 'Notification',
+  };
+}
+
 export default function NotificationBell() {
   const dispatch = useDispatch();
-  const notifications = useSelector((state) => state.notifications.notifications || []);
+  const notifications = useSelector((s) => s.notifications.notifications || []);
 
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Memoize unread notifications for performance
+  // Memoize unread notifications
   const unreadIds = useMemo(
     () => notifications.filter((n) => !n.read).map((n) => n._id || n.id),
     [notifications]
@@ -37,12 +123,7 @@ export default function NotificationBell() {
     if (!window.socket) return;
 
     const handleNewNotification = (notif) => {
-      const formattedNotif = {
-        ...notif,
-        senderName: notif.senderName || notif.data?.senderName || 'Someone',
-        profileImage: notif.profileImage || notif.data?.profileImage || 'default-avatar.png', // ✅ replaced default-avatar
-      };
-      dispatch(addNotification(formattedNotif));
+      dispatch(addNotification(normalizeNotification(notif)));
     };
 
     window.socket.on('new_notification', handleNewNotification);
@@ -62,10 +143,9 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Centralized optimistic update with rollback
+  // Optimistic read with rollback
   const markAsReadOptimistic = (ids) => {
     if (!ids.length) return;
-
     dispatch(markNotificationsReadOptimistic(ids));
     dispatch(markNotificationsRead(ids))
       .unwrap()
@@ -75,7 +155,7 @@ export default function NotificationBell() {
       });
   };
 
-  // Mark notifications read when dropdown opens
+  // Mark as read when dropdown opens
   useEffect(() => {
     if (open && unreadCount > 0) {
       markAsReadOptimistic(unreadIds);
@@ -100,12 +180,14 @@ export default function NotificationBell() {
       >
         <Bell className="w-6 h-6" />
         {unreadCount > 0 && (
-          <span className="
+          <span
+            className="
               absolute top-1 right-0.5 inline-flex items-center justify-center
               px-2 py-1 text-[11px] font-bold leading-none
               text-white bg-red-600 rounded-full shadow-sm
               transform translate-x-1/4 -translate-y-[1px]
-            ">
+            "
+          >
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
@@ -140,19 +222,15 @@ export default function NotificationBell() {
                   >
                     <div className="flex items-center gap-3">
                       <img
-                        src={n.profileImage || 'default-avatar.png'} // ✅ replaced default-avatar
+                        src={n.profileImage || '/default-avatar.png'}
                         alt={n.senderName || 'User'}
                         className="w-10 h-10 rounded-full object-cover border border-gray-200 shadow-sm"
                       />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-800">
+                      <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 whitespace-pre-wrap break-words leading-5">
                           {n.senderName ? `${n.senderName} ${n.message}` : n.message}
                         </p>
-                        <span className="text-xs text-gray-500">
-                          {new Date(n.date || n.createdAt).toLocaleDateString('en-GB', {
-                            day: '2-digit', month: 'short', year: 'numeric',
-                          })}
-                        </span>
+                        <span className="text-xs text-gray-500">{formatWhen(n)}</span>
                       </div>
                     </div>
                   </li>
@@ -161,10 +239,7 @@ export default function NotificationBell() {
             )}
 
             <div className="text-center p-2">
-              <button
-                onClick={handleClearAll}
-                className="text-indigo-600 hover:underline text-sm"
-              >
+              <button onClick={handleClearAll} className="text-indigo-600 hover:underline text-sm">
                 Clear All
               </button>
             </div>

@@ -8,7 +8,7 @@ import {
   setCurrentUserId,
   setError,
 } from './chatSlice';
-import API from '../api/axios'; // ✅ env-driven axios instance
+import API from '../../api/axios'; // ✅ env-driven axios instance
 
 // 🔁 Fetch all conversations for current user (teacher or student)
 export const fetchConversationsThunk = createAsyncThunk(

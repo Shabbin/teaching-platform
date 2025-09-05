@@ -21,7 +21,7 @@ import {
 } from "../../../../redux/teacherPostSlice";
 
 // ✅ use env-driven axios wrapper instead of raw axios
-import API from "../../../../api/axios";
+import API from "../../../../../api/axios";
 
 import Step1_EducationSystem from "./Step1_EducationSystem";
 import Step2_BoardGroup from "./Step2_BoardGroup";

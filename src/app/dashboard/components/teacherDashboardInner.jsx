@@ -3,7 +3,7 @@ import { useEffect, useRef, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import { uploadProfilePicture, getTeacherDashboard } from './../../redux/userSlice';
-import API from '../../api/axios';
+import API from '../../../api/axios';
 
 import ViewedPostsTimeline from './ViewedPostsTimeline';
 import { fetchPostViewEvents } from '../../redux/postViewEventSlice';
@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 
 // ✅ use your payments API helper
-import { getTeacherSummary } from '../../api/payments';
+import { getTeacherSummary } from '../../../api/payments';
 
 export default function TeacherDashboardInner() {
   const router = useRouter();

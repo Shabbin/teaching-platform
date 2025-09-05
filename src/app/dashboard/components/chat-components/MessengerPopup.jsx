@@ -17,7 +17,7 @@ import {
 } from '../../../redux/chatThunks';
 import useSocket from '../../../hooks/useSocket';
 import { FiMessageCircle } from 'react-icons/fi';
-import API from '../../../api/axios'; // ✅ env-driven axios instance
+import API from '../../../../api/axios'; // ✅ env-driven axios instance
 
 export default function MessengerPopup({ role: propRole }) {
   const user = useSelector((state) => state.user.userInfo);

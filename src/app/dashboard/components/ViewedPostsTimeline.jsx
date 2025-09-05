@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchPostViewEvents, fetchPostById } from '../../redux/postViewEventSlice';
 import DOMPurify from 'isomorphic-dompurify';
 import { Eye } from 'lucide-react';
-import { videoUrlFromStoredPath } from '../../api/axios'; 
+import { videoUrlFromStoredPath } from '../../../api/axios'; 
 
 export default function ViewedPostsTimeline() {
   const dispatch = useDispatch();
