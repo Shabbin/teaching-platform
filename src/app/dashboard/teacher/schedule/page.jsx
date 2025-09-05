@@ -4,7 +4,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import FixScheduleModal from '../../components/scheduleComponents/FixScheduleModal';
+import FixScheduleModal from '../../components/scheduleComponents/fixScheduleModal';
 import { useTeacherSchedules } from '../../../hooks/useSchedules';
 
 // --- Static demo cards (unchanged) ---
