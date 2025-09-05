@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 // ⬇️ Use your env-driven axios instance
-import API, { absUrl } from '../../../api/axios'; // adjust path if needed
+import API, { absUrl } from '../../api/axios'; // adjust path if needed
 
 export default function TuitionPostsPage() {
   const [posts, setPosts] = useState([]);

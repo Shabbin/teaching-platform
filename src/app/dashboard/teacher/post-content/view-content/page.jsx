@@ -6,7 +6,7 @@ import { Edit3, Trash2, Users, X, Eye } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchPostById } from '../../../../redux/postViewEventSlice'; // adjust path if needed
 import DOMPurify from 'isomorphic-dompurify';
-import API from '../../../../api/axios'; // ← env-driven axios (adjust path if needed)
+import API from '../../../../../api/axios'; // ← env-driven axios (adjust path if needed)
 
 export default function MyPostsList() {
   const [posts, setPosts] = useState([]);

@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import toast, { Toaster } from 'react-hot-toast'
 import { updateProfileImage } from '../../../redux/userSlice'
 import { Camera, Star, MessageSquare, DollarSign, CheckCircle } from 'lucide-react'
-import API, { absUrl } from '../../../api/axios' // ← use env-driven axios + URL helper
+import API, { absUrl } from '../../../../api/axios' // ← use env-driven axios + URL helper
 
 export default function TeacherProfilePage() {
   const dispatch = useDispatch()

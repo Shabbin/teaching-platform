@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import EditPostForm from '../../../../dashboard/teacher/components/EditPostForms';
-import API from '../../../../api/axios'; 
+import API from '../../../../../api/axios'; 
 
 export default function EditPostPage() {
   const { id } = useParams();
