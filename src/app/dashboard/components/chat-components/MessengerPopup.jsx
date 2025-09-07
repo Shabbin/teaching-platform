@@ -17,7 +17,7 @@ import {
 import useSocket from '../../../hooks/useSocket';
 import { FiMessageCircle } from 'react-icons/fi';
 import API from '../../../../api/axios';
-import MiniChatWindow from './MiniChatWindow';
+import MiniChatWindow from './miniChatWindow';
 
 export default function MessengerPopup({ role: propRole }) {
   const dispatch = useDispatch();
