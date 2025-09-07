@@ -4,277 +4,173 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import useSocket from '../../../hooks/useSocket';
 import {
-  addOrUpdateConversation,
   setCurrentThreadId,
   resetUnreadCount,
-  updateLastMessageInConversation,
-  addMessageToThread,
 } from '../../../redux/chatSlice';
 import { fetchConversationsThunk } from '../../../redux/chatThunks';
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
-import { playKnock } from '../../../utils/knock';
-
-function getFallbackAvatar(userId) {
-  return `https://i.pravatar.cc/150?u=${userId}`;
-}
 
 export default function StudentMessengerPage() {
   const dispatch = useDispatch();
-  const user = useSelector((state) => state.user.userInfo);
 
+  const user = useSelector((state) => state.user.userInfo);
   const currentUserId = (user?.id || user?._id)?.toString();
   const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
   const conversations = useSelector((state) => state.chat.conversations);
   const conversationsLoaded = useSelector((state) => state.chat.conversationsLoaded);
+  // 🔁 NEW: watch global currentThreadId set by MessengerPopup
+  const currentThreadIdGlobal = useSelector((state) => state.chat.currentThreadId);
 
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const joinedThreadsRef = useRef(new Set());
-  const lastKnockTimeRef = useRef(0);
   const userSelectedChatRef = useRef(false);
+  const lastResetThreadIdRef = useRef(null);
 
-  // Deduplicate and prepare conversations: show teacher info for student
+  // Helpers
+  const avatarOf = useCallback(
+    (conv) => {
+      if (conv?.displayProfileImage) return conv.displayProfileImage;
+      if (conv?.profileImage) return conv.profileImage;
+
+      if (conv?.participants?.length && currentUserId) {
+        const other = conv.participants.find((p) => String(p?._id) !== String(currentUserId));
+        if (other?.profileImage) return other.profileImage;
+      }
+
+      const fallbackId = conv?.participantId || conv?.studentId || conv?.teacherId || 'unknown';
+      return `https://i.pravatar.cc/150?u=${fallbackId}`;
+    },
+    [currentUserId]
+  );
+
+  const displayNameOf = useCallback(
+    (conv) => {
+      return (
+        conv?.displayName ||
+        conv?.name ||
+        (() => {
+          if (conv?.participants?.length && currentUserId) {
+            const other = conv.participants.find((p) => String(p?._id) !== String(currentUserId));
+            if (other?.name) return other.name;
+          }
+          return conv?.teacherName || conv?.studentName || 'Unknown';
+        })()
+      );
+    },
+    [currentUserId]
+  );
+
+  // Deduplicate + sort
   const dedupedConversations = useMemo(() => {
     const map = new Map();
-    conversations.forEach((c) => {
-      if (c.threadId && !map.has(c.threadId)) {
-        map.set(c.threadId, c);
-      }
-    });
-    const deduped = Array.from(map.values());
-
-    return deduped
-      .map((conv) => {
-        const mySession = conv.sessions?.find(
-          (s) => s.userId?.toString() === currentUserId
-        );
-        const lastSeen = mySession?.lastSeen ? new Date(mySession.lastSeen) : null;
-        const lastMsgTime = new Date(conv.lastMessageTimestamp || 0);
-        const isUnread = lastSeen ? lastSeen < lastMsgTime : true;
-
-        const studentId = conv.studentId?.toString();
-        const teacherId = conv.teacherId?.toString();
-
-        let displayName = conv.name;
-        let displayImage = conv.profileImage;
-
-        if (currentUserId === studentId) {
-          // Show teacher info for student
-          displayName = conv.teacherName || 'Teacher';
-          const teacherParticipant = conv.participants?.find(
-            (p) => p._id.toString() === teacherId
-          );
-          displayImage =
-            conv.teacherProfileImage ||
-            teacherParticipant?.profileImage ||
-            getFallbackAvatar(teacherId);
-        }
-
-        return {
-          ...conv,
-          isUnread,
-          name: displayName,
-          profileImage: displayImage,
-        };
-      })
-      .sort((a, b) => {
-        return new Date(b.lastMessageTimestamp || 0) - new Date(a.lastMessageTimestamp || 0);
-      });
-  }, [conversations, currentUserId]);
+    for (const c of conversations) {
+      const id = c.threadId || c._id || c.requestId;
+      if (id && !map.has(id)) map.set(id, c);
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => new Date(b.lastMessageTimestamp || 0) - new Date(a.lastMessageTimestamp || 0)
+    );
+  }, [conversations]);
 
   // Fetch conversations
   const fetchConversations = useCallback(async () => {
     if (!currentUserId) return;
     setLoading(true);
     setError(null);
-
     try {
-      const convos = await dispatch(fetchConversationsThunk({ role: 'student', userId: currentUserId })).unwrap();
+      const convos = await dispatch(
+        fetchConversationsThunk({ role: 'student', userId: currentUserId })
+      ).unwrap();
 
       if (convos.length > 0) {
-        if (!selectedChat) {
-          setSelectedChat(convos[0]);
-          dispatch(setCurrentThreadId(convos[0].threadId));
-        } else {
-          const updated = convos.find(c => c.threadId === selectedChat.threadId);
-          if (updated) {
-            setSelectedChat(updated);
-            dispatch(setCurrentThreadId(updated.threadId));
-          } else {
-            setSelectedChat(convos[0]);
-            dispatch(setCurrentThreadId(convos[0].threadId));
-          }
-        }
+        const keep =
+          selectedChat && convos.find((c) => c.threadId === selectedChat.threadId);
+        const nextSel = keep || convos[0];
+        setSelectedChat(nextSel);
+        dispatch(setCurrentThreadId(nextSel.threadId));
       } else {
         setSelectedChat(null);
         dispatch(setCurrentThreadId(null));
       }
-
       userSelectedChatRef.current = false;
     } catch (err) {
-      setError(err.message || 'Failed to fetch conversations');
+      setError(err?.message || 'Failed to fetch conversations');
     } finally {
       setLoading(false);
     }
   }, [dispatch, currentUserId, selectedChat]);
 
-useEffect(() => {
-  if (!conversationsLoaded && currentUserId) {
-    dispatch(fetchConversationsThunk({ userId: currentUserId }));
-  }
-}, [conversationsLoaded, currentUserId, dispatch]);
-
-  // Debounced knock sound
-  function playKnockDebounced() {
-    const now = Date.now();
-    if (now - lastKnockTimeRef.current > 3000) {
-      playKnock();
-      lastKnockTimeRef.current = now;
-    }
-  }
-
-  // Handle incoming messages
-  const handleNewMessage = (message) => {
-    const isMyMessage = String(message.senderId) === currentUserId;
-    const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
-
-    let sender = null;
-    if (message.sender) {
-      sender = message.sender;
-    } else if (message.participants && Array.isArray(message.participants)) {
-      sender = message.participants.find((p) => String(p._id) === String(message.senderId));
-    }
-
-    sender = {
-      _id: message.senderId,
-      name: sender?.name || message.senderName || 'Unknown',
-      profileImage: sender?.profileImage || getFallbackAvatar(message.senderId),
-      role: sender?.role || null,
-    };
-
-    if (!isMyMessage && !isCurrentThread) {
-      playKnockDebounced();
-    }
-
-    dispatch(
-      addOrUpdateConversation({
-        threadId: message.threadId,
-        lastMessage: message.text,
-        incrementUnread: !isCurrentThread,
-        messages: [message],
-        sender,
-      })
-    );
-
-    if (isCurrentThread) {
-      setSelectedChat((prev) => ({
-        ...prev,
-        lastMessage: message.text,
-        messages: [...(prev.messages || []), message],
-      }));
-    }
-
-    dispatch(
-      updateLastMessageInConversation({
-        threadId: message.threadId,
-        message: { text: message.text, timestamp: message.timestamp },
-      })
-    );
-
-    dispatch(addMessageToThread({ threadId: message.threadId, message }));
-  };
-
-  // Handle request approval notifications
-  const handleRequestUpdate = useCallback(
-    async (data) => {
-      if (data.type === 'approved') {
-        try {
-          const updatedConvos = await dispatch(fetchConversationsThunk({ role: 'student', userId: currentUserId })).unwrap();
-
-          const approvedConvo = updatedConvos.find(
-            (convo) => convo.threadId === data.threadId || convo.requestId === data.requestId
-          );
-
-          if (approvedConvo) {
-            dispatch(addOrUpdateConversation(approvedConvo));
-            setSelectedChat((prevSelected) => {
-              if (prevSelected?.threadId === approvedConvo.threadId) {
-                return { ...approvedConvo };
-              }
-              return prevSelected;
-            });
-            dispatch(setCurrentThreadId(approvedConvo.threadId));
-            userSelectedChatRef.current = true;
-          } else {
-            console.warn('Approved conversation not found after refresh');
-          }
-        } catch (err) {
-          console.error('Error refetching conversations after approval:', err);
-        }
-      }
-    },
-    [dispatch, currentUserId]
-  );
-
-  // Sync selectedChat with conversations updates
   useEffect(() => {
-    if (!selectedChat) return;
-
-    const updatedConvo = conversations.find(c => c.threadId === selectedChat.threadId);
-    if (!updatedConvo) return;
-
-    const hasChanged =
-      updatedConvo.unreadCount !== selectedChat.unreadCount ||
-      updatedConvo.lastMessageTimestamp !== selectedChat.lastMessageTimestamp ||
-      updatedConvo.lastMessage !== selectedChat.lastMessage;
-
-    if (hasChanged) {
-      setSelectedChat(updatedConvo);
+    if (!conversationsLoaded && currentUserId) {
+      fetchConversations();
     }
-  }, [conversations, selectedChat]);
+  }, [conversationsLoaded, currentUserId, fetchConversations]);
 
-  // Setup socket hooks
+  // ✅ NEW: if MessengerPopup sets currentThreadId, select it here
+  useEffect(() => {
+    if (!currentThreadIdGlobal) return;
+    const found = dedupedConversations.find((c) => c.threadId === currentThreadIdGlobal);
+    if (found && (!selectedChat || selectedChat.threadId !== found.threadId)) {
+      userSelectedChatRef.current = true;
+      setSelectedChat(found);
+    }
+  }, [currentThreadIdGlobal, dedupedConversations, selectedChat]);
+
+  // Socket: page-local behavior only
+  const handleNewMessage = useCallback((message) => {
+    const isCurrent = selectedChat && message.threadId === selectedChat.threadId;
+    if (isCurrent) {
+      // no-op; Redux updates handled in useSocket
+    }
+  }, [selectedChat]);
+
+  const handleRequestUpdate = useCallback(async (data) => {
+    if (data?.type === 'approved') {
+      fetchConversations();
+    }
+  }, [fetchConversations]);
+
   const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(
     currentUserId,
     handleNewMessage,
     handleRequestUpdate
   );
 
-  // Join selected thread room
+  // Join selected room
   useEffect(() => {
-    if (selectedChat?.threadId && !joinedThreadsRef.current.has(selectedChat.threadId)) {
-      joinThread(selectedChat.threadId);
-      joinedThreadsRef.current.add(selectedChat.threadId);
+    const tid = selectedChat?.threadId;
+    if (tid && !joinedThreadsRef.current.has(tid)) {
+      joinThread(tid);
+      joinedThreadsRef.current.add(tid);
     }
   }, [selectedChat, joinThread]);
 
-  // Join all conversation threads
+  // Join all conversation rooms
   useEffect(() => {
     if (!currentUserId || dedupedConversations.length === 0) return;
-
     dedupedConversations.forEach((convo) => {
-      if (convo.threadId && !joinedThreadsRef.current.has(convo.threadId)) {
-        joinThread(convo.threadId);
-        joinedThreadsRef.current.add(convo.threadId);
+      const tid = convo.threadId || convo._id || convo.requestId;
+      if (tid && !joinedThreadsRef.current.has(tid)) {
+        joinThread(tid);
+        joinedThreadsRef.current.add(tid);
       }
     });
   }, [currentUserId, dedupedConversations, joinThread]);
 
-  // Manage selectedChat updates when conversations change
+  // Keep a valid selection as convos change
   useEffect(() => {
     if (dedupedConversations.length === 0 && selectedChat !== null) {
       setSelectedChat(null);
       return;
     }
-
     if (!selectedChat && dedupedConversations.length > 0) {
       setSelectedChat(dedupedConversations[0]);
       return;
     }
-
     if (userSelectedChatRef.current) return;
 
     const stillExists = dedupedConversations.some((c) => c.threadId === selectedChat?.threadId);
@@ -283,22 +179,22 @@ useEffect(() => {
     }
   }, [dedupedConversations, selectedChat]);
 
-  // Reset unread count on selected chat change
+  // ✅ Reset unread ONCE per opened thread (no infinite loop)
   useEffect(() => {
-    if (!selectedChat) return;
+    const tid = selectedChat?.threadId;
+    if (!tid) return;
 
-    dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
+    if (lastResetThreadIdRef.current === tid) return;
+    lastResetThreadIdRef.current = tid;
 
-    if (emitMarkThreadRead) {
-      emitMarkThreadRead(selectedChat.threadId);
-    }
-  }, [selectedChat, dispatch, emitMarkThreadRead]);
+    dispatch(resetUnreadCount({ threadId: tid }));
+    emitMarkThreadRead?.(tid);
+  }, [selectedChat?.threadId, dispatch]); // intentionally not depending on emitMarkThreadRead
 
-  // Handle user selecting a chat
+  // User selecting a chat
   const handleSelectChat = (selected) => {
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
-
     userSelectedChatRef.current = true;
     setSelectedChat(finalSelection);
     dispatch(setCurrentThreadId(finalSelection.threadId));
@@ -316,6 +212,8 @@ useEffect(() => {
         onlineUserIds={onlineUserIds}
         userId={currentUserId}
         isStudent={true}
+        getAvatar={avatarOf}
+        getDisplayName={displayNameOf}
       />
       <ChatPanel chat={selectedChat} user={user} sendMessage={sendMessage} />
     </div>

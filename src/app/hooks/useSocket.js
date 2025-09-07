@@ -1,4 +1,6 @@
 // hooks/useSocket.js
+'use client';
+
 import { useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useDispatch, useSelector } from 'react-redux';
@@ -10,6 +12,9 @@ import {
   resetUnreadCount,
   setOnlineUserIds,
   setCurrentThreadId,
+  // ✅ presence helpers (make sure these exist in your slice)
+  addOnlineUserId,
+  removeOnlineUserId,
 } from '../redux/chatSlice';
 import { normalizeMessage } from '../redux/chatThunks';
 import { addPostViewEvent, updatePostViewsCount } from '../redux/postViewEventSlice';
@@ -21,12 +26,40 @@ const SOCKET_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   'http://localhost:5000';
 
+// ---- helpers for stable identity
+const isGenericName = (n) => !n || n === 'User' || n === 'Unknown' || n === 'No Name';
+
+function deriveOtherFromPayload(payload, myId) {
+  // Prefer participants from payload if present
+  if (Array.isArray(payload?.participants) && myId) {
+    const other = payload.participants.find((p) => String(p?._id) !== String(myId));
+    if (other) return other;
+  }
+  // If the sender is not me, use sender as "other"
+  if (payload?.sender && String(payload.sender._id || payload.senderId) !== String(myId)) {
+    const s = payload.sender;
+    return {
+      _id: s._id || payload.senderId,
+      name: s.name,
+      profileImage: s.profileImage,
+    };
+  }
+  return null;
+}
+
+// Normalize any user-ish thing to a string id
+const asId = (u) => {
+  if (!u) return '';
+  if (typeof u === 'object') return String(u._id || u.id || '');
+  return String(u);
+};
+
 export default function useSocket(
   userId,
   onNewMessage,
   onRequestUpdate,
   onMessageAlert,
-  onNotification // ✅ existing optional callback
+  onNotification // optional
 ) {
   const socketRef = useRef();
   const dispatch = useDispatch();
@@ -35,6 +68,7 @@ export default function useSocket(
   const lastKnockTimeRef = useRef(0);
 
   const currentThreadId = useSelector((state) => state.chat.currentThreadId);
+  const conversations = useSelector((state) => state.chat.conversations || []);
 
   // Load knock audio
   useEffect(() => {
@@ -53,6 +87,7 @@ export default function useSocket(
     }
   };
 
+  // ---- socket lifecycle
   useEffect(() => {
     if (!userId) return;
 
@@ -69,6 +104,7 @@ export default function useSocket(
       (typeof window !== 'undefined' && window.socket) ||
       io(SOCKET_URL, {
         withCredentials: true,
+        transports: ['websocket'],
         auth: tokenFromStorage ? { token: tokenFromStorage } : undefined,
       });
 
@@ -79,24 +115,78 @@ export default function useSocket(
 
     const s = socketRef.current;
 
+    // -------- CONNECT
     s.on('connect', () => {
-      console.log('[useSocket] connected:', s.id);
+      // announce presence & request initial list
+      s.emit('presence:join', { userId: String(userId) });
+      s.emit('presence:who', {}, (ids = []) => {
+        dispatch(setOnlineUserIds(ids.map(asId)));
+      });
+      // some servers only send this:
+      s.emit('who_is_online', {}, (ids = []) => {
+        if (Array.isArray(ids) && ids.length) dispatch(setOnlineUserIds(ids.map(asId)));
+      });
+      // fall back log
+      // console.log('[useSocket] connected:', s.id);
     });
 
-    s.on('online_users', (onlineUserIds) => {
-      console.log('[socket] online_users received:', onlineUserIds);
-      dispatch(setOnlineUserIds(onlineUserIds));
-    });
+    // -------- PRESENCE LIST (various server spellings supported)
+    s.on('presence:list', (ids) => dispatch(setOnlineUserIds((ids || []).map(asId))));
+    s.on('online_users', (ids) => dispatch(setOnlineUserIds((ids || []).map(asId))));
 
+    // single-user presence deltas
+    s.on('presence:online', (id) => dispatch(addOnlineUserId(asId(id))));
+    s.on('presence:offline', (id) => dispatch(removeOnlineUserId(asId(id))));
+    s.on('user_online', (u) => dispatch(addOnlineUserId(asId(u))));
+    s.on('user_offline', (u) => dispatch(removeOnlineUserId(asId(u))));
+    s.on('user_connected', (u) => dispatch(addOnlineUserId(asId(u))));
+    s.on('user_disconnected', (u) => dispatch(removeOnlineUserId(asId(u))));
+
+    // -------- MESSAGING
     s.on('new_message', (message) => {
       const normalizedMessage = normalizeMessage(message);
       if (!normalizedMessage) return;
 
-      const senderId = normalizedMessage.sender?._id?.toString() || normalizedMessage.senderId;
       const myUserId = userId?.toString();
+      const senderId =
+        normalizedMessage.sender?._id?.toString() || normalizedMessage.senderId?.toString();
       const isMyMessage = senderId === myUserId;
       const isCurrentThread = currentThreadId === normalizedMessage.threadId;
 
+      // Find existing convo for stable display fields
+      const existing = conversations.find(
+        (c) => c.threadId === normalizedMessage.threadId
+      );
+
+      // Compute other party (from payload) and *only* set if we don't already have a good one
+      let displayName = existing?.displayName;
+      let displayProfileImage = existing?.displayProfileImage;
+
+      if (!displayName || isGenericName(displayName) || !displayProfileImage) {
+        const other = deriveOtherFromPayload(normalizedMessage, myUserId);
+        if (other) {
+          if (!displayName || isGenericName(displayName)) {
+            if (other.name && !isGenericName(other.name)) displayName = other.name;
+          }
+          if (!displayProfileImage && other.profileImage) {
+            displayProfileImage = other.profileImage;
+          }
+        }
+        // ultimate fallback – deterministic avatar so it never looks random
+        if (!displayProfileImage) {
+          const seed =
+            (other?._id ||
+              existing?.participantId ||
+              existing?.studentId ||
+              existing?.teacherId ||
+              normalizedMessage.threadId ||
+              'unknown') + '';
+          displayProfileImage = `https://i.pravatar.cc/150?u=${seed}`;
+        }
+        if (!displayName) displayName = existing?.name || 'Unknown';
+      }
+
+      // ---- store message
       dispatch(
         addMessageToThread({
           threadId: normalizedMessage.threadId,
@@ -111,12 +201,16 @@ export default function useSocket(
         })
       );
 
+      // ---- update/insert conversation WITHOUT downgrading identity
       dispatch(
         addOrUpdateConversation({
           threadId: normalizedMessage.threadId,
           lastMessage: normalizedMessage.text,
           lastMessageTimestamp: normalizedMessage.timestamp,
           sender: normalizedMessage.sender,
+          // stable identity fields (preserved by reducer if already set)
+          displayName,
+          displayProfileImage,
         })
       );
 
@@ -130,23 +224,48 @@ export default function useSocket(
       }
     });
 
+    // -------- NOTIFICATIONS / MISC
     s.on('new_notification', (notification) => {
       if (notification.read === undefined) notification.read = false;
       dispatch(addNotification(notification));
       if (typeof onNotification === 'function') onNotification(notification);
     });
 
-    // lightweight schedule refresh signal
     s.on('schedules_refresh', (payload) => {
-      console.log('[socket] schedules_refresh', payload);
       if (typeof onNotification === 'function') {
         onNotification({ type: 'schedules_refresh', payload });
       }
     });
 
     s.on('conversation_list_updated', (fullThread) => {
-      console.log('[socket] conversation_list_updated received:', fullThread);
-      dispatch(addOrUpdateConversation(fullThread));
+      // preserve/compute display on server push
+      const myId = userId?.toString();
+      const existing = conversations.find((c) => c.threadId === fullThread.threadId);
+      let displayName = existing?.displayName;
+      let displayProfileImage = existing?.displayProfileImage;
+
+      if (!displayName || isGenericName(displayName) || !displayProfileImage) {
+        const other = deriveOtherFromPayload(fullThread, myId);
+        if (other?.name && !isGenericName(other.name)) displayName = other.name;
+        if (other?.profileImage) displayProfileImage = other.profileImage;
+      }
+      if (!displayProfileImage) {
+        const seed =
+          fullThread?.participantId ||
+          fullThread?.studentId ||
+          fullThread?.teacherId ||
+          fullThread?.threadId ||
+          'unknown';
+        displayProfileImage = `https://i.pravatar.cc/150?u=${seed}`;
+      }
+
+      dispatch(
+        addOrUpdateConversation({
+          ...fullThread,
+          displayName,
+          displayProfileImage,
+        })
+      );
     });
 
     s.on('new_message_alert', (alert) => {
@@ -154,14 +273,12 @@ export default function useSocket(
     });
 
     s.on('post_view_event', (event) => {
-      console.log('[socket] post_view_event received:', event);
       dispatch(addPostViewEvent(event));
       dispatch(updatePostViewsCount({ postId: event.postId, viewsCount: event.viewsCount }));
     });
 
+    // -------- TUITION REQUESTS
     s.on('new_tuition_request', (data) => {
-      console.log('[socket] new_tuition_request received:', data);
-
       const lastMsgText = data.lastMessageText?.trim() || 'New tuition request received';
       const lastMsgTimestamp = data.lastMessageTimestamp || new Date().toISOString();
 
@@ -175,15 +292,22 @@ export default function useSocket(
         isSystemMessage: true,
       };
 
+      // derive stable display
+      const myId = userId?.toString();
+      const isCurrentUserStudent = myId === String(data.studentId);
+      const otherName = isCurrentUserStudent ? data.teacherName : data.studentName;
+      const otherImage = isCurrentUserStudent
+        ? data.teacherProfileImage
+        : data.studentProfileImage;
+
+      const displayName = !isGenericName(otherName) ? otherName : 'Unknown';
+      const displayProfileImage =
+        otherImage ||
+        `https://i.pravatar.cc/150?u=${data.teacherId || data.studentId || data.threadId}`;
+
       dispatch(addMessageToThread({ threadId: data.threadId, message: realMessage }));
       dispatch(updateLastMessageInConversation({ threadId: data.threadId, message: realMessage }));
       dispatch(incrementUnreadCount({ threadId: data.threadId }));
-
-      const isCurrentUserStudent = userId === data.studentId;
-      const otherName = isCurrentUserStudent ? data.teacherName : data.studentName;
-      const otherImage = isCurrentUserStudent
-        ? data.teacherProfileImage || 'https://via.placeholder.com/40'
-        : data.studentProfileImage || 'https://via.placeholder.com/40';
 
       dispatch(
         addOrUpdateConversation({
@@ -193,18 +317,18 @@ export default function useSocket(
           teacherId: data.teacherId,
           studentName: data.studentName,
           teacherName: data.teacherName,
-          name: otherName,
-          profileImage: otherImage,
           participants: data.participants,
           lastMessage: lastMsgText,
           lastMessageTimestamp: lastMsgTimestamp,
           messages: [realMessage],
           status: 'pending',
+          // stable identity
+          displayName,
+          displayProfileImage,
         })
       );
 
       playKnock();
-
       if (typeof onNewMessage === 'function') onNewMessage(realMessage);
       if (typeof onRequestUpdate === 'function') onRequestUpdate({ type: 'new', ...data });
     });
@@ -216,8 +340,6 @@ export default function useSocket(
     });
 
     s.on('request_approved', (data) => {
-      console.log('[socket] request_approved received:', data);
-
       const { threadId, requestId, timestamp } = data;
 
       const approvalMessage = {
@@ -253,14 +375,11 @@ export default function useSocket(
     s.on('mark_thread_read', ({ threadId, userId: senderUserId }) => {
       const myUserId = userId?.toString();
       if (senderUserId === myUserId && threadId === currentThreadId) {
-        console.log(`[socket] mark_thread_read received for thread ${threadId}`);
         dispatch(resetUnreadCount({ threadId }));
       }
     });
 
     s.on('request_rejected', (data) => {
-      console.log('[socket] request_rejected received:', data);
-
       const { threadId, requestId, timestamp, rejectionMessage } = data;
 
       const rejectionMessageObj = {
@@ -292,7 +411,7 @@ export default function useSocket(
     });
 
     s.on('disconnect', (reason) => {
-      console.log('[useSocket] disconnected:', reason);
+      // console.log('[useSocket] disconnected:', reason);
     });
 
     // Cleanup: remove this hook's listeners but DON'T disconnect the shared socket
@@ -301,7 +420,18 @@ export default function useSocket(
       const sc = socketRef.current;
 
       sc.off('connect');
+
+      // presence
+      sc.off('presence:list');
       sc.off('online_users');
+      sc.off('presence:online');
+      sc.off('presence:offline');
+      sc.off('user_online');
+      sc.off('user_offline');
+      sc.off('user_connected');
+      sc.off('user_disconnected');
+
+      // messaging / misc
       sc.off('new_message');
       sc.off('new_notification');
       sc.off('schedules_refresh');
@@ -315,12 +445,20 @@ export default function useSocket(
       sc.off('mark_thread_read');
       sc.off('disconnect');
 
-      // ❌ don't call sc.disconnect() if it's the shared global socket
       if (typeof window === 'undefined' || window.socket !== sc) {
         sc.disconnect();
       }
     };
-  }, [userId, dispatch, onNewMessage, onRequestUpdate, onMessageAlert, onNotification, currentThreadId]);
+  }, [
+    userId,
+    dispatch,
+    onNewMessage,
+    onRequestUpdate,
+    onMessageAlert,
+    onNotification,
+    currentThreadId,
+    conversations,
+  ]);
 
   const joinThread = (threadId) => {
     if (socketRef.current && threadId) {
@@ -337,9 +475,9 @@ export default function useSocket(
   const emitMarkThreadRead = (threadId) => {
     if (socketRef.current && threadId) {
       socketRef.current.emit('mark_thread_read', { threadId, userId });
-      console.log(`[useSocket] Emitted mark_thread_read for thread ${threadId}`);
+      // console.log(`[useSocket] Emitted mark_thread_read for thread ${threadId}`);
     }
   };
 
-  return { joinThread, sendMessage, emitMarkThreadRead };
+  return { joinThread, sendMessage, emitMarkThreadRead, socketRef };
 }

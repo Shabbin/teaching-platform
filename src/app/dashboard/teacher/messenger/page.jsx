@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import axios from 'axios';
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
 import useSocket from '../../../hooks/useSocket';
@@ -10,9 +9,6 @@ import useSocket from '../../../hooks/useSocket';
 import {
   resetUnreadCount,
   setCurrentThreadId,
-  addOrUpdateConversation,
-  updateLastMessageInConversation,
-  addMessageToThread,
 } from '../../../redux/chatSlice';
 
 import {
@@ -20,137 +16,101 @@ import {
   approveRequestThunk,
 } from '../../../redux/chatThunks';
 
-import { playKnock } from '../../../utils/knock';
-
-// Helper fallback avatar function (optional)
-function getFallbackAvatar(userId) {
-  return `https://i.pravatar.cc/150?u=${userId}`;
-}
+import API from '../../../../api/axios';
 
 export default function MessengerPage() {
   const dispatch = useDispatch();
+
   const user = useSelector((state) => state.user.userInfo);
   const currentUserId = (user?.id || user?._id)?.toString();
-  const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
   const conversations = useSelector((state) => state.chat.conversations);
   const conversationsLoaded = useSelector((state) => state.chat.conversationsLoaded);
+  const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
+  // 🔁 NEW: watch global currentThreadId set by MessengerPopup
+  const currentThreadIdGlobal = useSelector((state) => state.chat.currentThreadId);
 
   const [selectedChat, setSelectedChat] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const joinedThreadsRef = useRef(new Set());
-  const lastKnockTimeRef = useRef(0);
   const userSelectedChatRef = useRef(false);
   const lastResetThreadIdRef = useRef(null);
 
-  // Deduplicate conversations and prepare display info: show *other participant* info
+  // ---------- helpers ----------
+  const avatarOf = useCallback(
+    (conv) => {
+      if (conv?.displayProfileImage) return conv.displayProfileImage;
+      if (conv?.profileImage) return conv.profileImage;
+
+      if (conv?.participants?.length && currentUserId) {
+        const other = conv.participants.find((p) => String(p?._id) !== String(currentUserId));
+        if (other?.profileImage) return other.profileImage;
+      }
+
+      const fallbackId = conv?.participantId || conv?.studentId || conv?.teacherId || 'unknown';
+      return `https://i.pravatar.cc/150?u=${fallbackId}`;
+    },
+    [currentUserId]
+  );
+
+  const displayNameOf = useCallback(
+    (conv) => {
+      return (
+        conv?.displayName ||
+        conv?.name ||
+        (() => {
+          if (conv?.participants?.length && currentUserId) {
+            const other = conv.participants.find((p) => String(p?._id) !== String(currentUserId));
+            if (other?.name) return other.name;
+          }
+          return conv?.studentName || conv?.teacherName || 'Unknown';
+        })()
+      );
+    },
+    [currentUserId]
+  );
+
+  // Deduplicate + sort conversations by latest activity
   const dedupedConversations = useMemo(() => {
     const map = new Map();
-    conversations.forEach((c) => {
-      if (c.threadId && !map.has(c.threadId)) {
-        map.set(c.threadId, c);
-      }
-    });
+    for (const c of conversations) {
+      const id = c.threadId || c._id || c.requestId;
+      if (id && !map.has(id)) map.set(id, c);
+    }
+    const list = Array.from(map.values()).sort(
+      (a, b) => new Date(b.lastMessageTimestamp || 0) - new Date(a.lastMessageTimestamp || 0)
+    );
+    return list;
+  }, [conversations]);
 
-    const deduped = Array.from(map.values());
-
-    const withUnreadAndDisplay = deduped.map((conv) => {
-      const mySession = conv.sessions?.find(
-        (s) => s.userId?.toString() === currentUserId
-      );
-      const lastSeen = mySession?.lastSeen ? new Date(mySession.lastSeen) : null;
-      const lastMsgTime = new Date(conv.lastMessageTimestamp || 0);
-      const isUnread = lastSeen ? lastSeen < lastMsgTime : true;
-
-      const studentId = conv.studentId?.toString();
-      const teacherId = conv.teacherId?.toString();
-
-      let displayName = conv.name;
-      let displayImage = conv.profileImage;
-
-      if (currentUserId === teacherId) {
-        displayName = conv.studentName || 'Student';
-        const studentParticipant = conv.participants?.find(
-          (p) => p._id.toString() === studentId
-        );
-        displayImage =
-          conv.studentProfileImage ||
-          studentParticipant?.profileImage ||
-          getFallbackAvatar(studentId);
-      } else if (currentUserId === studentId) {
-        displayName = conv.teacherName || 'Teacher';
-        const teacherParticipant = conv.participants?.find(
-          (p) => p._id.toString() === teacherId
-        );
-        displayImage =
-          conv.teacherProfileImage ||
-          teacherParticipant?.profileImage ||
-          getFallbackAvatar(teacherId);
-      }
-
-      return {
-        ...conv,
-        isUnread,
-        name: displayName,
-        profileImage: displayImage,
-      };
-    });
-
-    withUnreadAndDisplay.sort((a, b) => {
-      const timeA = new Date(a.lastMessageTimestamp || 0);
-      const timeB = new Date(b.lastMessageTimestamp || 0);
-      return timeB - timeA;
-    });
-
-    return withUnreadAndDisplay;
-  }, [conversations, currentUserId]);
-
-  // Fetch conversations from server
+  // Initial fetch / refresh
   const fetchConversations = useCallback(async () => {
     if (!currentUserId) return;
     setLoading(true);
     setError(null);
-
     try {
-      console.log('[fetchConversations] Fetching conversations...');
       const convos = await dispatch(
-        fetchConversationsThunk({ role: user.role, userId: currentUserId })
+        fetchConversationsThunk({ role: user?.role || 'teacher', userId: currentUserId })
       ).unwrap();
 
-      console.log('[fetchConversations] Conversations fetched:', convos.length);
-
       if (convos.length > 0) {
-        if (!selectedChat) {
-          console.log('[fetchConversations] No selected chat, selecting first');
-          setSelectedChat(convos[0]);
-          dispatch(setCurrentThreadId(convos[0].threadId));
-        } else {
-          const updated = convos.find((c) => c.threadId === selectedChat.threadId);
-          if (updated) {
-            console.log('[fetchConversations] Keeping selected chat:', selectedChat.threadId);
-            setSelectedChat(updated);
-            dispatch(setCurrentThreadId(updated.threadId));
-          } else {
-            console.log('[fetchConversations] Selected chat not found, selecting first');
-            setSelectedChat(convos[0]);
-            dispatch(setCurrentThreadId(convos[0].threadId));
-          }
-        }
+        const keep =
+          selectedChat && convos.find((c) => c.threadId === selectedChat.threadId);
+        const nextSel = keep || convos[0];
+        setSelectedChat(nextSel);
+        dispatch(setCurrentThreadId(nextSel.threadId));
       } else {
-        console.log('[fetchConversations] No conversations found');
         setSelectedChat(null);
         dispatch(setCurrentThreadId(null));
       }
-
       userSelectedChatRef.current = false;
     } catch (err) {
-      console.error('[fetchConversations] Failed to fetch conversations:', err);
-      setError(err.message || 'Failed to fetch conversations');
+      setError(err?.message || 'Failed to fetch conversations');
     } finally {
       setLoading(false);
     }
-  }, [dispatch, currentUserId, user?.role, selectedChat]);
+  }, [dispatch, currentUserId, selectedChat, user?.role]);
 
   useEffect(() => {
     if (!conversationsLoaded && currentUserId) {
@@ -158,100 +118,29 @@ export default function MessengerPage() {
     }
   }, [conversationsLoaded, currentUserId, fetchConversations]);
 
-  function playKnockDebounced() {
-    const now = Date.now();
-    if (now - lastKnockTimeRef.current > 3000) {
-      playKnock();
-      lastKnockTimeRef.current = now;
+  // ✅ NEW: if MessengerPopup sets currentThreadId, select it here
+  useEffect(() => {
+    if (!currentThreadIdGlobal) return;
+    const found = dedupedConversations.find((c) => c.threadId === currentThreadIdGlobal);
+    if (found && (!selectedChat || selectedChat.threadId !== found.threadId)) {
+      userSelectedChatRef.current = true;
+      setSelectedChat(found);
     }
-  }
+  }, [currentThreadIdGlobal, dedupedConversations, selectedChat]);
 
-  const handleNewMessage = (message) => {
-    const myUserId = currentUserId;
-    const isMyMessage = String(message.senderId) === myUserId;
-    const isCurrentThread = selectedChat && message.threadId === selectedChat.threadId;
-
-    let sender = null;
-    if (message.sender) {
-      sender = message.sender;
-    } else if (message.participants && Array.isArray(message.participants)) {
-      sender = message.participants.find(
-        (p) => String(p._id) === String(message.senderId)
-      );
+  // Socket: page-local behavior only
+  const handleNewMessage = useCallback((message) => {
+    const isCurrent = selectedChat && message.threadId === selectedChat.threadId;
+    if (isCurrent) {
+      // no-op; Redux updates handled in useSocket
     }
+  }, [selectedChat]);
 
-    if (!sender) {
-      sender = {
-        _id: message.senderId,
-        name: message.senderName || 'Unknown',
-        profileImage: null,
-        role: null,
-      };
+  const handleRequestUpdate = useCallback(async (data) => {
+    if (data?.type === 'approved') {
+      fetchConversations();
     }
-
-    sender.name = sender.name || 'Unknown';
-    sender.profileImage = sender.profileImage || getFallbackAvatar(sender._id);
-    sender.role = sender.role || null;
-
-    if (!isMyMessage && !isCurrentThread) {
-      playKnockDebounced();
-      dispatch(
-        addOrUpdateConversation({
-          threadId: message.threadId,
-          lastMessage: message.text,
-          incrementUnread: true,
-          messages: [message],
-          sender,
-        })
-      );
-    } else {
-      dispatch(
-        addOrUpdateConversation({
-          threadId: message.threadId,
-          lastMessage: message.text,
-          incrementUnread: false,
-          messages: [message],
-          sender,
-        })
-      );
-    }
-
-    if (selectedChat && message.threadId === selectedChat.threadId) {
-      setSelectedChat((prev) => ({
-        ...prev,
-        lastMessage: message.text,
-        messages: [...(prev.messages || []), message],
-      }));
-    }
-
-    dispatch(
-      updateLastMessageInConversation({
-        threadId: message.threadId,
-        message: { text: message.text, timestamp: message.timestamp },
-      })
-    );
-
-    dispatch(addMessageToThread({ threadId: message.threadId, message }));
-  };
-
-  const handleRequestUpdate = async (requestId, status) => {
-    try {
-      let updatedThread;
-
-      if (status === 'approved') {
-        updatedThread = await dispatch(approveRequestThunk(requestId)).unwrap();
-      } else if (status === 'rejected') {
-        // You need to implement rejectRequestThunk similarly to approveRequestThunk
-        updatedThread = await dispatch(rejectRequestThunk(requestId)).unwrap();
-      }
-
-      if (updatedThread) {
-        dispatch(addOrUpdateConversation(updatedThread));
-      }
-    } catch (err) {
-      console.error('Failed to update request status:', err);
-    }
-  };
+  }, [fetchConversations]);
 
   const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(
     currentUserId,
@@ -259,111 +148,72 @@ export default function MessengerPage() {
     handleRequestUpdate
   );
 
-  useEffect(() => {
-    if (
-      selectedChat?.threadId &&
-      !joinedThreadsRef.current.has(selectedChat.threadId)
-    ) {
-      console.log('[Socket] Joining selected thread:', selectedChat.threadId);
-      joinThread(selectedChat.threadId);
-      joinedThreadsRef.current.add(selectedChat.threadId);
-    }
-  }, [selectedChat, joinThread]);
-
+  // Join all conversation rooms
   useEffect(() => {
     if (!currentUserId || dedupedConversations.length === 0) return;
-
     dedupedConversations.forEach((convo) => {
-      if (convo.threadId && !joinedThreadsRef.current.has(convo.threadId)) {
-        console.log('[Socket] Joining thread from deduped list:', convo.threadId);
-        joinThread(convo.threadId);
-        joinedThreadsRef.current.add(convo.threadId);
+      const tid = convo.threadId || convo._id || convo.requestId;
+      if (tid && !joinedThreadsRef.current.has(tid)) {
+        joinThread(tid);
+        joinedThreadsRef.current.add(tid);
       }
     });
   }, [currentUserId, dedupedConversations, joinThread]);
 
+  // Keep a valid selection as convos change
   useEffect(() => {
-    console.log('[selectedChat effect] Running with selectedChat:', selectedChat?.threadId);
-    console.log('[selectedChat effect] Conversations count:', dedupedConversations.length);
-
     if (dedupedConversations.length === 0 && selectedChat !== null) {
-      console.log('[selectedChat effect] No conversations, clearing selectedChat');
       setSelectedChat(null);
       return;
     }
-
-    if (!selectedChat) {
-      if (
-        dedupedConversations.length > 0 &&
-        dedupedConversations[0].threadId !== selectedChat?.threadId
-      ) {
-        console.log('[selectedChat effect] No selectedChat, setting to first conversation');
-        setSelectedChat(dedupedConversations[0]);
-      }
-      return;
-    }
-
-    if (userSelectedChatRef.current) {
-      console.log('[selectedChat effect] Skipping update due to recent user selection');
-      return;
-    }
-
-    const stillExists = dedupedConversations.some(
-      (c) => c.threadId === selectedChat.threadId
-    );
-
-    if (!stillExists) {
-      console.log(
-        `[selectedChat effect] Selected chat ${selectedChat.threadId} no longer exists, switching to first conversation`
-      );
+    if (!selectedChat && dedupedConversations.length > 0) {
       setSelectedChat(dedupedConversations[0]);
-    } else {
-      console.log('[selectedChat effect] Selected chat still exists, no change');
+      return;
+    }
+    if (userSelectedChatRef.current) return;
+
+    const stillExists = dedupedConversations.some((c) => c.threadId === selectedChat?.threadId);
+    if (!stillExists && dedupedConversations.length > 0) {
+      setSelectedChat(dedupedConversations[0]);
     }
   }, [dedupedConversations, selectedChat]);
 
+  // ✅ Reset unread ONCE per opened thread (no infinite loop)
   useEffect(() => {
-    if (!selectedChat) return;
+    const tid = selectedChat?.threadId;
+    if (!tid) return;
 
-    dispatch(resetUnreadCount({ threadId: selectedChat.threadId }));
+    if (lastResetThreadIdRef.current === tid) return;
+    lastResetThreadIdRef.current = tid;
 
-    if (emitMarkThreadRead) {
-      emitMarkThreadRead(selectedChat.threadId);
-    }
-
-    lastResetThreadIdRef.current = selectedChat.threadId;
-  }, [selectedChat, dispatch, emitMarkThreadRead]);
+    dispatch(resetUnreadCount({ threadId: tid }));
+    emitMarkThreadRead?.(tid);
+  }, [selectedChat?.threadId, dispatch]); // intentionally not depending on emitMarkThreadRead
 
   const handleApprove = async (requestId) => {
     try {
       await dispatch(approveRequestThunk(requestId)).unwrap();
-      await fetchConversations(); // Refresh after approval
+      await fetchConversations();
     } catch (error) {
       console.error('Approve request failed:', error);
     }
   };
 
-  const handleReject = async (requestId) => {
-    try {
-      // Use axios with credentials, no token header needed
-      await axios.post(
-        `http://localhost:5000/api/teacher-requests/${requestId}/reject`,
-        {},
-        { withCredentials: true }
-      );
-      await fetchConversations(); // Refresh after rejection
-    } catch (err) {
-      console.error('Reject request failed:', err);
-    }
-  };
+const handleReject = async (requestId) => {
+  try {
+    // ⬅️ CHANGED: POST -> PATCH and use /:id/reject
+    await API.patch(`/teacher-requests/${requestId}/reject`, {}, { withCredentials: true });
+    await fetchConversations();
+  } catch (err) {
+    console.error('Reject request failed:', err);
+  }
+};
+
 
   const handleSelectChat = (selected) => {
-    console.log('[User Action] Selecting chat:', selected.threadId);
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
-
     userSelectedChatRef.current = true;
-
     setSelectedChat(finalSelection);
     dispatch(setCurrentThreadId(finalSelection.threadId));
   };
@@ -378,6 +228,8 @@ export default function MessengerPage() {
         selectedChatId={selectedChat?.threadId}
         onSelect={handleSelectChat}
         onlineUserIds={onlineUserIds}
+        getAvatar={avatarOf}
+        getDisplayName={displayNameOf}
       />
       <ChatPanel
         chat={selectedChat}

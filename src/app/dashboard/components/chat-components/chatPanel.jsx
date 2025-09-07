@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import MessageBubble from './MessageBubble';
 import useSocket from '../../../hooks/useSocket';
@@ -12,18 +12,28 @@ import { fetchMessagesThunk } from '../../../redux/chatThunks';
 import { CheckCircle, XCircle } from 'lucide-react';
 import { makeSelectMessagesByThread } from '../../../redux/chatSelectors';
 
+// One shared EMPTY for local fallbacks (don’t mutate)
+const EMPTY = Object.freeze([]);
+
 export default function ChatPanel({ chat, user, onApprove, onReject }) {
   const dispatch = useDispatch();
 
+  const threadId = chat?.threadId;
+  const currentUserId = user?._id || user?.id;
+
+  // Build a memoized selector instance for this thread
   const selectMessages = useMemo(
-    () => makeSelectMessagesByThread(chat?.threadId),
-    [chat?.threadId]
+    () => (threadId ? makeSelectMessagesByThread(threadId) : null),
+    [threadId]
   );
-  const messages = useSelector(selectMessages);
+
+  // Use a stable fallback selector when there is no threadId
+  const emptySelector = useCallback(() => EMPTY, []);
+  const messages = useSelector(selectMessages ?? emptySelector);
 
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef();
-  const { sendMessage: socketSendMessage, joinThread, socketRef } = useSocket(chat?.threadId);
+  const { sendMessage: socketSendMessage, joinThread, socketRef } = useSocket(threadId);
 
   const latestMessagesRef = useRef(messages);
   useEffect(() => {
@@ -73,6 +83,7 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
       socketSendMessage(messageData);
       setNewMessage('');
 
+      // locally reset unread for this thread
       dispatch(resetUnreadCount({ threadId: chat.threadId, userId: user?._id || user?.id }));
 
       if (socketRef && socketRef.current) {
@@ -97,7 +108,6 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
     return <p className="p-4 text-gray-500">Select a conversation to view messages.</p>;
   }
 
-  const currentUserId = user?._id || user?.id;
   const chatName =
     chat.name ||
     chat.participantName ||
