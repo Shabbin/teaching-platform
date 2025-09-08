@@ -4,14 +4,16 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchPostViewEvents, fetchPostById } from '../../redux/postViewEventSlice';
 import DOMPurify from 'isomorphic-dompurify';
 import { Eye } from 'lucide-react';
-import { videoUrlFromStoredPath } from '../../../api/axios'; 
+import { videoUrlFromStoredPath } from '../../../api/axios';
 
 export default function ViewedPostsTimeline() {
   const dispatch = useDispatch();
 
   const userInfo = useSelector((state) => state.user.userInfo);
   const isFetched = useSelector((state) => state.user.isFetched);
-  const teacherId = userInfo?._id;
+
+  // ▶️ FIX: read both id and _id (after login it’s often `id`)
+  const teacherId = userInfo?.id || userInfo?._id;
 
   const { events = [], posts = {}, loading, error } = useSelector(
     (state) => state.postViewEvents
@@ -19,43 +21,45 @@ export default function ViewedPostsTimeline() {
 
   const viewedPostsRef = useRef(new Set());
 
+  // bootstrap fetch once we know who the user is
   useEffect(() => {
-    if (!isFetched || !teacherId) return;
+    if (!isFetched) return;
+    if (!teacherId) return; // logged in user not teacher or not hydrated yet
     if (events.length === 0 && !loading && !error) {
       dispatch(fetchPostViewEvents(teacherId));
     }
-  }, [isFetched, teacherId, dispatch, events.length, loading, error]);
+  }, [isFetched, teacherId, events.length, loading, error, dispatch]);
 
+  // fetch full post details for the posts we got events for
   useEffect(() => {
-    if (!loading && !error && events.length > 0) {
-      events.forEach((event) => {
-        const postIdKey =
-          typeof event.postId === 'object'
-            ? event.postId._id?.toString() || JSON.stringify(event.postId)
-            : event.postId;
+    if (loading || error || events.length === 0) return;
+    events.forEach((event) => {
+      const postIdKey =
+        typeof event.postId === 'object'
+          ? event.postId._id?.toString() || JSON.stringify(event.postId)
+          : event.postId;
 
-        if (!posts[postIdKey]) {
-          dispatch(fetchPostById(postIdKey));
-        }
-      });
-    }
+      if (!posts[postIdKey]) {
+        dispatch(fetchPostById(postIdKey));
+      }
+    });
   }, [events, posts, loading, error, dispatch]);
 
+  // remember which posts appeared
   useEffect(() => {
-    if (teacherId && events.length > 0) {
-      events.forEach((event) => {
-        const postIdKey =
-          typeof event.postId === 'object'
-            ? event.postId._id?.toString() || JSON.stringify(event.postId)
-            : event.postId;
-
-        if (!viewedPostsRef.current.has(postIdKey)) {
-          viewedPostsRef.current.add(postIdKey);
-        }
-      });
-    }
+    if (!teacherId || events.length === 0) return;
+    events.forEach((event) => {
+      const postIdKey =
+        typeof event.postId === 'object'
+          ? event.postId._id?.toString() || JSON.stringify(event.postId)
+          : event.postId;
+      if (!viewedPostsRef.current.has(postIdKey)) {
+        viewedPostsRef.current.add(postIdKey);
+      }
+    });
   }, [events, teacherId]);
 
+  // group events by post (use createdAt from timestamps as fallback)
   const groupedEvents = useMemo(() => {
     const map = new Map();
 
@@ -70,19 +74,16 @@ export default function ViewedPostsTimeline() {
           postId: postIdKey,
           totalViews: 0,
           latestEventId: event._id || null,
-          latestViewedAt: event.viewedAt || null,
+          latestViewedAt: event.viewedAt || event.createdAt || null, // ▶️ fallback
         });
       }
 
       const existing = map.get(postIdKey);
       existing.totalViews += 1;
 
-      if (
-        event.viewedAt &&
-        (!existing.latestViewedAt ||
-          new Date(event.viewedAt) > new Date(existing.latestViewedAt))
-      ) {
-        existing.latestViewedAt = event.viewedAt;
+      const when = event.viewedAt || event.createdAt || null;
+      if (when && (!existing.latestViewedAt || new Date(when) > new Date(existing.latestViewedAt))) {
+        existing.latestViewedAt = when;
         existing.latestEventId = event._id || null;
       }
     });
@@ -93,9 +94,9 @@ export default function ViewedPostsTimeline() {
   const renderVideo = (post) => {
     if (post.youtubeLink) {
       const match = post.youtubeLink.match(
-        /^.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?.+&v=)([^#&?]*).*/
+        /^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?.+&v=)([^#&?]*).*/
       );
-      const youtubeId = match && match[1].length === 11 ? match[1] : null;
+      const youtubeId = match && match[1]?.length === 11 ? match[1] : null;
       if (youtubeId) {
         return (
           <iframe
@@ -111,7 +112,6 @@ export default function ViewedPostsTimeline() {
     if (post.videoFile) {
       return (
         <video controls className="w-full max-w-[400px] aspect-video rounded-lg mt-2">
-       
           <source src={videoUrlFromStoredPath(post.videoFile)} type="video/mp4" />
           Your browser does not support the video tag.
         </video>
@@ -121,6 +121,7 @@ export default function ViewedPostsTimeline() {
     return null;
   };
 
+  // UI states
   if (!isFetched) {
     return (
       <div className="flex justify-center items-center h-64 text-gray-500 text-lg font-semibold">
@@ -138,9 +139,7 @@ export default function ViewedPostsTimeline() {
   }
 
   if (loading && groupedEvents.length === 0) {
-    return (
-      <p className="text-gray-600 text-center text-lg py-20">Loading viewed posts...</p>
-    );
+    return <p className="text-gray-600 text-center text-lg py-20">Loading viewed posts...</p>;
   }
 
   if (error) {
@@ -175,21 +174,12 @@ export default function ViewedPostsTimeline() {
             key={post._id}
             className="bg-white/95 shadow-sm rounded-2xl p-6 border border-gray-100 cursor-default"
           >
-            {/* Title */}
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
-              {post.title}
-            </h3>
-
-            {/* Video if exists */}
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">{post.title}</h3>
             {renderVideo(post)}
-
-            {/* Sanitized rich description */}
             <div
               className="text-gray-700 mb-4 mt-4 line-clamp-3 prose prose-sm max-w-none overflow-hidden"
               dangerouslySetInnerHTML={{ __html: cleanDesc }}
             />
-
-            {/* Views */}
             <div className="flex items-center text-sm font-medium">
               <span className="inline-flex items-center gap-1 text-indigo-700">
                 <Eye className="w-4 h-4" />
