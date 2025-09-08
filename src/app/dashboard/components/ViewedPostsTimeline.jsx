@@ -9,61 +9,54 @@ import { videoUrlFromStoredPath } from '../../../api/axios';
 export default function ViewedPostsTimeline() {
   const dispatch = useDispatch();
 
-  const userInfo = useSelector((state) => state.user.userInfo);
+  const userInfo  = useSelector((state) => state.user.userInfo);
   const isFetched = useSelector((state) => state.user.isFetched);
 
-  // ▶️ FIX: read both id and _id (after login it’s often `id`)
-  const teacherId = userInfo?.id || userInfo?._id;
+  // 🔧 FIX: support either `_id` or `id` (some sessions return `id`)
+  const rawTeacherId = userInfo?._id || userInfo?.id;
+  const teacherId = rawTeacherId ? String(rawTeacherId) : null;
 
   const { events = [], posts = {}, loading, error } = useSelector(
     (state) => state.postViewEvents
   );
 
-  const viewedPostsRef = useRef(new Set());
+  // --- guards to avoid refetch loops when result is empty
+  const fetchedOnceRef = useRef(false);
+  const lastTeacherRef = useRef(null);
 
-  // bootstrap fetch once we know who the user is
+  // fetch once per teacher after auth is ready
   useEffect(() => {
-    if (!isFetched) return;
-    if (!teacherId) return; // logged in user not teacher or not hydrated yet
-    if (events.length === 0 && !loading && !error) {
+    if (!isFetched || !teacherId) return;
+
+    if (lastTeacherRef.current !== teacherId) {
+      lastTeacherRef.current = teacherId;
+      fetchedOnceRef.current = false; // new user → allow one fetch
+    }
+
+    if (!fetchedOnceRef.current) {
+      fetchedOnceRef.current = true;
       dispatch(fetchPostViewEvents(teacherId));
     }
-  }, [isFetched, teacherId, events.length, loading, error, dispatch]);
+  }, [isFetched, teacherId, dispatch]);
 
-  // fetch full post details for the posts we got events for
+  // lazily fetch full post details for any events we have
   useEffect(() => {
     if (loading || error || events.length === 0) return;
-    events.forEach((event) => {
+    for (const event of events) {
       const postIdKey =
         typeof event.postId === 'object'
           ? event.postId._id?.toString() || JSON.stringify(event.postId)
           : event.postId;
-
       if (!posts[postIdKey]) {
         dispatch(fetchPostById(postIdKey));
       }
-    });
+    }
   }, [events, posts, loading, error, dispatch]);
 
-  // remember which posts appeared
-  useEffect(() => {
-    if (!teacherId || events.length === 0) return;
-    events.forEach((event) => {
-      const postIdKey =
-        typeof event.postId === 'object'
-          ? event.postId._id?.toString() || JSON.stringify(event.postId)
-          : event.postId;
-      if (!viewedPostsRef.current.has(postIdKey)) {
-        viewedPostsRef.current.add(postIdKey);
-      }
-    });
-  }, [events, teacherId]);
-
-  // group events by post (use createdAt from timestamps as fallback)
+  // group by postId
   const groupedEvents = useMemo(() => {
     const map = new Map();
-
-    events.forEach((event) => {
+    for (const event of events) {
       const postIdKey =
         typeof event.postId === 'object'
           ? event.postId._id?.toString() || JSON.stringify(event.postId)
@@ -74,27 +67,25 @@ export default function ViewedPostsTimeline() {
           postId: postIdKey,
           totalViews: 0,
           latestEventId: event._id || null,
-          latestViewedAt: event.viewedAt || event.createdAt || null, // ▶️ fallback
+          latestViewedAt: event.viewedAt || event.createdAt || null,
         });
       }
-
       const existing = map.get(postIdKey);
       existing.totalViews += 1;
 
-      const when = event.viewedAt || event.createdAt || null;
-      if (when && (!existing.latestViewedAt || new Date(when) > new Date(existing.latestViewedAt))) {
-        existing.latestViewedAt = when;
+      const evTime = event.viewedAt || event.createdAt;
+      if (evTime && (!existing.latestViewedAt || new Date(evTime) > new Date(existing.latestViewedAt))) {
+        existing.latestViewedAt = evTime;
         existing.latestEventId = event._id || null;
       }
-    });
-
+    }
     return Array.from(map.values());
   }, [events]);
 
   const renderVideo = (post) => {
     if (post.youtubeLink) {
       const match = post.youtubeLink.match(
-        /^.*(?:youtu\.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?.+&v=)([^#&?]*).*/
+        /^.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?.+&v=)([^#&?]*).*/
       );
       const youtubeId = match && match[1]?.length === 11 ? match[1] : null;
       if (youtubeId) {
@@ -108,7 +99,6 @@ export default function ViewedPostsTimeline() {
         );
       }
     }
-
     if (post.videoFile) {
       return (
         <video controls className="w-full max-w-[400px] aspect-video rounded-lg mt-2">
@@ -117,11 +107,10 @@ export default function ViewedPostsTimeline() {
         </video>
       );
     }
-
     return null;
   };
 
-  // UI states
+  // --- UI states
   if (!isFetched) {
     return (
       <div className="flex justify-center items-center h-64 text-gray-500 text-lg font-semibold">
@@ -130,6 +119,7 @@ export default function ViewedPostsTimeline() {
     );
   }
 
+  // Only show “Please log in” after auth is fetched AND there’s no id in either field
   if (!teacherId) {
     return (
       <div className="flex justify-center items-center h-64 text-gray-500 text-lg font-semibold">
@@ -138,15 +128,17 @@ export default function ViewedPostsTimeline() {
     );
   }
 
-  if (loading && groupedEvents.length === 0) {
-    return <p className="text-gray-600 text-center text-lg py-20">Loading viewed posts...</p>;
+  if (loading && events.length === 0) {
+    return (
+      <p className="text-gray-600 text-center text-lg py-20">Loading viewed posts...</p>
+    );
   }
 
   if (error) {
     return <p className="text-red-600 text-center text-lg py-20">Error: {error}</p>;
   }
 
-  if (groupedEvents.length === 0) {
+  if (events.length === 0) {
     return <p className="text-gray-600 text-center text-lg py-20">No viewed posts yet.</p>;
   }
 
