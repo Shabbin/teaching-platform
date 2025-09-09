@@ -1,24 +1,31 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import useSocket from '../../../hooks/useSocket';
-import {
-  setCurrentThreadId,
-  resetUnreadCount,
-} from '../../../redux/chatSlice';
-import { fetchConversationsThunk } from '../../../redux/chatThunks';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
+import useSocket from '../../../hooks/useSocket';
 
-export default function StudentMessengerPage() {
+import {
+  resetUnreadCount,
+  setCurrentThreadId,
+} from '../../../redux/chatSlice';
+
+import {
+  fetchConversationsThunk,
+  approveRequestThunk,
+} from '../../../redux/chatThunks';
+
+import API from '../../../../api/axios';
+
+export default function MessengerPage() {
   const dispatch = useDispatch();
 
   const user = useSelector((state) => state.user.userInfo);
   const currentUserId = (user?.id || user?._id)?.toString();
-  const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
   const conversations = useSelector((state) => state.chat.conversations);
   const conversationsLoaded = useSelector((state) => state.chat.conversationsLoaded);
+  const onlineUserIds = useSelector((state) => state.chat.onlineUserIds || []);
   // watch global currentThreadId set by popup
   const currentThreadIdGlobal = useSelector((state) => state.chat.currentThreadId);
 
@@ -57,14 +64,14 @@ export default function StudentMessengerPage() {
             const other = conv.participants.find((p) => String(p?._id) !== String(currentUserId));
             if (other?.name) return other.name;
           }
-          return conv?.teacherName || conv?.studentName || 'Unknown';
+          return conv?.studentName || conv?.teacherName || 'Unknown';
         })()
       );
     },
     [currentUserId]
   );
 
-  // ---------- robust de-duplication ----------
+  // ---------- robust de-duplication (prefer entries with threadId) ----------
   const dedupedConversations = useMemo(() => {
     const sorted = (conversations || []).slice().sort(
       (a, b) =>
@@ -110,14 +117,14 @@ export default function StudentMessengerPage() {
     );
   }, [conversations]);
 
-  // ---------- fetch conversations ----------
+  // ---------- fetch / refresh ----------
   const fetchConversations = useCallback(async () => {
     if (!currentUserId) return;
     setLoading(true);
     setError(null);
     try {
       const convos = await dispatch(
-        fetchConversationsThunk({ role: 'student', userId: currentUserId })
+        fetchConversationsThunk({ role: user?.role || 'teacher', userId: currentUserId })
       ).unwrap();
 
       if (convos.length > 0) {
@@ -125,9 +132,7 @@ export default function StudentMessengerPage() {
           selectedChat && convos.find((c) => c.threadId === selectedChat.threadId);
         const nextSel = keep || convos[0];
         setSelectedChat(nextSel);
-        if (nextSel?.threadId) {
-          dispatch(setCurrentThreadId(nextSel.threadId));
-        }
+        if (nextSel?.threadId) dispatch(setCurrentThreadId(nextSel.threadId));
       } else {
         setSelectedChat(null);
         dispatch(setCurrentThreadId(null));
@@ -138,7 +143,7 @@ export default function StudentMessengerPage() {
     } finally {
       setLoading(false);
     }
-  }, [dispatch, currentUserId, selectedChat]);
+  }, [dispatch, currentUserId, selectedChat, user?.role]);
 
   useEffect(() => {
     if (!conversationsLoaded && currentUserId) {
@@ -146,7 +151,7 @@ export default function StudentMessengerPage() {
     }
   }, [conversationsLoaded, currentUserId, fetchConversations]);
 
-  // If popup sets currentThreadId, reflect selection here
+  // If popup set a current thread, reflect selection here
   useEffect(() => {
     if (!currentThreadIdGlobal) return;
     const found = dedupedConversations.find((c) => c.threadId === currentThreadIdGlobal);
@@ -157,27 +162,21 @@ export default function StudentMessengerPage() {
   }, [currentThreadIdGlobal, dedupedConversations, selectedChat]);
 
   // ---------- socket bindings ----------
-  const handleNewMessage = useCallback(
-    (message) => {
-      const isCurrent = selectedChat && message.threadId === selectedChat.threadId;
-      if (isCurrent) {
-        // no-op; Redux already updates via useSocket
-      }
-    },
-    [selectedChat]
-  );
+  const handleNewMessage = useCallback((message) => {
+    const isCurrent = selectedChat && message.threadId === selectedChat.threadId;
+    if (isCurrent) {
+      // no-op; Redux updates handled in useSocket
+    }
+  }, [selectedChat]);
 
-  const handleRequestUpdate = useCallback(
-    async (data) => {
-      if (data?.type === 'approved') {
-        await fetchConversations();
-        if (data.threadId) {
-          dispatch(setCurrentThreadId(data.threadId));
-        }
+  const handleRequestUpdate = useCallback(async (data) => {
+    if (data?.type === 'approved') {
+      await fetchConversations();
+      if (data.threadId) {
+        dispatch(setCurrentThreadId(data.threadId));
       }
-    },
-    [fetchConversations, dispatch]
-  );
+    }
+  }, [fetchConversations, dispatch]);
 
   const { joinThread, sendMessage, emitMarkThreadRead } = useSocket(
     currentUserId,
@@ -185,20 +184,11 @@ export default function StudentMessengerPage() {
     handleRequestUpdate
   );
 
-  // Join selected room (once)
-  useEffect(() => {
-    const tid = selectedChat?.threadId;
-    if (tid && !joinedThreadsRef.current.has(tid)) {
-      joinThread(tid);
-      joinedThreadsRef.current.add(tid);
-    }
-  }, [selectedChat, joinThread]);
-
-  // Join all rooms that actually have a threadId
+  // Join all rooms that actually have a threadId (avoid joining request-only placeholders)
   useEffect(() => {
     if (!currentUserId || dedupedConversations.length === 0) return;
     dedupedConversations.forEach((convo) => {
-      const tid = convo.threadId; // only join real threads
+      const tid = convo.threadId; // ✅ only join real threads
       if (tid && !joinedThreadsRef.current.has(tid)) {
         joinThread(tid);
         joinedThreadsRef.current.add(tid);
@@ -236,12 +226,12 @@ export default function StudentMessengerPage() {
     emitMarkThreadRead?.(tid);
   }, [selectedChat?.threadId, dispatch]); // intentionally not depending on emitMarkThreadRead
 
-  // 🔽 Scroll the left list so the selected conversation is visible (no layout changes)
+  // 🔽 Scroll the left list so the selected conversation is visible (without extra wrapper)
   useEffect(() => {
     const tid = selectedChat?.threadId;
     if (!tid) return;
 
-    const container = document;
+    const container = document; // let the row’s own scroll container handle it
     const t = setTimeout(() => {
       let row = null;
 
@@ -277,7 +267,38 @@ export default function StudentMessengerPage() {
     return () => clearTimeout(t);
   }, [selectedChat?.threadId, displayNameOf]);
 
-  // User selects a chat from the list
+  // Approve: after server updates, refresh and select the new thread for that request
+  const handleApprove = async (requestId) => {
+    try {
+      await dispatch(approveRequestThunk(requestId)).unwrap();
+      await fetchConversations();
+
+      const found = dedupedConversations.find((c) => {
+        const reqId =
+          c?.requestId ||
+          (Array.isArray(c?.sessions) ? c.sessions.find((s) => s?.requestId)?.requestId : null);
+        return reqId && String(reqId) === String(requestId);
+      });
+
+      const target = found || dedupedConversations[0] || null;
+      if (target) {
+        setSelectedChat(target);
+        if (target.threadId) dispatch(setCurrentThreadId(target.threadId));
+      }
+    } catch (error) {
+      console.error('Approve request failed:', error);
+    }
+  };
+
+  const handleReject = async (requestId) => {
+    try {
+      await API.patch(`/teacher-requests/${requestId}/reject`, {}, { withCredentials: true });
+      await fetchConversations();
+    } catch (err) {
+      console.error('Reject request failed:', err);
+    }
+  };
+
   const handleSelectChat = (selected) => {
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
@@ -292,18 +313,23 @@ export default function StudentMessengerPage() {
   if (error) return <p className="p-4 text-red-600">Error: {error}</p>;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+    
+    <div className="fixed inset-x-0 bottom-0 top-[4rem] flex overflow-hidden">
       <ConversationList
         conversations={dedupedConversations}
         selectedChatId={selectedChat?.threadId}
         onSelect={handleSelectChat}
         onlineUserIds={onlineUserIds}
-        userId={currentUserId}
-        isStudent={true}
         getAvatar={avatarOf}
         getDisplayName={displayNameOf}
       />
-      <ChatPanel chat={selectedChat} user={user} sendMessage={sendMessage} />
+      <ChatPanel
+        chat={selectedChat}
+        user={user}
+        onApprove={handleApprove}
+        onReject={handleReject}
+        sendMessage={sendMessage}
+      />
     </div>
   );
 }

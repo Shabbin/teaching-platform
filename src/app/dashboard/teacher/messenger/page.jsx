@@ -262,7 +262,6 @@ export default function MessengerPage() {
       if (row?.scrollIntoView) {
         row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
-      // (no index-based fallback here to avoid page scrolling)
     }, 60);
 
     return () => clearTimeout(t);
@@ -314,7 +313,8 @@ export default function MessengerPage() {
   if (error) return <p className="p-4 text-red-600">Error: {error}</p>;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
+   
+    <div className="fixed inset-x-0 bottom-0 top-[4rem] flex overflow-hidden">
       <ConversationList
         conversations={dedupedConversations}
         selectedChatId={selectedChat?.threadId}
