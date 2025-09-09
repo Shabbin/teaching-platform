@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import ConversationList from '../../components/chat-components/conversationList';
 import ChatPanel from '../../components/chat-components/chatPanel';
@@ -226,13 +226,54 @@ export default function MessengerPage() {
     emitMarkThreadRead?.(tid);
   }, [selectedChat?.threadId, dispatch]); // intentionally not depending on emitMarkThreadRead
 
+  // 🔽 Scroll the left list so the selected conversation is visible (without extra wrapper)
+  useEffect(() => {
+    const tid = selectedChat?.threadId;
+    if (!tid) return;
+
+    const container = document; // let the row’s own scroll container handle it
+    const t = setTimeout(() => {
+      let row = null;
+
+      const selectors = [
+        `[data-thread-id="${tid}"]`,
+        `#thread-${tid}`,
+        `[data-id="${tid}"]`,
+        `[data-tid="${tid}"]`,
+      ];
+      for (const sel of selectors) {
+        row = container.querySelector?.(sel);
+        if (row) break;
+      }
+
+      if (!row) {
+        const label = (displayNameOf(selectedChat) || '').toLowerCase();
+        if (label && container.querySelectorAll) {
+          const nodes = Array.from(container.querySelectorAll('*'));
+          row = nodes.find(
+            (el) =>
+              el instanceof HTMLElement &&
+              (el.getAttribute('role') === 'button' || el.className?.toString().includes('cursor-pointer')) &&
+              (el.textContent || '').toLowerCase().includes(label)
+          );
+        }
+      }
+
+      if (row?.scrollIntoView) {
+        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      // (no index-based fallback here to avoid page scrolling)
+    }, 60);
+
+    return () => clearTimeout(t);
+  }, [selectedChat?.threadId, displayNameOf]);
+
   // Approve: after server updates, refresh and select the new thread for that request
   const handleApprove = async (requestId) => {
     try {
       await dispatch(approveRequestThunk(requestId)).unwrap();
       await fetchConversations();
 
-      // Try to focus the conversation that corresponds to this request
       const found = dedupedConversations.find((c) => {
         const reqId =
           c?.requestId ||

@@ -65,22 +65,17 @@ export default function StudentMessengerPage() {
   );
 
   // ---------- robust de-duplication ----------
-  // Many backends send one convo with only requestId (pending) and then another with threadId (after approve).
-  // We prefer the item with a threadId; otherwise keep the newest by timestamp.
   const dedupedConversations = useMemo(() => {
-    // Sort newest first so "latest wins" where ties occur
     const sorted = (conversations || []).slice().sort(
       (a, b) =>
         new Date(b.lastMessageTimestamp || 0) - new Date(a.lastMessageTimestamp || 0)
     );
 
-    // Helper to pluck a requestId if not directly present
     const getReqId = (c) =>
       c?.requestId ||
       (Array.isArray(c?.sessions) ? c.sessions.find((s) => s?.requestId)?.requestId : null) ||
       null;
 
-    // Key by "requestId if present, else threadId/_id" to collapse duplicates
     const map = new Map();
     for (const c of sorted) {
       const reqId = getReqId(c);
@@ -94,7 +89,6 @@ export default function StudentMessengerPage() {
         continue;
       }
 
-      // Prefer the one that has a threadId
       const existingHasThread = !!existing.threadId;
       const candidateHasThread = !!tid;
 
@@ -103,7 +97,6 @@ export default function StudentMessengerPage() {
         continue;
       }
 
-      // If both have/ both don't have threadId, keep the newer one by timestamp
       const eTs = new Date(existing.lastMessageTimestamp || 0);
       const cTs = new Date(c.lastMessageTimestamp || 0);
       if (cTs > eTs) {
@@ -111,7 +104,6 @@ export default function StudentMessengerPage() {
       }
     }
 
-    // Final sorted list
     return Array.from(map.values()).sort(
       (a, b) =>
         new Date(b.lastMessageTimestamp || 0) - new Date(a.lastMessageTimestamp || 0)
@@ -178,7 +170,6 @@ export default function StudentMessengerPage() {
   const handleRequestUpdate = useCallback(
     async (data) => {
       if (data?.type === 'approved') {
-        // Refresh and jump to the approved thread as soon as it exists
         await fetchConversations();
         if (data.threadId) {
           dispatch(setCurrentThreadId(data.threadId));
@@ -245,9 +236,49 @@ export default function StudentMessengerPage() {
     emitMarkThreadRead?.(tid);
   }, [selectedChat?.threadId, dispatch]); // intentionally not depending on emitMarkThreadRead
 
+  // 🔽 Scroll the left list so the selected conversation is visible (no layout changes)
+  useEffect(() => {
+    const tid = selectedChat?.threadId;
+    if (!tid) return;
+
+    const container = document;
+    const t = setTimeout(() => {
+      let row = null;
+
+      const selectors = [
+        `[data-thread-id="${tid}"]`,
+        `#thread-${tid}`,
+        `[data-id="${tid}"]`,
+        `[data-tid="${tid}"]`,
+      ];
+      for (const sel of selectors) {
+        row = container.querySelector?.(sel);
+        if (row) break;
+      }
+
+      if (!row) {
+        const label = (displayNameOf(selectedChat) || '').toLowerCase();
+        if (label && container.querySelectorAll) {
+          const nodes = Array.from(container.querySelectorAll('*'));
+          row = nodes.find(
+            (el) =>
+              el instanceof HTMLElement &&
+              (el.getAttribute('role') === 'button' || el.className?.toString().includes('cursor-pointer')) &&
+              (el.textContent || '').toLowerCase().includes(label)
+          );
+        }
+      }
+
+      if (row?.scrollIntoView) {
+        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }, 60);
+
+    return () => clearTimeout(t);
+  }, [selectedChat?.threadId, displayNameOf]);
+
   // User selects a chat from the list
   const handleSelectChat = (selected) => {
-    // Rehydrate from store (may have fresher fields)
     const full = conversations.find((c) => c.threadId === selected.threadId);
     const finalSelection = full || selected;
     userSelectedChatRef.current = true;
