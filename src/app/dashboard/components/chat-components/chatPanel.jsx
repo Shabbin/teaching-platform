@@ -6,7 +6,7 @@ import MessageBubble from './MessageBubble';
 import useSocket from '../../../hooks/useSocket';
 import {
   clearMessagesForThread as clearMessagesAction,
-  addMessageToThread as resetUnreadCount,
+  resetUnreadCount, // ✅ use the real resetUnreadCount action
 } from '../../../redux/chatSlice';
 import { fetchMessagesThunk } from '../../../redux/chatThunks';
 import { CheckCircle, XCircle } from 'lucide-react';
@@ -32,7 +32,10 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
   const messages = useSelector(selectMessages ?? emptySelector);
 
   const [newMessage, setNewMessage] = useState('');
-  const messagesEndRef = useRef();
+
+  // 🔽 New: precise scroller ref + robust bottom scroll
+  const scrollerRef = useRef(null);
+
   const { sendMessage: socketSendMessage, joinThread, socketRef } = useSocket(threadId);
 
   const latestMessagesRef = useRef(messages);
@@ -40,10 +43,36 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
     latestMessagesRef.current = messages;
   }, [messages]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  // 🔽 New: always land exactly at the bottom
+  const scrollToBottom = useCallback((behavior = 'auto') => {
+    const el = scrollerRef.current;
+    if (!el) return;
 
+    // 1st pass
+    if (behavior === 'smooth') {
+      // smooth on first pass, then force exact at next frame
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // 2nd pass on next frame to defeat late layout changes (fonts/images/etc.)
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+      // one more micro tick for good measure on very busy layouts
+      setTimeout(() => {
+        el.scrollTop = el.scrollHeight;
+      }, 0);
+    });
+  }, []);
+
+  // When messages change or thread switches, stick to bottom
+  useEffect(() => {
+    if (!threadId) return;
+    scrollToBottom('smooth');
+  }, [threadId, messages.length, scrollToBottom]);
+
+  // Initial load / mark read
   useEffect(() => {
     if (!chat?.threadId || chat.status !== 'approved') {
       if (chat?.threadId) dispatch(clearMessagesAction(chat.threadId));
@@ -51,7 +80,10 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
     }
 
     dispatch(clearMessagesAction(chat.threadId));
-    dispatch(fetchMessagesThunk(chat.threadId));
+    dispatch(fetchMessagesThunk(chat.threadId)).finally(() => {
+      // ensure we settle at the bottom after the fetch paints
+      setTimeout(() => scrollToBottom('auto'), 0);
+    });
 
     if (socketRef && socketRef.current) {
       socketRef.current.emit('mark_thread_read', {
@@ -59,8 +91,9 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
         userId: user?._id || user?.id,
       });
     }
-  }, [chat?.threadId, chat?.status, dispatch, user, socketRef]);
+  }, [chat?.threadId, chat?.status, dispatch, user, socketRef, scrollToBottom]);
 
+  // Join room
   useEffect(() => {
     if (chat?.threadId && joinThread) {
       joinThread(chat.threadId);
@@ -92,6 +125,9 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
           userId: user?._id || user?.id,
         });
       }
+
+      // make sure the freshly appended bubble is fully visible
+      scrollToBottom('smooth');
     } catch (err) {
       console.error('Failed to send message:', err);
     }
@@ -121,7 +157,11 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
       <div>
         <h2 className="text-lg font-semibold">{chatName}</h2>
 
-        <div className="space-y-2 mt-2 max-h-[70vh] overflow-y-auto">
+        {/* 🔽 Attach the scroller ref here */}
+        <div
+          ref={scrollerRef}
+          className="space-y-2 mt-2 max-h-[70vh] overflow-y-auto"
+        >
           {chat.status === 'pending' ? (
             <div className="bg-white p-4 rounded-xl shadow border border-gray-200 max-w-[90%] w-full break-words">
               <p className="text-gray-600 mb-2 font-medium">
@@ -164,7 +204,8 @@ export default function ChatPanel({ chat, user, onApprove, onReject }) {
               />
             ))
           )}
-          <div ref={messagesEndRef} />
+          {/* Spacer is no longer required for scrolling, but harmless to keep */}
+          <div style={{ height: 1 }} />
         </div>
       </div>
 

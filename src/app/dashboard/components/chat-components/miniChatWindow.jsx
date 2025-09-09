@@ -1,7 +1,7 @@
 // app/dashboard/components/chat-components/MiniChatWindow.jsx
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { makeSelectMessagesByThread } from '../../../redux/chatSelectors';
 import {
@@ -43,25 +43,47 @@ export default function MiniChatWindow({
   const [busy, setBusy] = useState(false);
   const listRef = useRef(null);
 
+  // 🔽 robust scroll helper (lands exactly at true bottom)
+  const scrollToBottom = useCallback((behavior = 'auto') => {
+    const el = listRef.current;
+    if (!el) return;
+
+    if (behavior === 'smooth') {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
+
+    // late layout adjustments (fonts/images/async paints)
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+      setTimeout(() => {
+        el.scrollTop = el.scrollHeight;
+      }, 0);
+    });
+  }, []);
+
   // local status mirrors chat.status; flips instantly on approve/reject
   const [localStatus, setLocalStatus] = useState(chat?.status || 'approved');
   useEffect(() => {
     setLocalStatus(chat?.status || 'approved');
   }, [chat?.status]);
 
-  // autoscroll when open
+  // autoscroll when messages change or when expanding from minimized
   useEffect(() => {
-    if (!minimized && listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
-  }, [messages, minimized]);
+    if (!minimized) scrollToBottom('smooth');
+  }, [messages.length, minimized, scrollToBottom]);
 
   // join + fetch on open
   useEffect(() => {
     if (!threadId) return;
 
     joinThread?.(threadId);
-    dispatch(fetchMessagesThunk(threadId));
+    dispatch(fetchMessagesThunk(threadId)).finally(() => {
+      // ensure bottom after initial paint
+      setTimeout(() => scrollToBottom('auto'), 0);
+    });
+
     dispatch(resetUnreadCount({ threadId }));
     emitMarkThreadRead?.(threadId);
     dispatch(setCurrentThreadId(threadId));
@@ -80,6 +102,7 @@ export default function MiniChatWindow({
     });
 
     setText('');
+    scrollToBottom('smooth');
   };
 
   // Resolve requestId if not directly present on the convo
@@ -102,6 +125,8 @@ export default function MiniChatWindow({
     };
     dispatch(addMessageToThread({ threadId, message: msg }));
     dispatch(updateLastMessageInConversation({ threadId, message: msg }));
+    // also nudge scroll so the info is visible
+    scrollToBottom('smooth');
   };
 
   // ---------- APPROVE (same as Messenger: thunk) ----------
@@ -131,6 +156,9 @@ export default function MiniChatWindow({
           lastMessageTimestamp: new Date().toISOString(),
         })
       );
+
+      // after status flip, make sure we’re at the bottom
+      scrollToBottom('smooth');
     } catch (err) {
       // No chat message on error; keep it quiet
       console.error('Approve from mini chat failed:', err);
@@ -173,6 +201,8 @@ export default function MiniChatWindow({
           lastMessageTimestamp: new Date().toISOString(),
         })
       );
+
+      scrollToBottom('smooth');
     } catch (err) {
       console.error('Reject from mini chat failed:', err);
     } finally {
