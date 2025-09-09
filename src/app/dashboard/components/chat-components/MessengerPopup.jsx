@@ -1,3 +1,4 @@
+// src/app/dashboard/components/notificationComponent/MessengerPopup.jsx
 'use client';
 
 import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
@@ -62,16 +63,11 @@ export default function MessengerPopup({ role: propRole }) {
   useEffect(() => {
     if (!userId) return;
 
-    // If the store hasn't been bound to this user yet, or it changed from another user:
     if (currentUserIdInStore !== userId) {
-      // Bind store to new user id
       dispatch(setCurrentUserId(userId));
-      // Clear any leftover conversations from previous user
       dispatch(setConversations([]));
       dispatch(setConversationsLoaded(false));
-      // Reset one-time bootstrap flag so we refetch for this user
       hasFetchedRef.current = false;
-      // Close any mini windows from the previous user
       setMiniChats([]);
     }
   }, [userId, currentUserIdInStore, dispatch]);
@@ -146,13 +142,11 @@ export default function MessengerPopup({ role: propRole }) {
     if (!userId) return;
     if (hasFetchedRef.current) return;
 
-    // Only skip if we've already loaded for THIS user
     if (conversationsLoaded && currentUserIdInStore === userId) return;
 
-    dispatch(fetchConversationsThunk({ userId }))
-      .finally(() => {
-        hasFetchedRef.current = true;
-      });
+    dispatch(fetchConversationsThunk({ userId })).finally(() => {
+      hasFetchedRef.current = true;
+    });
   }, [dispatch, userId, conversationsLoaded, currentUserIdInStore]);
 
   // =========================================================================
@@ -163,7 +157,7 @@ export default function MessengerPopup({ role: propRole }) {
       const isOwn = String(msg.senderId || msg?.sender?._id) === String(userId);
       const onMessengerPage = pathname.includes('/messenger');
       if (!isOwn && !onMessengerPage) {
-        // optional: playKnock(); // or show a toast
+        // optional: playKnock();
       }
     },
     [userId, pathname]
@@ -241,6 +235,14 @@ export default function MessengerPopup({ role: propRole }) {
     });
   }, [conversations, searchTerm, displayNameOf]);
 
+  // Close on ESC (handy on mobile w/ keyboards)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
   return (
     // anchor the popup to the icon reliably
     <div className="relative inline-block">
@@ -262,25 +264,40 @@ export default function MessengerPopup({ role: propRole }) {
         )}
       </button>
 
-      {/* Popover (top-right of the button) */}
+      {/* Mobile overlay (click to close) */}
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/30 z-[1199] md:hidden"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Popover / Bottom Sheet */}
       {open && (
         <div
           className="
-            absolute top-11 right-0
-            w-80 max-h-[70vh]
-            bg-white border border-gray-200 rounded-xl shadow-xl
-            p-4 z-[1200] flex flex-col
+            z-[1200] flex flex-col
+            md:absolute md:top-11 md:right-0 md:w-80 md:max-h-[70vh] md:rounded-xl md:border md:border-gray-200 md:shadow-xl md:bg-white
+            fixed inset-x-0 bottom-0 md:inset-auto
+            max-h-[85vh] w-full bg-white rounded-t-2xl
           "
+          role="dialog"
+          aria-modal="true"
         >
-          {/* ▼ Pointed arrow */}
-          <span className="absolute -top-2 right-6">
-            {/* outer border triangle */}
-            <span className="block w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-200"></span>
-            {/* inner white triangle */}
-            <span className="block w-0 h-0 -mt-[3px] ml-[1px] border-l-3 border-r-3 border-b-3 border-l-transparent border-r-transparent border-b-white"></span>
+          {/* ▼ Pointed arrow — desktop only */}
+          <span className="hidden md:block absolute -top-2 right-6">
+            <span className="block w-0 h-0 border-l-4 border-r-4 border-b-4 border-l-transparent border-r-transparent border-b-gray-200" />
+            <span className="block w-0 h-0 -mt-[3px] ml-[1px] border-l-3 border-r-3 border-b-3 border-l-transparent border-r-transparent border-b-white" />
           </span>
 
-          <div className="flex justify-between items-center mb-3">
+          {/* Handle bar (mobile only) */}
+          <div className="md:hidden pt-2">
+            <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-gray-300" />
+          </div>
+
+          {/* Header */}
+          <div className="flex justify-between items-center px-4 pt-2 md:pt-4 pb-2 md:pb-3 border-b border-gray-100 sticky top-0 bg-white">
             <h2 className="text-[oklch(0.55_0.28_296.83)] font-semibold select-none">Chats</h2>
             <button
               onClick={() => setOpen(false)}
@@ -291,7 +308,8 @@ export default function MessengerPopup({ role: propRole }) {
             </button>
           </div>
 
-          <div className="flex items-center bg-gray-100 rounded-md px-3 py-2 mb-3">
+          {/* Search */}
+          <div className="flex items-center bg-gray-100 rounded-md px-3 py-2 m-4 mt-3 md:mt-3">
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
               <circle cx="11" cy="11" r="7" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -305,7 +323,8 @@ export default function MessengerPopup({ role: propRole }) {
             />
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-3">
+          {/* List */}
+          <div className="flex-1 overflow-y-auto px-4 pb-[env(safe-area-inset-bottom)] space-y-3">
             {!conversationsLoaded ? (
               <p className="text-sm text-gray-500 text-center mt-8">Loading…</p>
             ) : error ? (
@@ -323,12 +342,10 @@ export default function MessengerPopup({ role: propRole }) {
                       if (!tid) return;
 
                       if (pathname.includes('/messenger')) {
-                        // On the full messenger page: select the thread in the list/panel
                         dispatch(setCurrentThreadId(tid));
                         joinThread(tid);
                         setOpen(false);
                       } else {
-                        // Elsewhere: open mini chat window
                         openMiniChat({
                           ...chat,
                           displayName: displayNameOf(chat),
@@ -392,15 +409,18 @@ export default function MessengerPopup({ role: propRole }) {
             )}
           </div>
 
-          <button
-            onClick={() => {
-              setOpen(false);
-              router.push(`/dashboard/${role}/messenger`);
-            }}
-            className="mt-3 text-sm text-indigo-600 hover:underline self-end"
-          >
-            See all in Messenger →
-          </button>
+          {/* Footer action */}
+          <div className="px-4 pt-2 pb-3 md:pb-4 border-t border-gray-100 sticky bottom-0 bg-white">
+            <button
+              onClick={() => {
+                setOpen(false);
+                router.push(`/dashboard/${role}/messenger`);
+              }}
+              className="w-full md:w-auto md:self-end text-sm text-indigo-600 hover:underline"
+            >
+              See all in Messenger →
+            </button>
+          </div>
         </div>
       )}
 
