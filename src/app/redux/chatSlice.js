@@ -110,6 +110,21 @@ function computeIdentity({ incoming, existing, currentUserId }) {
   return { displayName, displayProfileImage };
 }
 
+// Find an existing conversation by ANY stable key so we don't duplicate
+function findExistingConvo(state, payload) {
+  const tId = payload.threadId || payload._id || null;
+  const rId = payload.requestId || null;
+  if (!state.conversations?.length) return { index: -1, item: null };
+
+  const idx = state.conversations.findIndex((c) => {
+    const cTid = c.threadId || c._id || null;
+    const cRid = c.requestId || null;
+    return (tId && cTid && cTid === tId) || (rId && cRid && cRid === rId);
+  });
+
+  return { index: idx, item: idx >= 0 ? state.conversations[idx] : null };
+}
+
 // --- optional async kept for markThreadAsRead compatibility ---
 export const markThreadAsRead = createAsyncThunk(
   'chat/markThreadAsRead',
@@ -136,6 +151,7 @@ const chatSlice = createSlice({
     // -------- conversations --------
     setConversations(state, action) {
       const incomingList = Array.isArray(action.payload) ? action.payload : [];
+
       const mapped = incomingList.map((convo) => {
         const rawLastMessage = convo.lastMessage;
 
@@ -152,30 +168,33 @@ const chatSlice = createSlice({
           convo.createdAt ||
           null;
 
-        const id = convo.threadId || convo._id || convo.requestId;
-        const existing =
-          state.conversations.find((c) => (c.threadId || c._id || c.requestId) === id) || {};
+        // 🔑 canonical thread id: prefer threadId, but we'll merge if only requestId matches
+        const id = convo.threadId || convo._id || null;
+
+        // Merge with any existing by threadId OR requestId
+        const { item: existing } = findExistingConvo(state, { threadId: id, requestId: convo.requestId });
 
         const { displayName, displayProfileImage } = computeIdentity({
-          incoming: { ...convo, threadId: id },
-          existing,
+          incoming: { ...convo, threadId: id || existing?.threadId || convo.threadId },
+          existing: existing || {},
           currentUserId: state.currentUserId,
         });
 
         return {
-          ...existing,
+          ...(existing || {}),
           ...convo,
-          threadId: id,
+          threadId: id || existing?.threadId || convo.threadId || existing?._id || convo._id,
+          requestId: convo.requestId || existing?.requestId,
           lastMessage: lastMessageText,
           lastMessageTimestamp: lastTimestamp ? new Date(lastTimestamp).toISOString() : null,
           unreadCount:
             typeof convo.unreadCount === 'number'
               ? convo.unreadCount
-              : existing.unreadCount || 0,
-          participants: convo.participants || existing.participants,
-          messages: convo.messages || existing.messages,
-          sessions: convo.sessions || existing.sessions,
-          sender: convo.sender || existing.sender,
+              : existing?.unreadCount || 0,
+          participants: convo.participants || existing?.participants,
+          messages: convo.messages || existing?.messages,
+          sessions: convo.sessions || existing?.sessions,
+          sender: convo.sender || existing?.sender,
           // stable identity
           displayName,
           displayProfileImage,
@@ -195,10 +214,14 @@ const chatSlice = createSlice({
 
     addOrUpdateConversation(state, action) {
       const convo = action.payload || {};
-      const id = convo.threadId || convo._id || convo.requestId;
-      if (!id) return;
+      if (!convo) return;
 
-      const currentUserId = state.currentUserId;
+      // Prefer threadId but allow requestId-only payloads and merge into existing
+      const preferredThreadId = convo.threadId || convo._id || null;
+      const { index: existingIndex, item: existingConvo } = findExistingConvo(state, {
+        threadId: preferredThreadId,
+        requestId: convo.requestId,
+      });
 
       // Normalize last message
       let lastMessage = convo.lastMessage;
@@ -218,13 +241,10 @@ const chatSlice = createSlice({
         ? new Date(lastTimestampRaw).toISOString()
         : null;
 
-      const existingIndex = state.conversations.findIndex(
-        (c) => (c.threadId || c._id || c.requestId) === id
-      );
-      const existingConvo = existingIndex !== -1 ? state.conversations[existingIndex] : null;
+      const currentUserId = state.currentUserId;
 
       const { displayName, displayProfileImage } = computeIdentity({
-        incoming: { ...convo, threadId: id },
+        incoming: { ...convo, threadId: preferredThreadId || existingConvo?.threadId },
         existing: existingConvo || {},
         currentUserId,
       });
@@ -232,7 +252,8 @@ const chatSlice = createSlice({
       const baseData = {
         ...(existingConvo || {}),
         ...convo,
-        threadId: id,
+        threadId: preferredThreadId || existingConvo?.threadId || convo._id || existingConvo?._id,
+        requestId: convo.requestId || existingConvo?.requestId,
         lastMessage,
         lastMessageTimestamp,
         participants: convo.participants || existingConvo?.participants,
@@ -276,8 +297,16 @@ const chatSlice = createSlice({
       state.onlineUserIds = state.onlineUserIds.filter((x) => x !== id);
     },
 
+    // 🔁 RESET STATE WHEN USER CHANGES
     setCurrentUserId(state, action) {
-      state.currentUserId = action.payload || null;
+      const newId = action.payload || null;
+      if (state.currentUserId !== newId) {
+        return {
+          ...initialState,
+          currentUserId: newId,
+        };
+      }
+      state.currentUserId = newId;
     },
 
     incrementUnreadCount(state, action) {
@@ -350,8 +379,10 @@ const chatSlice = createSlice({
 
     updateConversationStatus(state, action) {
       const { requestId, status } = action.payload || {};
-      const convo = state.conversations.find((c) => c.requestId === requestId);
-      if (convo) convo.status = status;
+      const { index } = findExistingConvo(state, { requestId });
+      if (index !== -1) {
+        state.conversations[index].status = status;
+      }
     },
 
     clearMessagesForThread(state, action) {

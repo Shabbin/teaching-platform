@@ -9,6 +9,10 @@ import {
   incrementUnreadCount,
   addMessageToThread,
   setCurrentThreadId,
+  // 🔽 added
+  setCurrentUserId,
+  setConversations,
+  setConversationsLoaded,
 } from '../../../redux/chatSlice';
 import {
   fetchConversationsThunk,
@@ -29,6 +33,7 @@ export default function MessengerPopup({ role: propRole }) {
   const conversationsLoaded = useSelector((s) => s.chat.conversationsLoaded);
   const error = useSelector((s) => s.chat.error);
   const onlineUserIds = useSelector((s) => s.chat.onlineUserIds || []);
+  const currentUserIdInStore = useSelector((s) => s.chat.currentUserId); // 🔽
 
   const userIdRaw = user?.id || user?._id || '';
   const userId = userIdRaw?.toString() || '';
@@ -53,7 +58,25 @@ export default function MessengerPopup({ role: propRole }) {
     setMiniChats((prev) => prev.filter((w) => w.threadId !== threadId));
   }, []);
 
-  // helpers
+  // ---------- user switch guard ----------
+  useEffect(() => {
+    if (!userId) return;
+
+    // If the store hasn't been bound to this user yet, or it changed from another user:
+    if (currentUserIdInStore !== userId) {
+      // Bind store to new user id
+      dispatch(setCurrentUserId(userId));
+      // Clear any leftover conversations from previous user
+      dispatch(setConversations([]));
+      dispatch(setConversationsLoaded(false));
+      // Reset one-time bootstrap flag so we refetch for this user
+      hasFetchedRef.current = false;
+      // Close any mini windows from the previous user
+      setMiniChats([]);
+    }
+  }, [userId, currentUserIdInStore, dispatch]);
+
+  // ---------- helpers ----------
   const otherIdOf = useCallback(
     (conv) => {
       if (!conv?.participants || !userId) return null;
@@ -104,7 +127,7 @@ export default function MessengerPopup({ role: propRole }) {
     [otherIdOf, onlineUserIds]
   );
 
-  // unique other-user count for badge
+  // ---- badge: distinct other users with unread
   const badgeCount = useMemo(() => {
     const set = new Set();
     for (const conv of conversations) {
@@ -116,15 +139,25 @@ export default function MessengerPopup({ role: propRole }) {
     return set.size;
   }, [conversations, otherIdOf]);
 
-  // load conversations once
+  // =========================================================================
+  //  FETCH ONCE PER USER
+  // =========================================================================
   useEffect(() => {
-    if (!userId || hasFetchedRef.current || conversationsLoaded) return;
-    dispatch(fetchConversationsThunk({ userId })).finally(() => {
-      hasFetchedRef.current = true;
-    });
-  }, [dispatch, userId, conversationsLoaded]);
+    if (!userId) return;
+    if (hasFetchedRef.current) return;
 
-  // socket bindings
+    // Only skip if we've already loaded for THIS user
+    if (conversationsLoaded && currentUserIdInStore === userId) return;
+
+    dispatch(fetchConversationsThunk({ userId }))
+      .finally(() => {
+        hasFetchedRef.current = true;
+      });
+  }, [dispatch, userId, conversationsLoaded, currentUserIdInStore]);
+
+  // =========================================================================
+  // SOCKET HANDLERS
+  // =========================================================================
   const handleNewMessage = useCallback(
     (msg) => {
       const isOwn = String(msg.senderId || msg?.sender?._id) === String(userId);
@@ -189,6 +222,7 @@ export default function MessengerPopup({ role: propRole }) {
     handleNewTuitionRequest
   );
 
+  // Join threads for this user’s conversations
   useEffect(() => {
     if (!userId) return;
     conversations.forEach((c) => {

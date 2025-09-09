@@ -1,7 +1,7 @@
 // src/app/dashboard/components/notificationComponent/NotificationBellIcon.jsx
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -118,19 +118,29 @@ export default function NotificationBell() {
     dispatch(fetchNotifications());
   }, [dispatch]);
 
-  // Socket listener for real-time notifications
-  useEffect(() => {
-    if (!window.socket) return;
-
-    const handleNewNotification = (notif) => {
+  // Stable handler for the socket listener
+  const handleNewNotification = useCallback(
+    (notif) => {
       dispatch(addNotification(normalizeNotification(notif)));
-    };
+    },
+    [dispatch]
+  );
 
-    window.socket.on('new_notification', handleNewNotification);
+  // Socket listener for real-time notifications (guarded + captured socket ref)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const s = window.socket; // capture current socket
+
+    if (s?.on) {
+      s.on('new_notification', handleNewNotification);
+    }
+
     return () => {
-      window.socket.off('new_notification', handleNewNotification);
+      if (s?.off) {
+        s.off('new_notification', handleNewNotification);
+      }
     };
-  }, [dispatch]);
+  }, [handleNewNotification]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -227,7 +237,7 @@ export default function NotificationBell() {
                         className="w-10 h-10 rounded-full object-cover border border-gray-200 shadow-sm"
                       />
                       <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 whitespace-pre-wrap break-words leading-5">
+                        <p className="text-sm font-medium text-gray-800 whitespace-pre-wrap break-words leading-5">
                           {n.senderName ? `${n.senderName} ${n.message}` : n.message}
                         </p>
                         <span className="text-xs text-gray-500">{formatWhen(n)}</span>
