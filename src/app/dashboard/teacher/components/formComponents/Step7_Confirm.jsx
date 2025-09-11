@@ -1,10 +1,14 @@
 // Step7_Confirm.jsx
 import React from 'react';
-import { useFormContext } from 'react-hook-form';
+import { useFormContext, useWatch } from 'react-hook-form';
 
 export default function Step7_Confirm() {
-  const { getValues } = useFormContext();
+  const { control, getValues } = useFormContext();
   const data = getValues();
+
+  // Read the actual File stored in form state
+  const vf = useWatch({ control, name: 'videoFile' }); // File | null | undefined
+  const selectedName = vf?.name || '';
 
   const Row = ({ label, children }) => (
     <div className="flex items-start gap-4 py-2 border-b last:border-b-0 border-gray-100">
@@ -27,7 +31,6 @@ export default function Step7_Confirm() {
         {data.title && <Row label="Title">{data.title}</Row>}
         {data.description && (
           <Row label="Description">
-            {/* If you used a rich text editor, this is HTML */}
             <div
               className="text-sm leading-6"
               dangerouslySetInnerHTML={{ __html: data.description }}
@@ -49,9 +52,9 @@ export default function Step7_Confirm() {
             </a>
           </Row>
         )}
-        {data.videoFile && data.videoFile.length > 0 && (
-          <Row label="Video File">{data.videoFile[0]?.name}</Row>
-        )}
+
+        {/* Show the picked file name if present */}
+        {selectedName && <Row label="Video File">{selectedName}</Row>}
       </div>
     </div>
   );

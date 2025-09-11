@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
+      domains: ['res.cloudinary.com'],
     remotePatterns: [
       // localhost — match any port (3000, 5000, etc.) and only /uploads/**
       { protocol: 'http', hostname: 'localhost', pathname: '/uploads/**' },

@@ -1,7 +1,7 @@
 'use client';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
+// ❌ removed next/image
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { Send, BookOpen, ArrowLeft, Eye, Users } from 'lucide-react';
@@ -49,6 +49,7 @@ const ViewPostDetails = ({ post }) => {
   const teacherId = post.teacher?._id || teacherIdFromQuery || userId;
   const isOwner = userRole === 'teacher' && String(userId) === String(teacherId);
 
+  // If it's an absolute URL (e.g., Cloudinary), return as-is; else prefix with API
   const getImageUrl = (img) =>
     !img || img.trim() === ''
       ? '/default-avatar.png'
@@ -58,7 +59,7 @@ const ViewPostDetails = ({ post }) => {
 
   const handleGoBack = () => {
     if (userRole === 'teacher') {
-      router.push('/dashboard/teacher/post-content');
+      router.push('/dashboard/teacher/post-content/view-content');
     } else if (teacherIdFromQuery) {
       router.push(`/teachers/${teacherIdFromQuery}/posts`);
     } else {
@@ -152,9 +153,7 @@ const ViewPostDetails = ({ post }) => {
     }
 
     if (paid === '1' && type === 'TUITION') {
-      // optional: show a quick confirmation (or trigger any post-payment refresh)
       if (typeof window !== 'undefined') {
-        // eslint-disable-next-line no-alert
         alert('✅ Tuition payment successful. You can proceed with classes.');
       }
       removeParams(['paid', 'type', 'tran_id', 'amt', 'status', 'phase', 'month']);
@@ -184,17 +183,15 @@ const ViewPostDetails = ({ post }) => {
       if ((topicCredits ?? 0) < 1) {
         const buy = confirm('You need topic credits. Buy 10 credits for ৳400 now?');
         if (buy) {
-          // include the exact page we’re on so the backend can bounce us back here
           const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
           const { url } = await startTopicPack({
             studentId: userId,
             orderId: 'TP-' + Date.now(),
             returnUrl: currentUrl,
           });
-           // open gateway in new tab
           window.open(url, '_blank', 'noopener,noreferrer');
         }
-        return; // user will come back with ?paid=1&type=TOPIC_PACK_10...
+        return;
       }
 
       // 3) Already has credits — open the compose modal
@@ -206,6 +203,12 @@ const ViewPostDetails = ({ post }) => {
     }
   };
 
+  // ✅ Decide final video src (Cloudinary URL vs stored path)
+  const videoSrc =
+    typeof post.videoFile === 'string' && post.videoFile.length
+      ? (post.videoFile.startsWith('http') ? post.videoFile : videoUrlFromStoredPath(post.videoFile))
+      : '';
+
   return (
     <div className="min-h-screen bg-gray-50 relative">
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8 p-6">
@@ -213,7 +216,8 @@ const ViewPostDetails = ({ post }) => {
         <aside className="hidden lg:block w-64 sticky top-6 self-start">
           <div className="bg-white rounded-2xl p-6 shadow-lg flex flex-col items-center border border-gray-200">
             <div className="w-40 h-40 rounded-full overflow-hidden flex-shrink-0">
-              <Image
+              {/* ✅ use regular <img> to avoid next/image domain config */}
+              <img
                 src={getImageUrl(fallbackTeacher.profileImage)}
                 alt={fallbackTeacher.name}
                 width={160}
@@ -241,21 +245,33 @@ const ViewPostDetails = ({ post }) => {
           </div>
 
           {/* Video Section */}
-          <div className="w-full max-w-3xl mx-auto overflow-hidden rounded-xl border border-gray-200 shadow-sm mb-6">
-            {youtubeId ? (
-              <iframe
-                className="w-full aspect-video rounded-lg"
-                src={`https://www.youtube.com/embed/${youtubeId}`}
-                title="YouTube Video"
-                allowFullScreen
-              />
-            ) : post.videoFile ? (
-              <video controls>
-                <source src={videoUrlFromStoredPath(post.videoFile)} type="video/mp4" />
-                Your browser does not support the video tag.
-              </video>
-            ) : null}
-          </div>
+      {/* Video Section */}
+<div className="w-full max-w-3xl mx-auto overflow-hidden rounded-xl border border-gray-200 shadow-sm mb-6">
+  {youtubeId ? (
+    <div className="aspect-video">
+      <iframe
+        className="w-full h-full"
+        src={`https://www.youtube.com/embed/${youtubeId}`}
+        title="YouTube Video"
+        allowFullScreen
+      />
+    </div>
+  ) : post.videoUrl ? ( // ⬅️ use signed URL from server
+    <div className="aspect-video">
+      <video
+        key={post.videoUrl}           // force remount if the URL changes
+        controls
+        className="w-full h-full block"
+        preload="metadata"
+      >
+        <source src={post.videoUrl} type="video/mp4" />
+        {/* Fallback text */}
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  ) : null}
+</div>
+
 
           {/* Views & Enrollments */}
           <div className="flex gap-6 mb-6 ml-[70px]">
@@ -358,9 +374,6 @@ const ViewPostDetails = ({ post }) => {
 };
 
 export default ViewPostDetails;
-
-
-
 
 
 

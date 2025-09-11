@@ -7,9 +7,9 @@ import {
   step1Schema,
   step2Schema,
   step3Schema,
-  step4Schema,      // Subjects / Tags
-  step5Schema,      // Post Details
-  step6Schema,      // Extras with required location/language + XOR youtube/video
+  step4Schema,
+  step5Schema,
+  step6Schema,
   finalTeacherPostSchema,
 } from "../../../../hooks/zodSchemas/teacherPostSchema";
 import { applyZodErrors } from "@/lib/zodToRHF";
@@ -20,7 +20,6 @@ import {
   resetError,
 } from "../../../../redux/teacherPostSlice";
 
-// ✅ use env-driven axios wrapper instead of raw axios
 import API from "../../../../../api/axios";
 
 import Step1_EducationSystem from "./Step1_EducationSystem";
@@ -40,23 +39,16 @@ import ProgressSteps from "../formComponents/FormLayouts/progressSteps";
 import { t } from "../../../../../lib/i18n/ui";
 
 const steps = [
-  { label: "Education System", component: Step1_EducationSystem },     // 0
-  { label: "Board / Group", component: Step2_BoardGroup },             // 1
-  { label: "Level / Sublevel", component: Step3_LevelSubLevel },       // 2
-  { label: "Subjects / Universities", component: Step4_SubjectsTags }, // 3
-  { label: "Post Details", component: Step5_PostDetails },             // 4
-  { label: "Additional Info", component: Step6_Extras },               // 5
-  { label: "Review & Submit", component: Step7_Confirm },              // 6
+  { label: "Education System", component: Step1_EducationSystem },
+  { label: "Board / Group", component: Step2_BoardGroup },
+  { label: "Level / Sublevel", component: Step3_LevelSubLevel },
+  { label: "Subjects / Universities", component: Step4_SubjectsTags },
+  { label: "Post Details", component: Step5_PostDetails },
+  { label: "Additional Info", component: Step6_Extras },
+  { label: "Review & Submit", component: Step7_Confirm },
 ];
 
-const stepSchemas = [
-  step1Schema, // 0
-  step2Schema, // 1
-  step3Schema, // 2
-  step4Schema, // 3
-  step5Schema, // 4
-  step6Schema, // 5
-];
+const stepSchemas = [step1Schema, step2Schema, step3Schema, step4Schema, step5Schema, step6Schema];
 
 export default function CreatePostWizard({
   initialData = null,
@@ -75,7 +67,6 @@ export default function CreatePostWizard({
   useEffect(() => {
     async function fetchTree() {
       try {
-        // ✅ now uses API client (baseURL/env aware)
         const res = await API.get("/education-tree");
         setEducationTree(res.data);
       } catch {
@@ -87,6 +78,9 @@ export default function CreatePostWizard({
     fetchTree();
   }, []);
 
+
+
+  
   const defaultValues = {
     title: initialData?.title ?? "",
     description: initialData?.description ?? "",
@@ -101,14 +95,19 @@ export default function CreatePostWizard({
     language: initialData?.language ?? "",
     hourlyRate: initialData?.hourlyRate ?? "",
     youtubeLink: initialData?.youtubeLink ?? "",
-    videoFile: (initialData && initialData.videoFile) || "",
+    // store a single File (or null) in RHF
+    videoFile: null,
   };
 
   const methods = useForm({
     mode: "onBlur",
     defaultValues,
+    // 🔑 keep values when a step unmounts
+    shouldUnregister: false,
   });
-
+useEffect(() => {
+    methods.register("videoFile");
+  }, [methods]);
   useEffect(() => {
     if (error) dispatch(resetError());
   }, [step, dispatch, error]);
@@ -116,7 +115,6 @@ export default function CreatePostWizard({
   if (loadingTree) return <p className="p-8">Loading education data...</p>;
   if (treeError) return <p className="p-8 text-red-600">{treeError}</p>;
 
-  /** Validate only the currently visible step */
   async function validateCurrentStep() {
     const schema = stepSchemas[step];
     if (!schema) return true;
@@ -129,15 +127,11 @@ export default function CreatePostWizard({
     return true;
   }
 
-  /** Compute where to go next, skipping non-applicable steps */
   function computeNextIndex(curr, data) {
     const es = data.educationSystem;
     const board = data.board;
 
-    if (curr === 0) {
-      if (es === "GED") return 3;
-      return 1;
-    }
+    if (curr === 0) return es === "GED" ? 3 : 1;
     if (curr === 1) {
       if (es === "BCS") return 4;
       if (es === "GED") return 3;
@@ -152,7 +146,6 @@ export default function CreatePostWizard({
     return Math.min(curr + 1, steps.length - 1);
   }
 
-  /** Compute previous index respecting the same path rules */
   function computePrevIndex(curr, data) {
     const es = data.educationSystem;
     const board = data.board;
@@ -179,9 +172,7 @@ export default function CreatePostWizard({
     const data = methods.getValues();
     const es = data.educationSystem;
 
-    if (es !== "Bangla-Medium") {
-      methods.setValue("group", "");
-    }
+    if (es !== "Bangla-Medium") methods.setValue("group", "");
     if (es === "GED") {
       methods.setValue("board", "");
       methods.setValue("level", "");
@@ -226,26 +217,68 @@ export default function CreatePostWizard({
     }
     const payload = parsed.data;
 
-    let resultAction;
-    if (initialData && initialData._id) {
-      resultAction = await dispatch(
-        updateTeacherPost({ id: initialData._id, data: payload })
-      );
-    } else {
-      resultAction = await dispatch(createTeacherPost(payload));
-    }
+    const hasFile =
+      payload.videoFile &&
+      typeof payload.videoFile === "object" &&
+      typeof payload.videoFile.name === "string" &&
+      payload.videoFile.size > 0;
 
-    if (resultAction.meta?.requestStatus === "fulfilled") {
-      alert(initialData ? "Post updated successfully!" : "Post created successfully!");
+    try {
+      let resultData;
+
+      if (hasFile) {
+        const fd = new FormData();
+        fd.append("title", payload.title ?? "");
+        fd.append("description", payload.description ?? "");
+        fd.append("location", payload.location ?? "");
+        fd.append("language", payload.language ?? "");
+        fd.append("hourlyRate", String(payload.hourlyRate ?? ""));
+        fd.append("youtubeLink", payload.youtubeLink ?? "");
+
+        fd.append("educationSystem", payload.educationSystem ?? "");
+        fd.append("board", payload.board ?? "");
+        fd.append("level", payload.level ?? "");
+        fd.append("subLevel", payload.subLevel ?? "");
+        fd.append("group", payload.group ?? "");
+
+        (payload.subjects ?? []).forEach((s) => fd.append("subjects", s));
+        (payload.tags ?? []).forEach((t) => fd.append("tags", t));
+
+        fd.append("videoFile", payload.videoFile);
+
+        if (editMode) {
+          const res = await API.put(`/posts/${initialData._id}`, fd, { withCredentials: true });
+          resultData = res.data;
+        } else {
+          const res = await API.post("/posts", fd, { withCredentials: true });
+          resultData = res.data;
+        }
+      } else {
+        let resultAction;
+        if (editMode) {
+          resultAction = await dispatch(updateTeacherPost({ id: initialData._id, data: payload }));
+        } else {
+          resultAction = await dispatch(createTeacherPost(payload));
+        }
+
+        if (resultAction.meta?.requestStatus !== "fulfilled") {
+          const msg =
+            resultAction?.payload?.message ||
+            resultAction?.error?.message ||
+            "Server error";
+          methods.setError("root", { type: "server", message: msg });
+          return;
+        }
+        resultData = resultAction.payload;
+      }
+
+      alert(editMode ? "Post updated successfully!" : "Post created successfully!");
       methods.reset();
       setStep(0);
-      if (initialData && onPostUpdated) onPostUpdated(resultAction.payload);
-      if (!initialData && onPostCreated) onPostCreated(resultAction.payload);
-    } else {
-      const msg =
-        resultAction?.payload?.message ||
-        resultAction?.error?.message ||
-        "Server error";
+      if (editMode && onPostUpdated) onPostUpdated(resultData);
+      if (!editMode && onPostCreated) onPostCreated(resultData);
+    } catch (e) {
+      const msg = e?.response?.data?.message || e.message || "Server error";
       methods.setError("root", { type: "server", message: msg });
     }
   }
@@ -284,9 +317,7 @@ export default function CreatePostWizard({
         >
           <StepTitle
             prefix={editMode ? t(lang, "updateYour") : t(lang, "createYour")}
-            highlight={
-              step === steps.length - 1 ? t(lang, "reviewing") : steps[step].label
-            }
+            highlight={step === steps.length - 1 ? t(lang, "reviewing") : steps[step].label}
           />
 
           <AnimatePresence mode="wait">

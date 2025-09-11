@@ -12,7 +12,7 @@ export default function ViewedPostsTimeline() {
   const userInfo  = useSelector((state) => state.user.userInfo);
   const isFetched = useSelector((state) => state.user.isFetched);
 
-  // 🔧 FIX: support either `_id` or `id` (some sessions return `id`)
+  // support either `_id` or `id`
   const rawTeacherId = userInfo?._id || userInfo?.id;
   const teacherId = rawTeacherId ? String(rawTeacherId) : null;
 
@@ -82,7 +82,24 @@ export default function ViewedPostsTimeline() {
     return Array.from(map.values());
   }, [events]);
 
+  // ---------- helpers ----------
+  // Resolve a playable URL for this post (Cloudinary signed, public, or legacy local)
+  const resolveVideoUrl = (post) => {
+    if (!post) return '';
+    // server now returns post.videoUrl for Cloudinary authenticated/public
+    if (post.videoUrl && /^https?:\/\//i.test(post.videoUrl)) return post.videoUrl;
+
+    // fallback to videoFile if it’s an absolute URL
+    if (post.videoFile && /^https?:\/\//i.test(post.videoFile)) return post.videoFile;
+
+    // legacy local path -> absolute
+    if (post.videoFile) return videoUrlFromStoredPath(post.videoFile);
+
+    return '';
+  };
+
   const renderVideo = (post) => {
+    // YouTube first
     if (post.youtubeLink) {
       const match = post.youtubeLink.match(
         /^.*(?:youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|watch\?.+&v=)([^#&?]*).*/
@@ -99,15 +116,23 @@ export default function ViewedPostsTimeline() {
         );
       }
     }
-    if (post.videoFile) {
-      return (
-        <video controls className="w-full max-w-[400px] aspect-video rounded-lg mt-2">
-          <source src={videoUrlFromStoredPath(post.videoFile)} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-      );
-    }
-    return null;
+
+    const url = resolveVideoUrl(post);
+    if (!url) return null;
+
+    // Key the <video> by URL so it hard-remounts when src changes (prevents 0:00)
+    return (
+      <video
+        key={url}
+        controls
+        playsInline
+        preload="metadata"
+        className="w-full max-w-[400px] aspect-video rounded-lg mt-2 bg-black"
+      >
+        <source src={url} type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+    );
   };
 
   // --- UI states
@@ -119,7 +144,6 @@ export default function ViewedPostsTimeline() {
     );
   }
 
-  // Only show “Please log in” after auth is fetched AND there’s no id in either field
   if (!teacherId) {
     return (
       <div className="flex justify-center items-center h-64 text-gray-500 text-lg font-semibold">

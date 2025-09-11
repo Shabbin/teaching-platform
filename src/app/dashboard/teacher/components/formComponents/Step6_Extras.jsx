@@ -3,7 +3,11 @@ import React from 'react';
 import { useFormContext } from 'react-hook-form';
 
 export default function Step6_Extras({ editMode }) {
-  const { register, formState: { errors } } = useFormContext();
+  const { setValue, watch, trigger, formState: { errors } } = useFormContext();
+
+  // videoFile is stored as a single File (or null)
+  const vf = watch('videoFile'); // File | null | undefined
+  const selectedName = vf?.name || '';
 
   return (
     <div className="space-y-6">
@@ -13,7 +17,8 @@ export default function Step6_Extras({ editMode }) {
         <input
           type="text"
           placeholder="e.g., Dhaka, Mirpur"
-          {...register('location')}
+          name="location"
+          onChange={(e) => setValue('location', e.target.value, { shouldDirty: true, shouldValidate: true })}
           className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white
                      focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300"
         />
@@ -28,7 +33,8 @@ export default function Step6_Extras({ editMode }) {
         <input
           type="text"
           placeholder="e.g., Bangla, English"
-          {...register('language')}
+          name="language"
+          onChange={(e) => setValue('language', e.target.value, { shouldDirty: true, shouldValidate: true })}
           className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white
                      focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300"
         />
@@ -43,7 +49,8 @@ export default function Step6_Extras({ editMode }) {
         <input
           type="url"
           placeholder="https://youtube.com/..."
-          {...register('youtubeLink')}
+          name="youtubeLink"
+          onChange={(e) => setValue('youtubeLink', e.target.value, { shouldDirty: true, shouldValidate: true })}
           className="w-full px-4 py-2 rounded-xl border border-gray-200 bg-white
                      focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300"
         />
@@ -58,11 +65,20 @@ export default function Step6_Extras({ editMode }) {
         <input
           type="file"
           accept="video/*"
-          {...register('videoFile')}
+          name="videoFile"
+          onChange={(e) => {
+            const file = e.target.files?.[0] ?? null; // turn FileList → File|null
+            setValue('videoFile', file, { shouldDirty: true, shouldValidate: true });
+            // validate XOR with youtubeLink if you use it
+            trigger('videoFile');
+          }}
           className="w-full rounded-xl border border-gray-200 bg-white
                      file:mr-3 file:px-4 file:py-2 file:border-0 file:rounded-lg file:bg-gray-100 file:text-gray-700
                      focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-300"
         />
+        {selectedName && (
+          <p className="mt-2 text-sm text-gray-700">Selected: {selectedName}</p>
+        )}
         <p className="mt-2 text-xs text-gray-500">Optional. Max size depends on server limits.</p>
         {errors.videoFile && (
           <p className="mt-2 text-sm text-red-600">{errors.videoFile.message}</p>

@@ -40,7 +40,7 @@ export const subjectsSchema = arrayFromUnknown
   )
   .transform((a) => a.map((s) => s.trim()).filter(Boolean).sort());
 
-// Tags (always optional; you removed PU tag requirement)
+// Tags (always optional)
 export const tagsSchema = z
   .preprocess(
     (v) => (Array.isArray(v) ? v : v == null ? [] : [v]),
@@ -58,12 +58,46 @@ const youtubeLinkSchema = z
     message: "Invalid URL",
   });
 
-// for final schema we’ll accept any (File or existing string path)
-const videoFileFinal = z.any().optional();
+/** ===== File helpers (front-end, browser) =====
+ * Normalize RHF file input to a single File (first item), or null.
+ * Works with:
+ * - File
+ * - FileList
+ * - Array<File>
+ * Ignores strings (legacy paths) by turning them into null.
+ */
+const normalizeToFirstFile = (v) => {
+  if (!v) return null;
+  // ignore old/legacy string values
+  if (typeof v === "string") return null;
 
-// optional defaults kept for compatibility
-const locationOptional = z.string().optional().transform((v) => v ?? "");
-const languageOptional = z.string().optional().transform((v) => v ?? "");
+  // FileList
+  if (typeof v === "object" && "length" in v && typeof v.length === "number" && typeof v.item === "function") {
+    return v.length > 0 ? v[0] : null;
+  }
+
+  // Array<File>
+  if (Array.isArray(v)) {
+    return v.length > 0 ? v[0] : null;
+  }
+
+  // Single File (duck-typed)
+  if (typeof v === "object" && v != null && "name" in v && "size" in v && "type" in v) {
+    return v;
+  }
+
+  return null;
+};
+
+// 50 MB limit (align with your multer 50MB)
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+
+// A schema that yields either a File or null/undefined
+const videoFileSchema = z
+  .preprocess((v) => normalizeToFirstFile(v), z.any().optional())
+  .refine((file) => !file || typeof file.size === "number", "Invalid file")
+  .refine((file) => !file || file.size <= MAX_VIDEO_BYTES, `Max 50MB allowed`)
+  .refine((file) => !file || (typeof file.type === "string" && file.type.startsWith("video/")), "Must be a video file");
 
 /** ===== Per-step schemas ===== */
 
@@ -73,8 +107,6 @@ export const step1Schema = z.object({
 });
 
 // STEP 2 (Board / Group)
-// - BM still needs group (Science/Commerce/Arts)
-// - BCS uses only board as stage (Preliminary/Written/Viva); group is ignored/not required
 export const step2Schema = z
   .object({
     educationSystem: EducationSystem,
@@ -102,7 +134,6 @@ export const step2Schema = z
     }
 
     if (educationSystem === "BCS") {
-      // BCS: stage-only in board, no group required/used
       if (!["Preliminary", "Written", "Viva"].includes(board || "")) {
         ctx.addIssue({
           path: ["board"],
@@ -110,7 +141,6 @@ export const step2Schema = z
           message: "For BCS, board must be Preliminary / Written / Viva",
         });
       }
-      // If someone passed a non-empty group, gently flag it (optional)
       if (group && group.trim() !== "") {
         ctx.addIssue({
           path: ["group"],
@@ -121,7 +151,6 @@ export const step2Schema = z
       return;
     }
 
-    // Other systems: group must be empty/omitted
     if (group && group !== "") {
       ctx.addIssue({ path: ["group"], code: z.ZodIssueCode.custom, message: "Group must be empty for this system" });
     }
@@ -139,10 +168,6 @@ export const step3Schema = z
   .superRefine((data, ctx) => {
     const { educationSystem, board, group, level, subLevel } = data;
 
-    // show/require "level" for:
-    // - English-Medium with a board
-    // - Bangla-Medium with a group
-    // - University-Admission with Public-University
     const needLevel =
       (educationSystem === "English-Medium" && !!board) ||
       (educationSystem === "Bangla-Medium" && !!group) ||
@@ -152,7 +177,6 @@ export const step3Schema = z
       ctx.addIssue({ path: ["level"], code: z.ZodIssueCode.custom, message: "Level is required" });
     }
 
-    // Sublevel only for EM + (CIE|Edexcel) + A_Level
     const needSub =
       educationSystem === "English-Medium" &&
       (board === "CIE" || board === "Edexcel") &&
@@ -175,7 +199,7 @@ export const step3Schema = z
     }
   });
 
-// STEP 4 (Subjects/Tags) — strict here (≥1) because BCS skips this step anyway
+// STEP 4 (Subjects/Tags)
 export const step4Schema = z.object({
   educationSystem: EducationSystem,
   board: z.string().optional(),
@@ -202,13 +226,11 @@ export const step6Schema = z
     location: z.string().trim().min(1, "Location is required"),
     language: z.string().trim().min(1, "Language is required"),
     youtubeLink: z.string().optional().transform((v) => v ?? ""),
-    videoFile: z.any().optional(),
+    videoFile: videoFileSchema, // ⬅️ normalize to first File or null
   })
   .superRefine((data, ctx) => {
     const hasYT = !!data.youtubeLink && data.youtubeLink.trim() !== "";
-    const hasFile =
-      data.videoFile != null &&
-      !(typeof data.videoFile === "string" && data.videoFile.trim() === "");
+    const hasFile = !!data.videoFile; // already normalized to a single File or null
 
     if (hasYT && !/^https?:\/\/.+/i.test(data.youtubeLink)) {
       ctx.addIssue({ path: ["youtubeLink"], code: z.ZodIssueCode.custom, message: "Invalid URL." });
@@ -237,6 +259,9 @@ const subjectsForFinal = z
   )
   .transform((a) => a.map((s) => s.trim()).filter(Boolean).sort());
 
+// Reuse normalized single-file schema here too
+const videoFileFinal = videoFileSchema;
+
 export const finalTeacherPostSchema = z
   .object({
     title: titleSchema,
@@ -251,7 +276,7 @@ export const finalTeacherPostSchema = z
 
     hourlyRate: hourlyRateSchema,
     youtubeLink: youtubeLinkSchema,
-    videoFile: videoFileFinal,
+    videoFile: videoFileFinal,      // ⬅️ single File or null
     tags: tagsSchema,
 
     educationSystem: EducationSystem,
@@ -299,7 +324,6 @@ export const finalTeacherPostSchema = z
         ctx.addIssue({ path: ["group"], code: z.ZodIssueCode.custom, message: "Invalid group for Bangla-Medium" });
       }
     } else if (educationSystem === "BCS") {
-      // No group for BCS; if present non-empty, warn
       if (group && group.trim() !== "") {
         ctx.addIssue({ path: ["group"], code: z.ZodIssueCode.custom, message: "Group is not used for BCS" });
       }
@@ -316,10 +340,7 @@ export const finalTeacherPostSchema = z
       }
     }
 
-    // ===== Subjects rules (final):
-    // - BCS: subjects may be empty
-    // - Others: at least one
-    // - Always enforce max 5
+    // Subjects rules (final)
     if (subjects && subjects.length > 5) {
       ctx.addIssue({
         path: ["subjects"],
@@ -327,29 +348,26 @@ export const finalTeacherPostSchema = z
         message: "Max 5 subjects allowed",
       });
     }
-
     if (educationSystem !== "BCS") {
       if (!subjects || subjects.length === 0) {
         ctx.addIssue({
           path: ["subjects"],
           code: z.ZodIssueCode.custom,
-          message: educationSystem === "Public-University"
-            ? "You must select at least one Unit"
-            : "Select at least one subject",
+          message:
+            educationSystem === "Public-University"
+              ? "You must select at least one Unit"
+              : "Select at least one subject",
         });
       }
     }
-
-    // University-Admission specifics
     if (educationSystem === "University-Admission" && hasValidBoard) {
       if (board === "Public-University") {
-        // Only require ≥1 unit (handled above by generic rule)
+        // ≥1 unit handled above
       }
       if (["Engineering", "Medical", "IBA"].includes(board || "")) {
-        // Also ≥1 subject (already enforced above)
+        // ≥1 subject handled above
       }
     }
-
     if (educationSystem === "Entrance-Exams") {
       if (!hasValidBoard) {
         ctx.addIssue({ path: ["board"], code: z.ZodIssueCode.custom, message: "Select an Exam (IELTS, SAT, etc.)" });
@@ -358,18 +376,15 @@ export const finalTeacherPostSchema = z
         ctx.addIssue({ path: ["subjects"], code: z.ZodIssueCode.custom, message: "Select at least one part" });
       }
     }
-
     if (educationSystem === "GED") {
       if (!subjects?.length) {
         ctx.addIssue({ path: ["subjects"], code: z.ZodIssueCode.custom, message: "Select at least one subject" });
       }
     }
 
-    // Step 6 XOR (YouTube vs Video)
+    // Step 6 XOR (YouTube vs Video) — using normalized single File
     const hasYT = !!data.youtubeLink && data.youtubeLink.trim() !== "";
-    const hasFile =
-      data.videoFile != null &&
-      !(typeof data.videoFile === "string" && data.videoFile.trim() === "");
+    const hasFile = !!data.videoFile;
     if (hasYT && hasFile) {
       ctx.addIssue({
         path: ["youtubeLink"],
