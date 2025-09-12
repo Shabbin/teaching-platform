@@ -3,26 +3,29 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSelector } from 'react-redux';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import FixScheduleModal from '../../components/scheduleComponents/fixScheduleModal';
 import { useTeacherSchedules } from '../../../hooks/useSchedules';
 
-// --- Static demo cards (unchanged) ---
+// --- Static demo cards (kept as-is) ---
 const SUBJECTS = [
   { name: 'Physics', studentsCount: 3 },
   { name: 'Chemistry', studentsCount: 4 },
   { name: 'Mathematics', studentsCount: 2 },
 ];
-const STUDENTS = [
-  { name: 'Fatima', img: 'https://i.pravatar.cc/60?img=1' },
-  { name: 'Rafi', img: 'https://i.pravatar.cc/60?img=2' },
-  { name: 'Rina', img: 'https://i.pravatar.cc/60?img=3' },
-  { name: 'Tanvir', img: 'https://i.pravatar.cc/60?img=4' },
-];
 const ANNOUNCEMENTS = ['Physics class moved to Friday', 'New video uploaded: Motion'];
 
-/* ---------------- Sidebar with real links + active state ---------------- */
-const Sidebar = ({ onOpen }) => {
+/* ---------------- Utils ---------------- */
+const getImageUrl = (img) =>
+  !img || String(img).trim() === ''
+    ? '/default-avatar.png'
+    : String(img).startsWith('http')
+    ? img
+    : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${img}`;
+
+/* ---------------- Sidebar ---------------- */
+const Sidebar = ({ onOpen, teacherName, teacherImage }) => {
   const pathname = usePathname();
 
   const links = [
@@ -37,11 +40,13 @@ const Sidebar = ({ onOpen }) => {
     <aside className="w-[250px] bg-gradient-to-b from-indigo-600 to-indigo-700 text-white p-5 flex flex-col flex-shrink-0">
       <div className="text-center mb-8">
         <img
-          src="https://i.pravatar.cc/100"
-          alt="Profile"
+          src={getImageUrl(teacherImage)}
+          alt={teacherName || 'Teacher'}
           className="w-20 h-20 rounded-full border-2 border-white object-cover mx-auto ring-2 ring-white/30"
         />
-        <h3 className="mt-2 text-lg font-medium">Mr. Ahmed</h3>
+        <h3 className="mt-2 text-lg font-medium truncate" title={teacherName || 'Teacher'}>
+          {teacherName || 'Teacher'}
+        </h3>
       </div>
 
       <button
@@ -98,21 +103,27 @@ const StudentList = ({ students }) => (
   <section>
     <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Students</h2>
     <div className="flex flex-wrap gap-4">
-      {students.map(({ name, img }) => (
-        <div key={name} className="flex flex-col items-center flex-shrink-0">
-          <img
-            src={img}
-            alt={name}
-            className="w-[60px] h-[60px] rounded-full object-cover ring-2 ring-indigo-300"
-          />
-          <p className="text-xs mt-1 text-gray-700">{name}</p>
-        </div>
-      ))}
+      {students.length === 0 ? (
+        <p className="text-sm text-slate-500">No students found from your schedules yet.</p>
+      ) : (
+        students.map(({ id, name, img }) => (
+          <div key={id || name} className="flex flex-col items-center flex-shrink-0 w-[72px]">
+            <img
+              src={getImageUrl(img)}
+              alt={name || 'Student'}
+              className="w-[60px] h-[60px] rounded-full object-cover ring-2 ring-indigo-300"
+            />
+            <p className="text-xs mt-1 text-gray-700 text-center truncate w-full" title={name || 'Student'}>
+              {name || 'Student'}
+            </p>
+          </div>
+        ))
+      )}
     </div>
   </section>
 );
 
-/* ---------------- Right sidebar (grouped) ---------------- */
+/* ---------------- Right sidebar (grouped; stays under Provider) ---------------- */
 function RightSidebarDynamic({ announcements }) {
   const schedulesQ = useTeacherSchedules();
 
@@ -155,7 +166,7 @@ function RightSidebarDynamic({ announcements }) {
           <h3 className="text-base font-semibold text-gray-900">Announcements</h3>
         </div>
         <div className="space-y-3">
-          {announcements.map((item, i) => (
+          {ANNOUNCEMENTS.map((item, i) => (
             <div key={i} className="p-3 rounded-lg bg-white shadow-sm border border-indigo-100 hover:shadow-md transition">
               <p className="text-sm text-slate-700">{item}</p>
             </div>
@@ -205,10 +216,60 @@ function RightSidebarDynamic({ announcements }) {
   );
 }
 
-// --- Mount a local QueryClient just for this page ---
+/* ---------------- Main area that needs React Query ---------------- */
+function MainArea() {
+  const schedulesQ = useTeacherSchedules();
+
+  // Build a unique student list from schedules (no random avatars)
+  const studentsFromSchedules = useMemo(() => {
+    const all = Array.isArray(schedulesQ.data) ? schedulesQ.data : [];
+    const map = new Map();
+
+    for (const s of all) {
+      const arr = Array.isArray(s.studentIds)
+        ? s.studentIds
+        : s.studentId
+        ? [s.studentId]
+        : [];
+
+      for (const st of arr) {
+        let id, name, img;
+        if (st && typeof st === 'object') {
+          id = String(st._id || st.id || st._id?.toString?.() || Math.random().toString(36).slice(2));
+          name = st.name || st.fullName || st.username || 'Student';
+          img = st.profileImage || st.avatar || '';
+        } else {
+          id = String(st);
+          name = 'Student';
+          img = '';
+        }
+        if (!map.has(id)) {
+          map.set(id, { id, name, img });
+        }
+      }
+    }
+
+    return Array.from(map.values()).slice(0, 24);
+  }, [schedulesQ.data]);
+
+  return (
+    <div className="p-8">
+      <ClassOverview subjects={SUBJECTS} />
+      <StudentList students={studentsFromSchedules} />
+    </div>
+  );
+}
+
+/* ---------------- Page ---------------- */
 export default function TeacherClassroom() {
   const [open, setOpen] = useState(false);
   const [client] = useState(() => new QueryClient());
+
+  // Pull teacher info from Redux (prefer teacherDashboard.teacher, fallback to userInfo)
+  const { teacherDashboard, userInfo } = useSelector((state) => state.user);
+  const teacherObj = teacherDashboard?.teacher || userInfo || {};
+  const teacherName = teacherObj?.name || 'Teacher';
+  const teacherImage = teacherObj?.profileImage;
 
   // 🔄 live-refresh schedules via socket
   useEffect(() => {
@@ -229,11 +290,8 @@ export default function TeacherClassroom() {
         (typeof t === 'string' && t.startsWith('routine_')) ||
         t === 'schedules_refresh';
 
-      const onNotif = (payload = {}) => {
-        const t = payload?.type;
-        if (shouldRefresh(t)) {
-          client.invalidateQueries({ queryKey: ['schedules'] });
-        }
+      const onNotif = () => {
+        client.invalidateQueries({ queryKey: ['schedules'] });
       };
 
       const onRefresh = () => {
@@ -267,15 +325,16 @@ export default function TeacherClassroom() {
 
   return (
     <QueryClientProvider client={client}>
-      <div className="flex w-full h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
-        <Sidebar onOpen={() => setOpen(true)} />
+      <div className="flex w/full h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+        <Sidebar
+          onOpen={() => setOpen(true)}
+          teacherName={teacherName}
+          teacherImage={teacherImage}
+        />
         <main className="flex-1 overflow-y-auto">
-          <div className="p-8">
-            <ClassOverview subjects={SUBJECTS} />
-            <StudentList students={STUDENTS} />
-          </div>
+          <MainArea />
         </main>
-        <RightSidebarDynamic announcements={ANNOUNCEMENTS} />
+        <RightSidebarDynamic />
         <FixScheduleModal open={open} onClose={() => setOpen(false)} />
       </div>
     </QueryClientProvider>

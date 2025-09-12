@@ -30,8 +30,15 @@ import {
 // ✅ Real payment redirect
 import { startInvitePayment, startTuition } from '../../../../api/payments';
 
-/** ---------- HELPERS ---------- */
+/* ---------- HELPERS ---------- */
 const brand = 'oklch(0.49 0.25 277)';
+
+const getImageUrl = (img) => {
+  if (!img) return '/default-avatar.png';
+  const s = String(img);
+  if (s.startsWith('http') || s.startsWith('data:')) return s;
+  return `${process.env.NEXT_PUBLIC_API_BASE_URL}/${s}`;
+};
 
 const formatDhaka = (iso) => {
   if (!iso) return 'TBD';
@@ -62,14 +69,14 @@ const dhakaDateKey = (dateLike) => {
 };
 const isSameDhakaDay = (a, b) => dhakaDateKey(a) === dhakaDateKey(b);
 
-/** ---------- TRANSFORM: schedules → teachers[] ---------- */
+/* ---------- TRANSFORM: schedules → teachers[] ---------- */
 function buildTeachers(list) {
   const byTeacher = new Map();
   for (const s of list || []) {
     const tRaw = s.teacherId?._id || 'unknown';
     const tKey = `t:${tRaw}`;
     const tName = s.teacherId?.name || 'Teacher';
-    const tAvatar = s.teacherId?.profileImage || 'https://i.pravatar.cc/100?img=12';
+    const tAvatar = s.teacherId?.profileImage || ''; // leave blank; normalize on render
 
     if (!byTeacher.has(tKey)) {
       byTeacher.set(tKey, {
@@ -126,8 +133,8 @@ function buildTeachers(list) {
   return teachers;
 }
 
-/** ---------- LEFT SIDEBAR ---------- */
-function StudentSidebar() {
+/* ---------- LEFT SIDEBAR (now uses real student name + image) ---------- */
+function StudentSidebar({ studentName, studentImage }) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -146,11 +153,13 @@ function StudentSidebar() {
     <aside className="w-[260px] bg-white/70 backdrop-blur-sm border-r border-slate-200 p-6 flex flex-col flex-shrink-0">
       <div className="text-center mb-6">
         <img
-          src="https://i.pravatar.cc/100?img=12"
-          alt="Student"
+          src={getImageUrl(studentImage)}
+          alt={studentName || 'Student'}
           className="w-16 h-16 rounded-full object-cover mx-auto ring-2 ring-slate-200"
         />
-        <h3 className="mt-2 text-base font-semibold text-slate-800">Rafi</h3>
+        <h3 className="mt-2 text-base font-semibold text-slate-800 truncate" title={studentName || 'Student'}>
+          {studentName || 'Student'}
+        </h3>
       </div>
 
       <h4 className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Menu</h4>
@@ -162,8 +171,6 @@ function StudentSidebar() {
         >
           <span className="mr-2">🗓️</span>My Schedule
         </button>
-
-        {/* No separate Course Invites page; they show inside Schedule */}
 
         <button
           type="button"
@@ -209,7 +216,7 @@ function StudentSidebar() {
   );
 }
 
-/** ---------- AGREEMENTS (pending schedules + routine invites) ---------- */
+/* ---------- AGREEMENTS (unchanged UI; uses real teacher names from API) ---------- */
 function Agreements({
   pendingSchedules,
   pendingRoutines,
@@ -292,6 +299,7 @@ function Agreements({
                   );
                 })}
               </ul>
+
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => !busy && onRejectRoutine(r._id)}
@@ -317,13 +325,8 @@ function Agreements({
   );
 }
 
-/** ---------- Enrollment Invites (BDT; real payment redirect) ---------- */
-function EnrollmentInvites({
-  invites,
-  actingId,
-  onPayInvite,
-  onDecline,
-}) {
+/* ---------- Enrollment Invites (unchanged UI) ---------- */
+function EnrollmentInvites({ invites, actingId, onPayInvite, onDecline }) {
   if (!Array.isArray(invites) || invites.length === 0) return null;
 
   const moneyBDT = (n) => `৳${Number(n || 0).toLocaleString('en-BD')}`;
@@ -344,8 +347,7 @@ function EnrollmentInvites({
                     {inv.courseTitle || inv?.postId?.title || 'Course'}
                   </div>
                   <div className="text-xs text-slate-600 mt-0.5">
-                    Fee: {moneyBDT(inv.courseFeeTk)}
-                    {' • '}
+                    Fee: {moneyBDT(inv.courseFeeTk)} {' • '}
                     {inv.advanceTk
                       ? <>Advance required: {moneyBDT(inv.advanceTk)}</>
                       : <>Upfront due (15%): {moneyBDT(inv.upfrontDueTk)}</>}
@@ -353,9 +355,7 @@ function EnrollmentInvites({
                   <div className="text-[11px] text-slate-500 mt-1">
                     Paid: {moneyBDT(inv.paidTk)} • Status: {inv.paymentStatus || 'unpaid'}
                   </div>
-                  {inv.note && (
-                    <div className="text-xs text-slate-600 mt-1">Note: {inv.note}</div>
-                  )}
+                  {inv.note && <div className="text-xs text-slate-600 mt-1">Note: {inv.note}</div>}
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full ring-1 bg-amber-50 text-amber-700 ring-amber-200">
                   {inv.status}
@@ -390,10 +390,9 @@ function EnrollmentInvites({
   );
 }
 
-/** ---------- “Requests” (incoming one-off change requests from teacher) ---------- */
+/* ---------- Requests Inbox (unchanged UI) ---------- */
 function RequestsInbox({ requests, onRespond }) {
   if (!Array.isArray(requests) || requests.length === 0) return null;
-
   return (
     <section className="mb-6">
       <h3 className="text-base font-semibold text-slate-900 mb-3">Requests</h3>
@@ -406,16 +405,10 @@ function RequestsInbox({ requests, onRespond }) {
             </div>
             {r.note ? <div className="text-xs text-slate-500 mt-1">“{r.note}”</div> : null}
             <div className="mt-3 flex gap-2">
-              <button
-                onClick={() => onRespond(r._id, 'reject')}
-                className="px-3 py-1.5 rounded-lg border"
-              >
+              <button onClick={() => onRespond(r._id, 'reject')} className="px-3 py-1.5 rounded-lg border">
                 Reject
               </button>
-              <button
-                onClick={() => onRespond(r._id, 'accept')}
-                className="px-3 py-1.5 rounded-lg text-white bg-slate-900 hover:bg-black"
-              >
+              <button onClick={() => onRespond(r._id, 'accept')} className="px-3 py-1.5 rounded-lg text-white bg-slate-900 hover:bg-black">
                 Accept
               </button>
             </div>
@@ -426,7 +419,7 @@ function RequestsInbox({ requests, onRespond }) {
   );
 }
 
-/** ---------- ROUTINE LIST (student view: for already-created routines) ---------- */
+/* ---------- ROUTINE LIST (student view) ---------- */
 function RoutineList({ routines, meId, onConsent }) {
   if (!Array.isArray(routines) || routines.length === 0) return null;
 
@@ -457,7 +450,7 @@ function RoutineList({ routines, meId, onConsent }) {
             <div key={r._id} className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex items-center gap-3">
                 <img
-                  src={r.teacher?.profileImage || 'https://i.pravatar.cc/80'}
+                  src={getImageUrl(r.teacher?.profileImage)}
                   alt=""
                   className="w-9 h-9 rounded-full object-cover"
                 />
@@ -508,7 +501,6 @@ function RoutineList({ routines, meId, onConsent }) {
                 </div>
               )}
 
-              {/* Agreement CTA for routines that were created with requiresAcceptance */}
               {r.requiresAcceptance && (
                 <div className="mt-3">
                   {mePending ? (
@@ -547,7 +539,7 @@ function RoutineList({ routines, meId, onConsent }) {
   );
 }
 
-/** ---------- MAIN: TEACHER-SECTIONS ---------- */
+/* ---------- MAIN: TEACHER-SECTIONS (normalize teacher avatars) ---------- */
 function TeacherSections({ teachers, onPay }) {
   const [openPayFor, setOpenPayFor] = useState(null);
   const toggleMenu = (teacherId) =>
@@ -571,7 +563,7 @@ function TeacherSections({ teachers, onPay }) {
             {/* Teacher header */}
             <div className="relative flex items-center gap-4 p-5 bg-gradient-to-r from-white to-slate-50 border-b border-slate-200">
               <img
-                src={t.avatar}
+                src={getImageUrl(t.avatar)}
                 alt={t.name}
                 className="w-12 h-12 rounded-full ring-2 ring-slate-200 object-cover"
               />
@@ -590,7 +582,6 @@ function TeacherSections({ teachers, onPay }) {
                   Pay ▾
                 </button>
 
-                {/* Small hint chip if gate reached */}
                 {completedDemos >= 3 && (
                   <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-200">
                     3 demos used
@@ -682,16 +673,10 @@ function TeacherSections({ teachers, onPay }) {
                       return (
                         <li
                           key={cls.id}
-                          className={`flex items-center justify-between py-2.5 ${
-                            cancelled ? 'opacity-60' : ''
-                          }`}
+                          className={`flex items-center justify-between py-2.5 ${cancelled ? 'opacity-60' : ''}`}
                         >
                           <div className="flex items-center gap-2">
-                            <span
-                              className={`text-[13px] ${
-                                cancelled ? 'line-through text-slate-500' : 'text-slate-800'
-                              }`}
-                            >
+                            <span className={`text-[13px] ${cancelled ? 'line-through text-slate-500' : 'text-slate-800'}`}>
                               {cls.name}
                             </span>
                             {cls.type === 'demo' && (
@@ -728,7 +713,7 @@ function TeacherSections({ teachers, onPay }) {
   );
 }
 
-/** ---------- RIGHT SIDEBAR ---------- */
+/* ---------- RIGHT SIDEBAR (unchanged; derives from teachers[]) ---------- */
 function RightSidebar({ teachers }) {
   const todayItems = useMemo(() => {
     const now = new Date();
@@ -802,7 +787,7 @@ function RightSidebar({ teachers }) {
   );
 }
 
-/** ---------- PAGE ---------- */
+/* ---------- PAGE ---------- */
 export default function StudentSchedulePage() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState('');
@@ -821,7 +806,7 @@ export default function StudentSchedulePage() {
   const [actingInviteId, setActingInviteId] = useState(null);
 
   // prevent multi-click spam on Accept/Reject
-   const [busyScheduleIds, setBusyScheduleIds] = useState(new Set());
+  const [busyScheduleIds, setBusyScheduleIds] = useState(new Set());
   const [busyRoutineIds, setBusyRoutineIds] = useState(new Set());
   const addBusy = (setter, id) => setter((prev) => new Set(prev).add(id));
   const removeBusy = (setter, id) =>
@@ -833,8 +818,15 @@ export default function StudentSchedulePage() {
 
   const [conflictMsg, setConflictMsg] = useState('');
 
-  const userId = useSelector((s) => s?.auth?.user?._id);
-  const userRole = useSelector((s) => s?.auth?.user?.role);
+  // Prefer user slice for identity (userInfo or studentDashboard.student)
+  const { userInfo, studentDashboard } = useSelector((s) => s.user || {});
+  const me = studentDashboard?.student || userInfo || {};
+  const studentName = me?.name || 'Student';
+  const studentImage = me?.profileImage || '';
+
+  // Some other parts may rely on a separate auth slice — keep these if you used them elsewhere
+  const userId = useSelector((s) => s?.auth?.user?._id) || me?._id || me?.id;
+  // const userRole = useSelector((s) => s?.auth?.user?.role); // not used here
 
   // schedules — NO page-level loader after first render
   const fetchSchedules = async ({ silent = false } = {}) => {
@@ -921,14 +913,9 @@ export default function StudentSchedulePage() {
     try {
       const sp = new URLSearchParams(window.location.search);
       if (sp.has('paid') || sp.has('status')) {
-        // refresh invites/routines/schedules just in case
         fetchEnrollmentInvites();
         fetchSchedules({ silent: true });
         fetchRoutines();
-        // optional: clear the query params
-        // const url = new URL(window.location.href);
-        // url.search = '';
-        // window.history.replaceState({}, '', url.toString());
       }
     } catch {}
   }, []); // run once on mount
@@ -1096,7 +1083,7 @@ export default function StudentSchedulePage() {
         returnUrl: window.location.href,
       });
       if (url) {
-        window.location.href = url; // 🔁 redirect to SSLCommerz gateway
+        window.location.href = url;
       } else {
         alert('Could not start payment. Try again.');
       }
@@ -1145,7 +1132,7 @@ export default function StudentSchedulePage() {
 
   return (
     <div className="flex w-full h-screen bg-gradient-to-b from-white to-slate-50">
-      <StudentSidebar />
+      <StudentSidebar studentName={studentName} studentImage={studentImage} />
 
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-6 py-8">
