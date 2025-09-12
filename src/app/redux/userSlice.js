@@ -1,3 +1,4 @@
+// redux/userSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import API from '../../api/axios';
 
@@ -60,19 +61,29 @@ export const fetchCurrentUser = createAsyncThunk(
   }
 );
 
-// 📷 Upload Profile Picture (FormData; no manual headers)
+// 📷 Upload Profile Picture (role-aware; FormData; no manual headers)
 export const uploadProfilePicture = createAsyncThunk(
   'user/uploadProfilePicture',
-  async (file, { rejectWithValue }) => {
+  async (file, { rejectWithValue, getState }) => {
     try {
       const formData = new FormData();
       formData.append('profileImage', file); // must match backend field
 
-      const { data } = await API.put('/teachers/profile-picture', formData, {
+      const state = getState();
+      const role = state?.user?.userInfo?.role;
+
+      // Route to the correct endpoint by role
+      const endpoint =
+        role === 'teacher'
+          ? '/teachers/profile-picture'
+          : '/students/profile-picture';
+
+      const { data } = await API.put(endpoint, formData, {
         withCredentials: true,
         // DO NOT set Content-Type here; Axios will set proper multipart boundary
       });
 
+      // backend returns the absolute URL (Cloudinary)
       return data.profileImage;
     } catch (error) {
       return rejectWithValue(error?.response?.data?.message || error.message);
@@ -126,6 +137,9 @@ const userSlice = createSlice({
       if (state.userInfo) state.userInfo.profileImage = newUrl;
       if (state.teacherDashboard?.teacher) {
         state.teacherDashboard.teacher.profileImage = newUrl;
+      }
+      if (state.studentDashboard?.student) {
+        state.studentDashboard.student.profileImage = newUrl;
       }
     },
 
@@ -249,7 +263,7 @@ const userSlice = createSlice({
 
       // === Upload Profile Picture ===
       .addCase(uploadProfilePicture.fulfilled, (state, action) => {
-        const base = action.payload;
+        const base = action.payload; // absolute URL from backend
         const cacheBusted = base + (base.includes('?') ? '&' : '?') + 'v=' + Date.now();
 
         state.profileImage = cacheBusted;
@@ -257,6 +271,9 @@ const userSlice = createSlice({
         if (state.userInfo) state.userInfo.profileImage = cacheBusted;
         if (state.teacherDashboard?.teacher) {
           state.teacherDashboard.teacher.profileImage = cacheBusted;
+        }
+        if (state.studentDashboard?.student) {
+          state.studentDashboard.student.profileImage = cacheBusted;
         }
       })
       .addCase(uploadProfilePicture.rejected, (state, action) => {

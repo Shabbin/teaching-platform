@@ -1,16 +1,19 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { getStudentDashboard } from '../../redux/userSlice';
+import { getStudentDashboard, uploadProfilePicture } from '../../redux/userSlice';
 
 import ProtectedRoute from '../../components/auth/protectedRoute';
-import Image from 'next/image';
+// ❌ remove next/image to avoid domain config hassles
 import Link from 'next/link';
+import { ImageIcon } from 'lucide-react';
 
 const StudentDashboard = () => {
   const dispatch = useDispatch();
-  const { studentDashboard, loading, error } = useSelector((state) => state.user);
+  const fileInputRef = useRef(null);
+
+  const { studentDashboard, loading, error, userInfo } = useSelector((state) => state.user);
 
   useEffect(() => {
     if (!studentDashboard) {
@@ -127,6 +130,17 @@ const StudentDashboard = () => {
     }
   };
 
+  // ---------- profile image (mirror teacher) ----------
+  const rawProfile =
+    userInfo?.profileImage || studentDashboard?.student?.profileImage || '';
+
+  const profileSrc =
+    !rawProfile || rawProfile.trim() === ''
+      ? '/default-avatar.png'
+      : rawProfile.startsWith('http')
+      ? rawProfile
+      : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${rawProfile}`;
+
   return (
     <ProtectedRoute allowedRole="student">
       {/* Match teacher dashboard vibe */}
@@ -224,21 +238,41 @@ const StudentDashboard = () => {
                 {/* Welcome / Profile */}
                 <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center gap-5">
-                    <Image
-                      src={
-                        studentDashboard.student?.profileImage ||
-                        '/default-avatar.png'
-                      }
-                      alt="Student Profile"
-                      width={84}
-                      height={84}
-                      className="h-20 w-20 rounded-full object-cover ring-2 ring-indigo-600/40"
-                    />
+                    <div className="relative w-20 h-20 sm:w-24 sm:h-24">
+                      <div className="w-full h-full rounded-full overflow-hidden object-cover ring-2 ring-indigo-600/40 shadow">
+                        <img
+                          src={profileSrc}
+                          alt="Student Profile"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      {/* 🆕 same change button as teacher */}
+                      <button
+                        onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                        className="absolute bottom-1.5 right-1.5 bg-indigo-600 text-white p-2 rounded-full shadow-md hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        title="Change Profile Picture"
+                        aria-label="Change Profile Picture"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                      </button>
+
+                      {/* hidden input */}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) dispatch(uploadProfilePicture(file));
+                        }}
+                      />
+                    </div>
+
                     <div className="min-w-0">
                       <h1 className="text-2xl font-bold text-gray-900">
-                        {`Welcome, ${
-                          studentDashboard.student?.name || 'Student'
-                        }!`}
+                        {`Welcome, ${studentDashboard.student?.name || 'Student'}!`}
                       </h1>
                       <p className="mt-1 truncate text-sm text-gray-500">
                         {studentDashboard.student?.email}
