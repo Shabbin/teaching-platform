@@ -16,6 +16,15 @@ import { fetchMessagesThunk, approveRequestThunk } from '../../../redux/chatThun
 import MessageBubble from './MessageBubble';
 import API from '../../../../api/axios';
 
+// 🔽 Tiny built-in emoji palette—no external deps.
+const QUICK_EMOJIS = [
+  '😀','😁','😂','🤣','😊','😍','😘','😎','🙂','😉',
+  '🥰','🤗','🤩','🤔','😴','😇','🙃','😌','😅','🤤',
+  '😭','😢','😤','😡','😱','🤯','🤨','😬','😐','🙄',
+  '👍','👏','🙏','🤝','💯','🎉','✨','🔥','⚡','🌟',
+  '❤️','💙','💚','💛','🧡','💜','🖤','🤍','🤎','💖',
+];
+
 export default function MiniChatWindow({
   chat,
   user,
@@ -43,6 +52,13 @@ export default function MiniChatWindow({
   const [busy, setBusy] = useState(false);
   const listRef = useRef(null);
 
+  // 🔽 emoji UI state/refs
+  const [showEmoji, setShowEmoji] = useState(false);
+  const emojiBtnRef = useRef(null);
+  const emojiPanelRef = useRef(null);
+  const inputRef = useRef(null);
+  const lastCaretRef = useRef({ start: null, end: null });
+
   // 🔽 robust scroll helper (lands exactly at true bottom)
   const scrollToBottom = useCallback((behavior = 'auto') => {
     const el = listRef.current;
@@ -54,7 +70,6 @@ export default function MiniChatWindow({
       el.scrollTop = el.scrollHeight;
     }
 
-    // late layout adjustments (fonts/images/async paints)
     requestAnimationFrame(() => {
       el.scrollTop = el.scrollHeight;
       setTimeout(() => {
@@ -80,7 +95,6 @@ export default function MiniChatWindow({
 
     joinThread?.(threadId);
     dispatch(fetchMessagesThunk(threadId)).finally(() => {
-      // ensure bottom after initial paint
       setTimeout(() => scrollToBottom('auto'), 0);
     });
 
@@ -102,6 +116,7 @@ export default function MiniChatWindow({
     });
 
     setText('');
+    lastCaretRef.current = { start: null, end: null };
     scrollToBottom('smooth');
   };
 
@@ -113,11 +128,10 @@ export default function MiniChatWindow({
       : null) ||
     null;
 
-  // Only used when we truly can’t proceed (no requestId in payload).
-  const pushSystemMessage = (text) => {
+  const pushSystemMessage = (textMsg) => {
     const msg = {
       _id: `sys-${Date.now()}`,
-      text,
+      text: textMsg,
       threadId,
       senderId: 'system',
       timestamp: new Date().toISOString(),
@@ -125,15 +139,12 @@ export default function MiniChatWindow({
     };
     dispatch(addMessageToThread({ threadId, message: msg }));
     dispatch(updateLastMessageInConversation({ threadId, message: msg }));
-    // also nudge scroll so the info is visible
     scrollToBottom('smooth');
   };
 
-  // ---------- APPROVE (same as Messenger: thunk) ----------
   const handleApprove = async () => {
     if (!resolvedRequestId || busy) {
       if (!resolvedRequestId) {
-        // Show a one-time helper message if we literally can’t resolve the id.
         pushSystemMessage(
           'Cannot approve from mini window because requestId is missing. Open full Messenger to review.'
         );
@@ -143,8 +154,6 @@ export default function MiniChatWindow({
     try {
       setBusy(true);
       await dispatch(approveRequestThunk(resolvedRequestId)).unwrap();
-
-      // Flip UI to approved (no debug/system message)
       setLocalStatus('approved');
       dispatch(updateConversationStatus({ requestId: resolvedRequestId, status: 'approved' }));
       dispatch(
@@ -152,22 +161,17 @@ export default function MiniChatWindow({
           threadId,
           requestId: resolvedRequestId,
           status: 'approved',
-          // keep last message untouched; server/socket will add anything if needed
           lastMessageTimestamp: new Date().toISOString(),
         })
       );
-
-      // after status flip, make sure we’re at the bottom
       scrollToBottom('smooth');
     } catch (err) {
-      // No chat message on error; keep it quiet
       console.error('Approve from mini chat failed:', err);
     } finally {
       setBusy(false);
     }
   };
 
-  // ---------- REJECT (same as Messenger: PATCH /:id/reject) ----------
   const handleReject = async () => {
     if (!resolvedRequestId || busy) {
       if (!resolvedRequestId) {
@@ -189,8 +193,6 @@ export default function MiniChatWindow({
         { rejectionMessage },
         { withCredentials: true }
       );
-
-      // Flip UI to rejected; no system text injected
       setLocalStatus('rejected');
       dispatch(updateConversationStatus({ requestId: resolvedRequestId, status: 'rejected' }));
       dispatch(
@@ -201,7 +203,6 @@ export default function MiniChatWindow({
           lastMessageTimestamp: new Date().toISOString(),
         })
       );
-
       scrollToBottom('smooth');
     } catch (err) {
       console.error('Reject from mini chat failed:', err);
@@ -234,6 +235,71 @@ export default function MiniChatWindow({
   const isPending = (localStatus || 'approved') === 'pending';
 
   const OPEN_H = 360;
+
+  // 🔽 caret helpers so emoji inserts at cursor
+  const updateCaretFromEvent = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    lastCaretRef.current = {
+      start: el.selectionStart ?? text.length,
+      end: el.selectionEnd ?? text.length,
+    };
+  };
+
+  const insertAtCaret = (emoji) => {
+    const el = inputRef.current;
+    if (!el) {
+      setText((t) => t + emoji);
+      return;
+    }
+    const pos =
+      lastCaretRef.current.start == null
+        ? { start: el.selectionStart ?? text.length, end: el.selectionEnd ?? text.length }
+        : lastCaretRef.current;
+
+    const before = text.slice(0, pos.start);
+    const after = text.slice(pos.end);
+    const next = `${before}${emoji}${after}`;
+    setText(next);
+
+    requestAnimationFrame(() => {
+      el.focus();
+      const caretPos = pos.start + emoji.length;
+      try {
+        el.setSelectionRange(caretPos, caretPos);
+      } catch {}
+    });
+  };
+
+  // 🔽 Close emoji panel on outside click or ESC
+  useEffect(() => {
+    if (!showEmoji) return;
+    const onDown = (e) => {
+      const t = e.target;
+      if (
+        emojiPanelRef.current &&
+        !emojiPanelRef.current.contains(t) &&
+        emojiBtnRef.current &&
+        !emojiBtnRef.current.contains(t)
+      ) {
+        setShowEmoji(false);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowEmoji(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [showEmoji]);
+
+  const handlePickEmoji = (e) => {
+    insertAtCaret(e);
+    setShowEmoji(false);
+  };
 
   return (
     <div
@@ -312,8 +378,45 @@ export default function MiniChatWindow({
             transition: 'opacity 200ms ease',
           }}
         >
-          {isApproved ? (
-            messages.length > 0 ? (
+          {(() => {
+            const isApproved = (localStatus || 'approved') === 'approved';
+            if (!isApproved) {
+              return (
+                <div className="bg-white p-3 rounded-lg border">
+                  <p className="text-sm text-gray-700">
+                    Request is <strong>{localStatus}</strong>. You’ll be able to chat here once it’s
+                    approved.
+                  </p>
+
+                  {isTeacher && (localStatus === 'pending') && (
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        onClick={handleApprove}
+                        disabled={busy || !resolvedRequestId}
+                        className="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
+                      >
+                        {busy ? 'Approving…' : 'Approve'}
+                      </button>
+                      <button
+                        onClick={handleReject}
+                        disabled={busy || !resolvedRequestId}
+                        className="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-60"
+                      >
+                        {busy ? 'Rejecting…' : 'Reject'}
+                      </button>
+                    </div>
+                  )}
+
+                  {isTeacher && (localStatus === 'pending') && !resolvedRequestId && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Request ID is missing in this conversation payload. Open full Messenger to review.
+                    </p>
+                  )}
+                </div>
+              );
+            }
+
+            return messages.length > 0 ? (
               messages.map((msg, i) => (
                 <MessageBubble
                   key={msg._id || `${msg.timestamp}-${i}`}
@@ -329,52 +432,66 @@ export default function MiniChatWindow({
               <p className="text-sm text-gray-500 text-center py-6">
                 No messages yet. Say hello 👋
               </p>
-            )
-          ) : (
-            <div className="bg-white p-3 rounded-lg border">
-              <p className="text-sm text-gray-700">
-                Request is <strong>{localStatus}</strong>. You’ll be able to chat here once it’s
-                approved.
-              </p>
-
-              {/* Teacher-only action buttons when pending */}
-              {isTeacher && isPending && (
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    onClick={handleApprove}
-                    disabled={busy || !resolvedRequestId}
-                    className="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60"
-                  >
-                    {busy ? 'Approving…' : 'Approve'}
-                  </button>
-                  <button
-                    onClick={handleReject}
-                    disabled={busy || !resolvedRequestId}
-                    className="px-3 py-1.5 rounded-md text-sm font-medium text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-60"
-                  >
-                    {busy ? 'Rejecting…' : 'Reject'}
-                  </button>
-                </div>
-              )}
-
-              {/* Helpful hint if we cannot resolve the id */}
-              {isTeacher && isPending && !resolvedRequestId && (
-                <p className="mt-2 text-xs text-gray-500">
-                  Request ID is missing in this conversation payload. Open full Messenger to review.
-                </p>
-              )}
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* INPUT */}
-        <div className="px-3 py-2 border-t bg-gray-50 rounded-b-xl">
-          <div className="flex items-center space-x-2">
+        <div className="px-3 py-2 border-t bg-gray-50 rounded-b-xl relative overflow-visible">
+          {/* Emoji panel (anchored to the input area) */}
+          {showEmoji && (
+            <div
+              ref={emojiPanelRef}
+              className="absolute bottom-14 right-5 w-[280px] max-h-[220px] overflow-y-auto bg-white border border-gray-200 rounded-xl shadow-xl p-2 grid grid-cols-8 gap-1 z-[1001]"
+              role="dialog"
+              aria-label="Emoji picker"
+            >
+              {QUICK_EMOJIS.map((e) => (
+                <button
+                  key={e}
+                  onClick={() => handlePickEmoji(e)}
+                  className="text-xl p-1 rounded hover:bg-gray-100 focus:outline-none focus:ring focus:ring-indigo-300"
+                  aria-label={`Insert ${e}`}
+                >
+                  {e}
+                </button>
+              ))}
+              <div className="col-span-8 text-[11px] text-gray-500 px-1 pt-1">
+                Click an emoji to insert.
+              </div>
+            </div>
+          )}
+
+          {/* Input group as one pill so nothing shifts */}
+          <div className="relative">
+            {/* Left emoji button (absolute) */}
+            <button
+              ref={emojiBtnRef}
+              onClick={() => {
+                setShowEmoji((s) => !s);
+                requestAnimationFrame(() => inputRef.current?.focus());
+              }}
+              className="absolute left-1.5 top-1/2 -translate-y-1/2 text-xl px-2 py-1 rounded-full hover:bg-gray-100 focus:outline-none focus:ring focus:ring-indigo-300 disabled:opacity-60"
+              aria-label="Open emoji panel"
+              title="Emoji"
+              disabled={!isApproved}
+            >
+              😊
+            </button>
+
+            {/* The input itself has padding to make room for emoji and send */}
             <input
+              ref={inputRef}
               type="text"
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                updateCaretFromEvent();
+              }}
+              onClick={updateCaretFromEvent}
+              onKeyUp={updateCaretFromEvent}
               onKeyDown={(e) => {
+                updateCaretFromEvent();
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSend();
@@ -382,12 +499,14 @@ export default function MiniChatWindow({
               }}
               disabled={!isApproved}
               placeholder={isApproved ? 'Type a message…' : 'Disabled until approved'}
-              className="flex-1 bg-white rounded-full px-3 py-2 text-sm border outline-none disabled:opacity-60"
+              className="w-full bg-white rounded-full pl-11 pr-24 py-2 text-sm border outline-none disabled:opacity-60"
             />
+
+            {/* Right send button (absolute) */}
             <button
               onClick={handleSend}
               disabled={!isApproved || !text.trim()}
-              className="flex-shrink-0 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-full px-3 py-1.5 text-sm transition"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[64px] text-center bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-full px-3 py-1.5 text-sm transition"
             >
               Send
             </button>
