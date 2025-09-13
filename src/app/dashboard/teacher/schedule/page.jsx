@@ -24,7 +24,7 @@ const getImageUrl = (img) =>
     ? img
     : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${img}`;
 
-/* ---------------- Sidebar ---------------- */
+/* ---------------- Sidebar (white theme like student) ---------------- */
 const Sidebar = ({ onOpen, teacherName, teacherImage }) => {
   const pathname = usePathname();
 
@@ -36,39 +36,42 @@ const Sidebar = ({ onOpen, teacherName, teacherImage }) => {
   const isActive = (href) =>
     pathname === href || (href !== '/dashboard/teacher/schedule' && pathname?.startsWith(href));
 
+  const itemClass = (active) =>
+    `rounded-lg px-3 py-2 text-sm text-left transition border ${
+      active
+        ? 'bg-slate-900 text-white border-slate-900'
+        : 'text-slate-700 bg-white/0 hover:bg-slate-50 border-transparent hover:border-slate-200'
+    }`;
+
   return (
-    <aside className="w-[250px] bg-gradient-to-b from-indigo-600 to-indigo-700 text-white p-5 flex flex-col flex-shrink-0">
-      <div className="text-center mb-8">
+    <aside className="w-[260px] bg-white/70 backdrop-blur-sm border-r border-slate-200 p-6 flex flex-col flex-shrink-0">
+      <div className="text-center mb-6">
         <img
           src={getImageUrl(teacherImage)}
           alt={teacherName || 'Teacher'}
-          className="w-20 h-20 rounded-full border-2 border-white object-cover mx-auto ring-2 ring-white/30"
+          className="w-16 h-16 rounded-full object-cover mx-auto ring-2 ring-slate-200"
         />
-        <h3 className="mt-2 text-lg font-medium truncate" title={teacherName || 'Teacher'}>
+        <h3
+          className="mt-2 text-base font-semibold text-slate-800 truncate"
+          title={teacherName || 'Teacher'}
+        >
           {teacherName || 'Teacher'}
         </h3>
       </div>
 
       <button
         onClick={onOpen}
-        className="bg-white/10 hover:bg-white/20 rounded-lg px-4 py-2 text-sm text-slate-200 hover:text-white transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-300"
+        className="rounded-lg px-4 py-2 text-sm text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-300"
       >
         Fix Schedule
       </button>
 
-      <nav className="flex flex-col gap-2 mt-5">
+      <h4 className="text-[11px] uppercase tracking-wide text-slate-500 mt-5 mb-2">Menu</h4>
+      <nav className="flex flex-col gap-1.5">
         {links.map((item) => {
           const active = isActive(item.href);
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`rounded-lg px-4 py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
-                active
-                  ? 'bg-white text-indigo-700'
-                  : 'bg-white/10 text-slate-200 hover:bg-white/20 hover:text-white'
-              }`}
-            >
+            <Link key={item.href} href={item.href} className={itemClass(active)}>
               {item.label}
             </Link>
           );
@@ -85,11 +88,11 @@ const ClassOverview = ({ subjects }) => (
       {subjects.map(({ name, studentsCount }) => (
         <div
           key={name}
-          className="bg-white p-5 rounded-xl shadow-sm w-48 border border-gray-100 hover:border-indigo-200 hover:shadow-md transition"
+          className="bg-white p-5 rounded-xl shadow-sm w-48 border border-gray-100 hover:border-slate-200 hover:shadow-md transition"
         >
           <h3 className="text-base font-semibold text-gray-900 mb-1">{name}</h3>
           <p className="text-sm text-slate-600">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-indigo-700 bg-indigo-50 ring-1 ring-indigo-100">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-slate-800 bg-slate-100 ring-1 ring-slate-200">
               Students: {studentsCount}
             </span>
           </p>
@@ -111,9 +114,12 @@ const StudentList = ({ students }) => (
             <img
               src={getImageUrl(img)}
               alt={name || 'Student'}
-              className="w-[60px] h-[60px] rounded-full object-cover ring-2 ring-indigo-300"
+              className="w-[60px] h-[60px] rounded-full object-cover ring-2 ring-slate-200"
             />
-            <p className="text-xs mt-1 text-gray-700 text-center truncate w-full" title={name || 'Student'}>
+            <p
+              className="text-xs mt-1 text-gray-700 text-center truncate w-full"
+              title={name || 'Student'}
+            >
               {name || 'Student'}
             </p>
           </div>
@@ -123,7 +129,7 @@ const StudentList = ({ students }) => (
   </section>
 );
 
-/* ---------------- Right sidebar (grouped; stays under Provider) ---------------- */
+/* ---------------- Right sidebar (white theme; grouped) ---------------- */
 function RightSidebarDynamic({ announcements }) {
   const schedulesQ = useTeacherSchedules();
 
@@ -158,16 +164,19 @@ function RightSidebarDynamic({ announcements }) {
   }, [schedulesQ.data]);
 
   return (
-    <aside className="w-[300px] bg-gradient-to-b from-indigo-50 to-white p-6 border-l border-indigo-100 flex-shrink-0 min-h-screen hidden md:block">
+    <aside className="w-[300px] bg-white/70 backdrop-blur-sm p-6 border-l border-slate-200 flex-shrink-0 min-h-screen hidden md:block">
       {/* Announcements */}
       <div className="mb-8">
         <div className="flex items-center mb-3">
-          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 mr-2">📢</span>
+          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 mr-2">📢</span>
           <h3 className="text-base font-semibold text-gray-900">Announcements</h3>
         </div>
         <div className="space-y-3">
-          {ANNOUNCEMENTS.map((item, i) => (
-            <div key={i} className="p-3 rounded-lg bg-white shadow-sm border border-indigo-100 hover:shadow-md transition">
+          {(announcements || []).map((item, i) => (
+            <div
+              key={i}
+              className="p-3 rounded-lg bg-white shadow-sm border border-slate-200 hover:shadow-md transition"
+            >
               <p className="text-sm text-slate-700">{item}</p>
             </div>
           ))}
@@ -177,7 +186,7 @@ function RightSidebarDynamic({ announcements }) {
       {/* Today's Schedule (grouped) */}
       <div>
         <div className="flex items-center mb-3">
-          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 mr-2">📅</span>
+          <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 mr-2">📅</span>
           <h3 className="text-base font-semibold text-gray-900">Today’s Schedule</h3>
         </div>
 
@@ -190,7 +199,7 @@ function RightSidebarDynamic({ announcements }) {
             {groupedToday.map((g, idx) => (
               <div
                 key={`${g.postId}-${g.subject}-${g.type}-${g.date.getTime()}-${idx}`}
-                className="flex items-center justify-between p-3 rounded-lg bg-white shadow-sm border border-indigo-100 hover:shadow-md transition"
+                className="flex items-center justify-between p-3 rounded-lg bg-white shadow-sm border border-slate-200 hover:shadow-md transition"
               >
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-gray-800 truncate">
@@ -201,9 +210,8 @@ function RightSidebarDynamic({ announcements }) {
                   )}
                 </div>
                 <span
-                  className="ml-3 inline-flex items-center justify-center text-xs font-semibold rounded-full w-6 h-6 text-white"
+                  className="ml-3 inline-flex items-center justify-center text-xs font-semibold rounded-full w-6 h-6 text-white bg-slate-900"
                   title={`${g.count} student${g.count > 1 ? 's' : ''}`}
-                  style={{ backgroundColor: 'rgb(99 102 241)' }}
                 >
                   {g.count}
                 </span>
@@ -325,7 +333,7 @@ export default function TeacherClassroom() {
 
   return (
     <QueryClientProvider client={client}>
-      <div className="flex w/full h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
+      <div className="flex w-full h-screen bg-gradient-to-b from-white to-slate-50">
         <Sidebar
           onOpen={() => setOpen(true)}
           teacherName={teacherName}
@@ -334,7 +342,7 @@ export default function TeacherClassroom() {
         <main className="flex-1 overflow-y-auto">
           <MainArea />
         </main>
-        <RightSidebarDynamic />
+        <RightSidebarDynamic announcements={ANNOUNCEMENTS} />
         <FixScheduleModal open={open} onClose={() => setOpen(false)} />
       </div>
     </QueryClientProvider>
