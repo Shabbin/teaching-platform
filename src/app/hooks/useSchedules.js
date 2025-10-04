@@ -1,16 +1,32 @@
-// src/hooks/useSchedules.js
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTeacherSchedules, createSchedule, cancelSchedule } from "../../api/schedules";
+import {
+  getTeacherSchedules,
+  getStudentSchedules,   // ⬅️ make sure this exists in ../../api/schedules
+  createSchedule,
+  cancelSchedule,
+} from "../../api/schedules";
 
+// (existing) teacher
 export function useTeacherSchedules() {
   return useQuery({
-    queryKey: ["schedules"],           // keep as-is (used elsewhere)
+    queryKey: ["schedules","teacher"],
     queryFn: getTeacherSchedules,
-    staleTime: 10_000,                 // optional: reduces refetch flicker
-    refetchOnWindowFocus: false,       // optional
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
   });
 }
 
+// ✅ NEW: student
+export function useStudentSchedules() {
+  return useQuery({
+    queryKey: ["schedules","student"],
+    queryFn: getStudentSchedules,   // if your API name differs, swap it here
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+// (keep your existing create/cancel mutations)
 export function useCreateSchedule() {
   const qc = useQueryClient();
   return useMutation({
@@ -18,7 +34,6 @@ export function useCreateSchedule() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["schedules"] }),
   });
 }
-
 export function useCancelSchedule() {
   const qc = useQueryClient();
   return useMutation({

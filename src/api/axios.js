@@ -21,6 +21,15 @@ API.interceptors.request.use((config) => {
     config.headers["Content-Type"] = "application/json";
   }
 
+  // 🔥 NEW: dev auth shim support
+  // If localStorage has devUserId, send it so backend shim picks it up
+  if (typeof window !== "undefined") {
+    const devUserId = localStorage.getItem("devUserId");
+    if (devUserId) {
+      config.headers["X-Dev-User-Id"] = devUserId;
+    }
+  }
+
   return config;
 });
 

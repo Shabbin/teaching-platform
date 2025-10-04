@@ -1,17 +1,39 @@
 // src/config/env.js
+
+// Base origin (no /api here)
 export const API_ORIGIN =
-  (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000').replace(/\/+$/, '');
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
 
-const RAW_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX ?? '/api').trim();
-const API_PREFIX = RAW_PREFIX ? (RAW_PREFIX.startsWith('/') ? RAW_PREFIX : `/${RAW_PREFIX}`) : '';
+// Normalize prefix to always start with "/" (or be empty)
+const RAW_PREFIX = (process.env.NEXT_PUBLIC_API_PREFIX ?? "/api").trim();
+const NORM_PREFIX = RAW_PREFIX
+  ? (RAW_PREFIX.startsWith("/") ? RAW_PREFIX : `/${RAW_PREFIX}`)
+  : "";
 
-export const API_BASE = API_ORIGIN + API_PREFIX;
+// API base (origin + normalized prefix)
+export const API_BASE = API_ORIGIN.replace(/\/+$/, "") + NORM_PREFIX;
 
-export const absUrl = (path = '') =>
-  API_ORIGIN + '/' + String(path).replace(/^\/+/, '');
+// Absolute URL helper (for assets or non-prefixed routes)
+export const absUrl = (path) =>
+  API_ORIGIN.replace(/\/+$/, "") + "/" + String(path || "").replace(/^\/+/, "");
 
+// Turn a stored DB path like "/uploads/videos/<hash>" into "/videos/<hash>" on the backend origin
 export const videoUrlFromStoredPath = (storedPath) => {
-  if (!storedPath) return '';
-  const file = String(storedPath).split('/').pop();
-  return `${API_ORIGIN}/videos/${file}`;
+  if (!storedPath) return "";
+  const file = String(storedPath).split("/").pop(); // "<hash>.mp4" or "<hash>"
+  return `${API_ORIGIN.replace(/\/+$/, "")}/videos/${file}`;
 };
+
+/* --------------------------------------------------------------------------
+   Daily.co frontend config
+   Your Daily subdomain (no trailing slash).
+   This is used by ClassJoiner to embed the video room.
+   You can override via .env.local:
+     NEXT_PUBLIC_DAILY_ROOM_BASE=https://tutogogy.daily.co
+--------------------------------------------------------------------------- */
+export const DAILY_ROOM_BASE =
+  (process.env.NEXT_PUBLIC_DAILY_ROOM_BASE || "https://tutogogy.daily.co").replace(/\/+$/, "");
+
+// Helper to build full join URL consistently
+export const dailyRoomUrl = (roomName = "") =>
+  DAILY_ROOM_BASE ? `${DAILY_ROOM_BASE}/${encodeURIComponent(roomName)}` : "";

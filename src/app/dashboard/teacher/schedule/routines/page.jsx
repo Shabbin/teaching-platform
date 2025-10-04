@@ -16,6 +16,11 @@ import {
   createEnrollmentInvite,
 } from '../../../../../api/enrollmentInvites';
 
+// React Query (for TodayScheduleList)
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// Reuse the “today + join” widget you added in step 6
+import TodayScheduleList from '../../../components/scheduleComponents/TodayScheduleList';
+
 // (optional tiny debug helper)
 import { API_BASE_URL_LOG } from '../../../../../api/axios';
 
@@ -1091,7 +1096,7 @@ function ChangeModal({ open, onClose, group, onSent, otherCourseSlots = [] }) {
                 </div>
               )}
 
-              {weekly.op === 'add' && ( // <-- JS uses && ; keep your version using &&
+              {weekly.op === 'add' && (
                 <div className="grid md:grid-cols-3 gap-3">
                   <label className="block">
                     <span className="text-[11px] text-slate-500">Weekday</span>
@@ -1172,6 +1177,8 @@ function ChangeModal({ open, onClose, group, onSent, otherCourseSlots = [] }) {
 export default function TeacherRoutinesPage() {
   const userId = useSelector((s) => s?.auth?.user?._id);
 
+  const [client] = useState(() => new QueryClient()); // 👈 local QueryClient for TodayScheduleList
+
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalGroup, setModalGroup] = useState(null);
@@ -1241,86 +1248,93 @@ export default function TeacherRoutinesPage() {
   };
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-slate-900">My Weekly Routines</h2>
-        <p className="text-sm text-slate-600">Grouped by course. Manage time/day changes with student agreements.</p>
-      </div>
-
-      {loading ? (
-        <div className="text-sm text-slate-500">Loading…</div>
-      ) : groups.length === 0 ? (
-        <div className="text-sm text-slate-500">No routines yet.</div>
-      ) : (
-        <div className="grid gap-4">
-          {groups.map(g => {
-            const title = g.post?.title || 'Course';
-            const subjects = Array.isArray(g.post?.subjects) ? g.post.subjects.join(' | ') : (g.post?.subjects || '');
-            const studentCount = g.students.length;
-            const slotCount = g.slotUnion.length;
-
-            return (
-              <div key={g.key} className="bg-white border rounded-2xl p-5">
-                <div className="flex items-center gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-900">{title}</div>
-                    <div className="text-[12px] text-slate-600">{subjects}</div>
-                  </div>
-                  <Pill>{studentCount} {studentCount === 1 ? 'student' : 'students'}</Pill>
-                  <Pill>{slotCount} {slotCount === 1 ? 'slot' : 'slots'}</Pill>
-                  <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full ring-1 ${
-                    g.status === 'active'
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                      : g.status === 'paused'
-                      ? 'bg-amber-50 text-amber-700 ring-amber-200'
-                      : 'bg-slate-100 text-slate-700 ring-slate-200'
-                  }`}>{g.status}</span>
-                </div>
-
-                <div className="mt-4 flex gap-2 flex-wrap">
-                  {g.status !== 'active' ? (
-                    <button onClick={()=>onToggleGroupStatus(g, 'active')} className="px-3 py-1.5 rounded-lg border">Resume</button>
-                  ) : (
-                    <button onClick={()=>onToggleGroupStatus(g, 'paused')} className="px-3 py-1.5 rounded-lg border">Pause</button>
-                  )}
-                  <button
-                    onClick={()=>setModalGroup(g)}
-                    className="px-3 py-1.5 rounded-lg text-white"
-                    style={{ backgroundColor: brand }}
-                  >
-                    Propose change
-                  </button>
-                  <button
-                    onClick={()=>setDrawerGroup(g)}
-                    className="px-3 py-1.5 rounded-lg border"
-                  >
-                    Pending changes
-                  </button>
-                  {/* Invite to this course */}
-                  <button
-                    onClick={()=>setInviteGroup(g)}
-                    className="px-3 py-1.5 rounded-lg border"
-                  >
-                    Invite to course
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+    <QueryClientProvider client={client}>
+      <div className="p-6 max-w-6xl mx-auto">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-slate-900">My Weekly Routines</h2>
+          <p className="text-sm text-slate-600">Grouped by course. Manage time/day changes with student agreements.</p>
         </div>
-      )}
 
-      <ChangeModal
-        open={!!modalGroup}
-        group={modalGroup}
-        onClose={()=>setModalGroup(null)}
-        onSent={fetchRoutines}
-        otherCourseSlots={allWeeklySlots}
-      />
-      <RequestsDrawer open={!!drawerGroup} group={drawerGroup} onClose={()=>setDrawerGroup(null)} />
+        {/* Quick join for anything happening today */}
+        <div className="mb-6">
+          <TodayScheduleList />
+        </div>
 
-      {/* Invite UI */}
-      <InviteModal open={!!inviteGroup} group={inviteGroup} onClose={()=>setInviteGroup(null)} allGroups={groups} />
-    </div>
+        {loading ? (
+          <div className="text-sm text-slate-500">Loading…</div>
+        ) : groups.length === 0 ? (
+          <div className="text-sm text-slate-500">No routines yet.</div>
+        ) : (
+          <div className="grid gap-4">
+            {groups.map(g => {
+              const title = g.post?.title || 'Course';
+              const subjects = Array.isArray(g.post?.subjects) ? g.post.subjects.join(' | ') : (g.post?.subjects || '');
+              const studentCount = g.students.length;
+              const slotCount = g.slotUnion.length;
+
+              return (
+                <div key={g.key} className="bg-white border rounded-2xl p-5">
+                  <div className="flex items-center gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-900">{title}</div>
+                      <div className="text-[12px] text-slate-600">{subjects}</div>
+                    </div>
+                    <Pill>{studentCount} {studentCount === 1 ? 'student' : 'students'}</Pill>
+                    <Pill>{slotCount} {slotCount === 1 ? 'slot' : 'slots'}</Pill>
+                    <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full ring-1 ${
+                      g.status === 'active'
+                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                        : g.status === 'paused'
+                        ? 'bg-amber-50 text-amber-700 ring-amber-200'
+                        : 'bg-slate-100 text-slate-700 ring-slate-200'
+                    }`}>{g.status}</span>
+                  </div>
+
+                  <div className="mt-4 flex gap-2 flex-wrap">
+                    {g.status !== 'active' ? (
+                      <button onClick={()=>onToggleGroupStatus(g, 'active')} className="px-3 py-1.5 rounded-lg border">Resume</button>
+                    ) : (
+                      <button onClick={()=>onToggleGroupStatus(g, 'paused')} className="px-3 py-1.5 rounded-lg border">Pause</button>
+                    )}
+                    <button
+                      onClick={()=>setModalGroup(g)}
+                      className="px-3 py-1.5 rounded-lg text-white"
+                      style={{ backgroundColor: brand }}
+                    >
+                      Propose change
+                    </button>
+                    <button
+                      onClick={()=>setDrawerGroup(g)}
+                      className="px-3 py-1.5 rounded-lg border"
+                    >
+                      Pending changes
+                    </button>
+                    {/* Invite to this course */}
+                    <button
+                      onClick={()=>setInviteGroup(g)}
+                      className="px-3 py-1.5 rounded-lg border"
+                    >
+                      Invite to course
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <ChangeModal
+          open={!!modalGroup}
+          group={modalGroup}
+          onClose={()=>setModalGroup(null)}
+          onSent={fetchRoutines}
+          otherCourseSlots={allWeeklySlots}
+        />
+        <RequestsDrawer open={!!drawerGroup} group={drawerGroup} onClose={()=>setDrawerGroup(null)} />
+
+        {/* Invite UI */}
+        <InviteModal open={!!inviteGroup} group={inviteGroup} onClose={()=>setInviteGroup(null)} allGroups={groups} />
+      </div>
+    </QueryClientProvider>
   );
 }

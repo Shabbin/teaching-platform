@@ -6,6 +6,12 @@ import { useRouter, usePathname } from 'next/navigation';
 import API from '../../../../api/axios';
 import useSocket from '../../../hooks/useSocket';
 
+// 🔌 React Query provider (fixes: No QueryClient set)
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// ✅ integrate the student list component
+import StudentScheduleList from '../components/studentScheduleList';
+
 // ✅ routines APIs
 import {
   getStudentRoutines,
@@ -76,7 +82,7 @@ function buildTeachers(list) {
     const tRaw = s.teacherId?._id || 'unknown';
     const tKey = `t:${tRaw}`;
     const tName = s.teacherId?.name || 'Teacher';
-    const tAvatar = s.teacherId?.profileImage || ''; // leave blank; normalize on render
+    const tAvatar = s.teacherId?.profileImage || '';
 
     if (!byTeacher.has(tKey)) {
       byTeacher.set(tKey, {
@@ -133,7 +139,7 @@ function buildTeachers(list) {
   return teachers;
 }
 
-/* ---------- LEFT SIDEBAR (now uses real student name + image) ---------- */
+/* ---------- LEFT SIDEBAR ---------- */
 function StudentSidebar({ studentName, studentImage }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -164,51 +170,22 @@ function StudentSidebar({ studentName, studentImage }) {
 
       <h4 className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Menu</h4>
       <div className="flex flex-col gap-1.5">
-        <button
-          type="button"
-          onClick={go('/dashboard/student/schedule')}
-          className={itemClass(isActive('/dashboard/student/schedule'))}
-        >
+        <button type="button" onClick={go('/dashboard/student/schedule')} className={itemClass(isActive('/dashboard/student/schedule'))}>
           <span className="mr-2">🗓️</span>My Schedule
         </button>
-
-        <button
-          type="button"
-          onClick={go('/dashboard/student/schedule/routines')}
-          className={itemClass(isActive('/dashboard/student/schedule/routines'))}
-        >
+        <button type="button" onClick={go('/dashboard/student/schedule/routines')} className={itemClass(isActive('/dashboard/student/schedule/routines'))}>
           <span className="mr-2">🔁</span>Regular Routine
         </button>
-
-        <button
-          type="button"
-          onClick={go('/dashboard/student/courses')}
-          className={itemClass(isActive('/dashboard/student/courses'))}
-        >
+        <button type="button" onClick={go('/dashboard/student/courses')} className={itemClass(isActive('/dashboard/student/courses'))}>
           <span className="mr-2">📚</span>My Courses
         </button>
-
-        <button
-          type="button"
-          onClick={go('/dashboard/student/find-teachers')}
-          className={itemClass(isActive('/dashboard/student/find-teachers'))}
-        >
+        <button type="button" onClick={go('/dashboard/student/find-teachers')} className={itemClass(isActive('/dashboard/student/find-teachers'))}>
           <span className="mr-2">🔎</span>Find Teachers
         </button>
-
-        <button
-          type="button"
-          onClick={go('/dashboard/student/messages')}
-          className={itemClass(isActive('/dashboard/student/messages'))}
-        >
+        <button type="button" onClick={go('/dashboard/student/messages')} className={itemClass(isActive('/dashboard/student/messages'))}>
           <span className="mr-2">✉️</span>Messages
         </button>
-
-        <button
-          type="button"
-          onClick={go('/dashboard/student/settings')}
-          className={itemClass(isActive('/dashboard/student/settings'))}
-        >
+        <button type="button" onClick={go('/dashboard/student/settings')} className={itemClass(isActive('/dashboard/student/settings'))}>
           <span className="mr-2">⚙️</span>Settings
         </button>
       </div>
@@ -216,7 +193,7 @@ function StudentSidebar({ studentName, studentImage }) {
   );
 }
 
-/* ---------- AGREEMENTS (unchanged UI; uses real teacher names from API) ---------- */
+/* ---------- AGREEMENTS ---------- */
 function Agreements({
   pendingSchedules,
   pendingRoutines,
@@ -325,7 +302,7 @@ function Agreements({
   );
 }
 
-/* ---------- Enrollment Invites (unchanged UI) ---------- */
+/* ---------- Enrollment Invites ---------- */
 function EnrollmentInvites({ invites, actingId, onPayInvite, onDecline }) {
   if (!Array.isArray(invites) || invites.length === 0) return null;
 
@@ -390,7 +367,7 @@ function EnrollmentInvites({ invites, actingId, onPayInvite, onDecline }) {
   );
 }
 
-/* ---------- Requests Inbox (unchanged UI) ---------- */
+/* ---------- Requests Inbox ---------- */
 function RequestsInbox({ requests, onRespond }) {
   if (!Array.isArray(requests) || requests.length === 0) return null;
   return (
@@ -419,7 +396,7 @@ function RequestsInbox({ requests, onRespond }) {
   );
 }
 
-/* ---------- ROUTINE LIST (student view) ---------- */
+/* ---------- ROUTINE LIST ---------- */
 function RoutineList({ routines, meId, onConsent }) {
   if (!Array.isArray(routines) || routines.length === 0) return null;
 
@@ -539,7 +516,7 @@ function RoutineList({ routines, meId, onConsent }) {
   );
 }
 
-/* ---------- MAIN: TEACHER-SECTIONS (normalize teacher avatars) ---------- */
+/* ---------- TEACHER-SECTIONS ---------- */
 function TeacherSections({ teachers, onPay }) {
   const [openPayFor, setOpenPayFor] = useState(null);
   const toggleMenu = (teacherId) =>
@@ -713,7 +690,7 @@ function TeacherSections({ teachers, onPay }) {
   );
 }
 
-/* ---------- RIGHT SIDEBAR (unchanged; derives from teachers[]) ---------- */
+/* ---------- RIGHT SIDEBAR ---------- */
 function RightSidebar({ teachers }) {
   const todayItems = useMemo(() => {
     const now = new Date();
@@ -793,6 +770,9 @@ export default function StudentSchedulePage() {
   const [error, setError] = useState('');
   const [teachers, setTeachers] = useState([]);
 
+  // keep raw schedules for StudentScheduleList (even though it can fetch itself)
+  const [schedules, setSchedules] = useState([]);
+
   // weekly routines + incoming change requests
   const [routines, setRoutines] = useState([]);
   const [incoming, setIncoming] = useState([]);
@@ -826,12 +806,11 @@ export default function StudentSchedulePage() {
 
   // Some other parts may rely on a separate auth slice — keep these if you used them elsewhere
   const userId = useSelector((s) => s?.auth?.user?._id) || me?._id || me?.id;
-  // const userRole = useSelector((s) => s?.auth?.user?.role); // not used here
 
   // schedules — NO page-level loader after first render
   const fetchSchedules = async ({ silent = false } = {}) => {
     try {
-      setError('');
+      if (!silent) setError('');
       const now = new Date();
       const from = new Date(now);
       from.setDate(from.getDate() - 30);
@@ -845,11 +824,13 @@ export default function StudentSchedulePage() {
 
       const res = await API.get(`/schedules/student?${params}`);
       const list = Array.isArray(res.data) ? res.data : [];
+      setSchedules(list);
       setTeachers(buildTeachers(list));
     } catch (e) {
       setError(
         e?.response?.data?.message || e?.normalizedMessage || 'Failed to load schedules.'
       );
+      setSchedules([]);
       setTeachers([]);
     } finally {
       if (initialLoading) setInitialLoading(false);
@@ -939,8 +920,7 @@ export default function StudentSchedulePage() {
       'routine_accepted',
       'routine_rejected',
       'routine_response',
-      'new_notification', // important: invite created uses new_notification
-      // optional: if server ever emits these directly:
+      'new_notification',
       'enrollment_invite_created',
       'enrollment_invite_updated',
       'enrollment_invite_paid',
@@ -1130,60 +1110,76 @@ export default function StudentSchedulePage() {
     }
   };
 
+  // 🧠 local QueryClient for this page (fixes the runtime error)
+  const queryClientRef = useRef(null);
+  if (!queryClientRef.current) {
+    queryClientRef.current = new QueryClient();
+  }
+
   return (
-    <div className="flex w-full h-screen bg-gradient-to-b from-white to-slate-50">
-      <StudentSidebar studentName={studentName} studentImage={studentImage} />
+    <QueryClientProvider client={queryClientRef.current}>
+      <div className="flex w-full h-screen bg-gradient-to-b from-white to-slate-50">
+        <StudentSidebar studentName={studentName} studentImage={studentImage} />
 
-      <main className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-6xl px-6 py-8">
+        <main className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-6xl px-6 py-8">
 
-          {/* Accept/Reject inbox (class proposals + routine invitations incl. demos) */}
-          <Agreements
-            pendingSchedules={pendingSchedules}
-            pendingRoutines={pendingRoutines}
-            onAcceptSchedule={onAcceptSchedule}
-            onRejectSchedule={onRejectSchedule}
-            onAcceptRoutine={onAcceptRoutine}
-            onRejectRoutine={onRejectRoutine}
-            busyScheduleIds={busyScheduleIds}
-            busyRoutineIds={busyRoutineIds}
-            conflictMsg={conflictMsg}
-          />
+            {/* 🔌 Integrated: Student schedule list (uses tanstack query via hook) */}
+            <StudentScheduleList
+              schedules={schedules}
+              loading={initialLoading}
+              error={error}
+              onRefresh={() => fetchSchedules({ silent: true })}
+            />
 
-          {/* ✅ Course Invites inside Schedule (BDT + SSLCommerz redirect) */}
-          <EnrollmentInvites
-            invites={enrollmentInvites}
-            actingId={actingInviteId}
-            onPayInvite={onPayInvite}
-            onDecline={onDeclineInvite}
-          />
+            {/* Accept/Reject inbox (class proposals + routine invitations incl. demos) */}
+            <Agreements
+              pendingSchedules={pendingSchedules}
+              pendingRoutines={pendingRoutines}
+              onAcceptSchedule={onAcceptSchedule}
+              onRejectSchedule={onRejectSchedule}
+              onAcceptRoutine={onAcceptRoutine}
+              onRejectRoutine={onRejectRoutine}
+              busyScheduleIds={busyScheduleIds}
+              busyRoutineIds={busyRoutineIds}
+              conflictMsg={conflictMsg}
+            />
 
-          {/* Requests (one-off change requests) */}
-          <RequestsInbox requests={incoming} onRespond={onRespondChange} />
+            {/* ✅ Course Invites inside Schedule (BDT + SSLCommerz redirect) */}
+            <EnrollmentInvites
+              invites={enrollmentInvites}
+              actingId={actingInviteId}
+              onPayInvite={onPayInvite}
+              onDecline={onDeclineInvite}
+            />
 
-          {/* Regular Routine */}
-          <RoutineList routines={routines} meId={userId} onConsent={onConsent} />
+            {/* Requests (one-off change requests) */}
+            <RequestsInbox requests={incoming} onRespond={onRespondChange} />
 
-          <div className="mb-4">
-            <h2 className="text-lg font-semibold text-slate-900">Teachers & Courses</h2>
-            <p className="text-sm text-slate-500">A clear view of your upcoming lessons.</p>
-          </div>
+            {/* Regular Routine */}
+            <RoutineList routines={routines} meId={userId} onConsent={onConsent} />
 
-          {initialLoading ? (
-            <div className="text-sm text-slate-500">Loading…</div>
-          ) : error ? (
-            <div className="text-sm text-rose-600">{error}</div>
-          ) : teachers.length === 0 ? (
-            <div className="text-sm text-slate-500">
-              No classes yet. You’ll see them here when teachers schedule.
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Teachers & Courses</h2>
+              <p className="text-sm text-slate-500">A clear view of your upcoming lessons.</p>
             </div>
-          ) : (
-            <TeacherSections teachers={teachers} onPay={onPay} />
-          )}
-        </div>
-      </main>
 
-      <RightSidebar teachers={teachers} />
-    </div>
+            {initialLoading ? (
+              <div className="text-sm text-slate-500">Loading…</div>
+            ) : error ? (
+              <div className="text-sm text-rose-600">{error}</div>
+            ) : teachers.length === 0 ? (
+              <div className="text-sm text-slate-500">
+                No classes yet. You’ll see them here when teachers schedule.
+              </div>
+            ) : (
+              <TeacherSections teachers={teachers} onPay={onPay} />
+            )}
+          </div>
+        </main>
+
+        <RightSidebar teachers={teachers} />
+      </div>
+    </QueryClientProvider>
   );
 }
