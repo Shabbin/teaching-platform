@@ -1,4 +1,4 @@
-// src/app/dashboard/student/components/studentScheduleList.jsx
+
 'use client';
 
 import React, { useMemo } from 'react';

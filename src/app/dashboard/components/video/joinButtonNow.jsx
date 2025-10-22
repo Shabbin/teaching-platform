@@ -3,7 +3,8 @@ import React, { useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCanJoin } from '../../../hooks/useCanJoin';
 import { issueJoinToken } from '../../../../api/video';
-import ClassJoiner from './ClassJoiner';
+import ClassJoiner from "./classJoiner";
+
 
 export default function JoinNowButton({ schedule, scheduleId: scheduleIdProp, compact }) {
   const scheduleId = useMemo(
