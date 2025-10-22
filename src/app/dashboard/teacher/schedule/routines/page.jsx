@@ -19,7 +19,8 @@ import {
 // React Query (for TodayScheduleList)
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // Reuse the “today + join” widget you added in step 6
-import TodayScheduleList from '../../../components/scheduleComponents/TodayScheduleList';
+import TodayScheduleList from "../../../components/scheduleComponents/todayScheduleList";
+
 
 // (optional tiny debug helper)
 import { API_BASE_URL_LOG } from '../../../../../api/axios';
