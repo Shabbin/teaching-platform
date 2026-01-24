@@ -73,6 +73,26 @@ export default function TeacherDashboardInner() {
     }
   }, [isAuthenticated, teacherDashboard, fallbackPayments]);
 
+  // 🔹 ADD HERE: after your useEffects and before return
+const handleMakeEligible = async () => {
+  if (!teacher._id) {
+    console.error('No teacher ID available!');
+    return;
+  }
+
+  try {
+    console.log('Approving teacher with ID:', teacher._id);
+    await API.patch(`/teachers/approve/${teacher._id}`);
+    console.log('Approved successfully');
+
+    // Refresh dashboard
+    dispatch(getTeacherDashboard());
+  } catch (err) {
+    console.error('Failed to approve teacher', err.response?.data || err.message);
+  }
+};
+
+
   // derive data safely even during loading/error (use defaults)
   const teacher = teacherDashboard?.teacher || {};
   const upcomingSessions = teacherDashboard?.upcomingSessions || [];
@@ -279,12 +299,28 @@ export default function TeacherDashboardInner() {
                 </div>
 
                 <div className="flex flex-col justify-center flex-grow min-w-0 text-center sm:text-left">
-                  <h1 className="text-2xl font-bold text-gray-900 truncate">
-                    {teacher.name || 'Teacher'}
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-indigo-700 bg-indigo-50 ring-1 ring-indigo-100 text-xs font-medium">
-                      Verified teacher
-                    </span>
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-gray-900 truncate">
+                      {teacher.name || 'Teacher'}
+                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-indigo-700 bg-indigo-50 ring-1 ring-indigo-100 text-xs font-medium">
+                        Verified teacher
+                      </span>
+                    </h1>
+
+                    {/* ✅ ELIGIBILITY BUTTON (ONLY ADDITION) */}
+               {/* ✅ ELIGIBILITY BUTTON (FULLY FUNCTIONAL) */}
+{!teacher.isEligible && (
+  <button
+    type="button"
+    onClick={handleMakeEligible}
+    className="ml-auto px-4 py-2 rounded-full text-sm font-semibold text-white bg-[lab(33_49.49_-85.39)] hover:opacity-90 transition shadow-sm"
+  >
+    Make Eligible
+  </button>
+)}
+
+
+                  </div>
 
                   <p className="text-gray-600 text-sm flex items-center justify-center sm:justify-start gap-2 mt-1">
                     <span className="flex items-center gap-1 text-yellow-600 font-semibold">

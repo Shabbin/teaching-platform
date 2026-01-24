@@ -1,28 +1,30 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import API from '../../api/axios'; // ✅ centralized axios (reads env)
+import API from '../../api/axios';
 import { logout } from './userSlice';
 
-// Async: Fetch teacher profile (with posts)
+// Fetch teacher profile (with posts)
 export const fetchTeacherProfile = createAsyncThunk(
   'teacherProfile/fetchTeacherProfile',
-  async (_, { rejectWithValue }) => {
+  async ({ teacherId }, { rejectWithValue }) => {
+    if (!teacherId) return rejectWithValue('Teacher ID is required');
+
     try {
-      const res = await API.get('/teachers/profile', {
-        withCredentials: true, // keep if your instance doesn't set it globally
+      const res = await API.get(`/teachers/${teacherId}/profile`, {
+        withCredentials: true,
       });
       return res.data;
     } catch (err) {
-      return rejectWithValue(
-        err?.response?.data?.message || err?.response?.data || 'Failed to fetch teacher profile'
-      );
+      return rejectWithValue(err?.response?.data?.message || 'Failed to fetch teacher profile');
     }
   }
 );
 
-// Async: Upload profile or background image
+
+// Upload profile or cover image
 export const uploadTeacherImage = createAsyncThunk(
   'teacherProfile/uploadTeacherImage',
-  async ({ file, type }, { rejectWithValue }) => {
+  async ({ file, type, teacherId }, { rejectWithValue }) => {
+    
     try {
       const formData = new FormData();
       formData.append(type, file);
@@ -34,8 +36,8 @@ export const uploadTeacherImage = createAsyncThunk(
         withCredentials: true,
       });
 
-      // Re-fetch updated profile
-      const refreshed = await API.get('/teachers/profile', {
+      // Re-fetch updated profile using the correct teacherId
+      const refreshed = await API.get(`/teachers/${teacherId}/profile`, {
         withCredentials: true,
       });
 
@@ -48,7 +50,6 @@ export const uploadTeacherImage = createAsyncThunk(
   }
 );
 
-// Slice
 const teacherProfileSlice = createSlice({
   name: 'teacherProfile',
   initialState: {
@@ -60,15 +61,12 @@ const teacherProfileSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      // Reset state on logout
       .addCase(logout, (state) => {
         state.teacher = null;
         state.posts = [];
         state.loading = false;
         state.error = null;
       })
-
-      // Fetch
       .addCase(fetchTeacherProfile.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -82,8 +80,6 @@ const teacherProfileSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
-      // Upload
       .addCase(uploadTeacherImage.pending, (state) => {
         state.loading = true;
         state.error = null;

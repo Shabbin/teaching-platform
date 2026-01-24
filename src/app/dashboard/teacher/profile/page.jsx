@@ -4,18 +4,23 @@ import { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import toast, { Toaster } from 'react-hot-toast'
 import { updateProfileImage } from '../../../redux/userSlice'
+import { fetchTeacherProfile, uploadTeacherImage } from '../../../redux/teacherProfileSlice'
 import { Camera, Star, MessageSquare, DollarSign, CheckCircle } from 'lucide-react'
-import API, { absUrl } from '../../../../api/axios' // ← use env-driven axios + URL helper
+import API, { absUrl } from '../../../../api/axios'
 
 export default function TeacherProfilePage() {
   const dispatch = useDispatch()
-  const teacherId = useSelector((state) => state.user.userInfo?._id)
+  const userInfo = useSelector((state) => state.user.userInfo)
+  const teacherId = userInfo?._id || userInfo?.id // ✅ safe fallback
 
-  const [teacher, setTeacher] = useState(null)
-  const [posts, setPosts] = useState([])
-  const [loading, setLoading] = useState(true)
+  console.log('userInfo on render:', userInfo)
+  console.log('teacherId on render:', teacherId)
+
+  const { teacher, posts, loading, error } = useSelector(
+    (state) => state.teacherProfile
+  )
+
   const [isEditing, setIsEditing] = useState(false)
-
   const [formData, setFormData] = useState({
     name: '',
     bio: '',
@@ -25,18 +30,8 @@ export default function TeacherProfilePage() {
     availability: ''
   })
 
-  const fetchProfile = async () => {
-    setLoading(true)
-    if (!teacherId) {
-      setLoading(false)
-      return
-    }
-
-    try {
-      const res = await API.get(`/teachers/${teacherId}/profile`)
-      const { teacher, posts } = res.data
-      setTeacher(teacher)
-      setPosts(posts)
+  useEffect(() => {
+    if (teacher) {
       setFormData({
         name: teacher.name || '',
         bio: teacher.bio || '',
@@ -45,38 +40,31 @@ export default function TeacherProfilePage() {
         location: teacher.location || '',
         availability: teacher.availability || ''
       })
-    } catch (err) {
-      toast.error('Failed to fetch profile')
-    } finally {
-      setLoading(false)
     }
-  }
+  }, [teacher])
 
+  // ✅ Guarded fetch
   useEffect(() => {
-    if (teacherId) fetchProfile()
-  }, [teacherId])
+    if (!teacherId) {
+      console.log('Teacher ID not yet available, waiting...')
+      return
+    }
+    console.log('Dispatching fetchTeacherProfile with ID:', teacherId)
+    dispatch(fetchTeacherProfile({ teacherId }))
+  }, [dispatch, teacherId])
 
   const handleUpload = async (e, type) => {
     const file = e.target.files[0]
     if (!file) return
-    const uploadData = new FormData()
-    uploadData.append(type, file)
 
     try {
-      const route =
-        type === 'profileImage' ? '/teachers/profile-picture' : '/teachers/cover-image'
-
-      const res = await API.put(route, uploadData, {
-        // let browser set multipart boundary; interceptor removes Content-Type for FormData
-      })
+      await dispatch(uploadTeacherImage({ file, type, teacherId })).unwrap()
 
       if (type === 'profileImage') {
-        // update redux user slice thumbnail/avatar if you keep it there
-        dispatch(updateProfileImage(res.data.profileImage))
+        dispatch(updateProfileImage(URL.createObjectURL(file)))
       }
 
       toast.success('Image uploaded successfully')
-      fetchProfile()
     } catch {
       toast.error('Image upload failed')
     }
@@ -87,14 +75,24 @@ export default function TeacherProfilePage() {
     if (!formData.name || !formData.bio || !formData.hourlyRate) {
       return toast.error('Name, bio, and hourly rate are required')
     }
+
     try {
-      const res = await API.put('/teachers/profile-info', formData)
-      setTeacher(res.data.user)
+      await API.put(`/teachers/${teacherId}/profile-info`, formData, { withCredentials: true })
       toast.success('Profile updated')
       setIsEditing(false)
+      dispatch(fetchTeacherProfile({ teacherId }))
     } catch {
       toast.error('Profile update failed')
     }
+  }
+
+  // ⬅ Guard: wait for teacherId before rendering
+  if (!teacherId) {
+    return (
+      <div className="max-w-7xl mx-auto p-4 text-center text-gray-500">
+        Loading teacher info...
+      </div>
+    )
   }
 
   if (loading) {
@@ -113,7 +111,7 @@ export default function TeacherProfilePage() {
     )
   }
 
-  if (!teacher) {
+  if (error || !teacher) {
     return (
       <div className="max-w-7xl mx-auto p-4 text-center text-red-600">
         Unable to load teacher profile.
@@ -125,7 +123,7 @@ export default function TeacherProfilePage() {
     <div className="max-w-7xl mx-auto p-4">
       <Toaster />
 
-      {/* Cover Section */}
+      {/* Cover Image */}
       <div className="relative w-full h-60 sm:h-72 md:h-[20rem] rounded-2xl overflow-hidden shadow-md">
         <img
           src={teacher.coverImage ? absUrl(teacher.coverImage) : '/default-cover.jpg'}
@@ -142,18 +140,14 @@ export default function TeacherProfilePage() {
         </label>
       </div>
 
-      {/* Profile Info Card */}
+      {/* Profile Info */}
       <div className="relative bg-white rounded-2xl shadow-lg p-6 mt-[-4rem] z-10 border border-gray-100">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
-          {/* Profile Image with Edit Overlay */}
+          {/* Avatar */}
           <div className="relative">
             <div className="w-32 h-32 rounded-full overflow-hidden shadow-md ring-4 ring-white">
               <img
-                src={
-                  teacher?.profileImage
-                    ? absUrl(teacher.profileImage)
-                    : '/default-avatar.png'
-                }
+                src={teacher?.profileImage ? absUrl(teacher.profileImage) : '/default-avatar.png'}
                 alt="Profile"
                 className="w-full h-full object-cover"
               />
@@ -168,7 +162,7 @@ export default function TeacherProfilePage() {
             </label>
           </div>
 
-          {/* Info */}
+          {/* Info & Edit */}
           <div className="flex-1 text-center md:text-left">
             <div className="flex flex-wrap justify-between items-center gap-2">
               <h2 className="text-2xl font-bold">{teacher.name}</h2>
@@ -184,9 +178,7 @@ export default function TeacherProfilePage() {
               {teacher.role || 'Tutor'} · Joined on {teacher.createdAt ? new Date(teacher.createdAt).toDateString() : 'N/A'}
             </p>
 
-            {/* Rating + Stats */}
             <div className="mt-4 flex flex-wrap items-center gap-6 text-gray-700">
-              {/* Rating */}
               <div className="flex items-center gap-1">
                 {[...Array(5)].map((_, i) => (
                   <Star
@@ -196,27 +188,20 @@ export default function TeacherProfilePage() {
                 ))}
                 <span className="ml-2 font-medium">{teacher.rating || 0}.0</span>
               </div>
-
-              {/* Reviews */}
               <div className="flex items-center gap-2 text-sm">
                 <MessageSquare className="w-4 h-4 text-gray-400" />
                 {teacher.reviewsCount || 0} Reviews
               </div>
-
-              {/* Earnings */}
               <div className="flex items-center gap-2 text-sm">
                 <DollarSign className="w-4 h-4 text-gray-400" />
                 ${teacher.totalEarnings || 0}
               </div>
-
-              {/* Completion */}
               <div className="flex items-center gap-2 text-sm">
                 <CheckCircle className="w-4 h-4 text-gray-400" />
                 {teacher.completionRate || 0}%
               </div>
             </div>
 
-            {/* Bio & Info */}
             {!isEditing ? (
               <div className="mt-4 space-y-2 text-gray-700">
                 <p><strong>Bio:</strong> {teacher.bio || 'Not added yet'}</p>
@@ -262,14 +247,14 @@ export default function TeacherProfilePage() {
                   className="w-full border border-gray-300 rounded-lg p-2"
                   placeholder="Location"
                   value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, location })}
                 />
                 <input
                   type="text"
                   className="w-full border border-gray-300 rounded-lg p-2"
                   placeholder="Availability"
                   value={formData.availability}
-                  onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, availability })}
                 />
                 <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-md shadow hover:bg-indigo-700">
                   Save
@@ -280,7 +265,7 @@ export default function TeacherProfilePage() {
         </div>
       </div>
 
-      {/* Posts Section */}
+      {/* Tuition posts */}
       <div className="mt-10">
         <h3 className="text-xl font-semibold mb-4">Your Tuition Posts</h3>
         {posts.length === 0 ? (

@@ -55,17 +55,17 @@ export default function Step5_PostDetails({ editMode }) {
             control={control}
             rules={{ required: 'Description is required' }}
             render={({ field }) => (
-              <ReactQuill
-                theme="snow"
-                value={typeof field.value === 'string' ? field.value : ''}  // single source of truth
-                onChange={(content, delta, source, editor) => {
-                  // Use editor.getHTML() to avoid any oddities in content arg
-                  field.onChange(editor.getHTML());
-                }}
-                onBlur={field.onBlur}
-                modules={quillModules}
-                placeholder="Describe your teaching style, experience, and what learners can expect…"
-              />
+           <ReactQuill
+  theme="snow"
+  value={typeof field.value === 'string' ? field.value : ''}
+  onChange={(content) => {
+    field.onChange(content); // <-- simplified, spacebar will now work
+  }}
+  onBlur={field.onBlur}
+  modules={quillModules}
+  placeholder="Describe your teaching style, experience, and what learners can expect…"
+/>
+
             )}
           />
         </div>
