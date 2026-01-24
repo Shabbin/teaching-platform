@@ -81,7 +81,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
             <Link
-              href="/teachers"
+            href="/dashboard/student/teachers"
               className="inline-block bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-10 py-4 rounded-full shadow-lg hover:opacity-90 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition"
             >
               Find a Teacher

@@ -6,6 +6,7 @@ import Avatar from '@mui/material/Avatar';
 import Skeleton from '@mui/material/Skeleton';
 import { Star, StarBorder } from '@mui/icons-material';
 import API from '../../../../api/axios'; // ← adjust the relative path if needed
+import { useSelector } from 'react-redux'; // optional, only if you want to show logged-in info
 
 const ViewTeachers = () => {
   const [allTags, setAllTags] = useState([]);
@@ -17,6 +18,9 @@ const ViewTeachers = () => {
   const [maxPay, setMaxPay] = useState('');
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Optional: get logged-in user (guest users will have undefined)
+  const user = useSelector((state) => state.auth?.user);
 
   // Indigo-first theme for react-select
   const selectTheme = (theme) => ({
@@ -128,7 +132,6 @@ const ViewTeachers = () => {
         subjects: new Set(filteredSubjects),
         hourlyRate: post.hourlyRate,
         location: post.location,
-        // Dummy ratings/reviews
         rating: Math.floor(Math.random() * 5) + 1,
         reviews: Math.floor(Math.random() * 20) + 1,
       });
@@ -143,6 +146,11 @@ const ViewTeachers = () => {
 
   return (
     <div className="min-h-screen p-4 sm:p-6 bg-gradient-to-br from-gray-50 via-white to-gray-50">
+      {/* Optional greeting */}
+      {user?.name && (
+        <p className="text-sm text-gray-700 mb-2">Welcome back, {user.name}!</p>
+      )}
+
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Filters */}
         <div className="w-full lg:w-1/4 lg:sticky top-6 h-fit">

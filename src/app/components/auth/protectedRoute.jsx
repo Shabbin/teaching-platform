@@ -10,20 +10,23 @@ export default function ProtectedRoute({ children, allowedRole }) {
   const router = useRouter();
 
   useEffect(() => {
-    // Only check auth after rehydration and loading complete
-    if (isFetched && !loading) {
-      if (!userInfo || userInfo.role !== allowedRole) {
-        dispatch(logout());
-        router.push('/login');
-      }
-    }
-  }, [userInfo, allowedRole, dispatch, router, isFetched, loading]);
+    if (!isFetched || loading) return;
 
-  // Don't render or redirect until user data is loaded and ready
+    // Case 1: User is logged in but role mismatch → send to /login
+    if (userInfo && userInfo.role !== allowedRole) {
+      router.replace('/login');
+    }
+
+    // Case 2: User is logged out → layout handles landing page redirect
+    // So we do NOT force push to /login here
+  }, [userInfo, allowedRole, router, isFetched, loading]);
+
+  // Don't render until data is ready
   if (!isFetched || loading) return null;
 
-  // If user not allowed, don't render children
-  if (!userInfo || userInfo.role !== allowedRole) return null;
+  // If user exists and role matches, render children
+  if (userInfo && userInfo.role === allowedRole) return children;
 
-  return children;
+  // Otherwise, null (layout will handle redirect)
+  return null;
 }

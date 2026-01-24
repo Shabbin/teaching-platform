@@ -14,10 +14,11 @@ import {
   HelpCircle,
   Menu,
   X,
+  ChevronDown,
 } from 'lucide-react';
 import MessengerPopup from './components/chat-components/MessengerPopup';
 import NotificationBellIcon from './components/notificationComponent/NotificationBellIcon';
-import API from '../../api/axios'; // ✅ use env-driven axios instance
+import API from '../../api/axios';
 
 export default function DashboardLayout({ children }) {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function DashboardLayout({ children }) {
 
   const [navOpen, setNavOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [signupDropdownOpen, setSignupDropdownOpen] = useState(false);
   const [navItems, setNavItems] = useState([]);
   const [activePath, setActivePath] = useState('');
 
@@ -53,28 +55,32 @@ export default function DashboardLayout({ children }) {
         { label: 'My Bookings', href: '/dashboard/student/bookings' },
         { label: 'Profile', href: '/dashboard/student/profile' },
       ]);
+    } else {
+      setNavItems([]);
     }
   }, [role]);
 
-  // Set active path (kept as-is with your router usage)
+  // Set active path
   useEffect(() => {
     setActivePath(router.pathname);
   }, [router.pathname]);
 
-  const handleLogout = async () => {
-    try {
-      await API.post('/auth/logout', {}, { withCredentials: true }); // ✅ no hardcoded URL
-      dispatch(logout());
-      router.push('/login');
-    } catch (err) {
-      console.error('Logout failed', err);
-    }
-  };
+const handleLogout = async () => {
+  try {
+    await API.post('/auth/logout', {}, { withCredentials: true });
+    dispatch(logout());
+    router.replace('/'); // replaces history and avoids auto-redirect conflicts
+  } catch (err) {
+    console.error('Logout failed', err);
+  }
+};
 
+  // Close dropdowns if click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
+        setSignupDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -90,131 +96,183 @@ export default function DashboardLayout({ children }) {
     profileImage?.startsWith('http')
       ? profileImage
       : profileImage
-      ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/${profileImage}` // ✅ env-based host
+      ? `${process.env.NEXT_PUBLIC_API_BASE_URL}/${profileImage}`
       : '/default-avatar.png';
+
+  // Decide logo link dynamically
+  const logoLink = userInfo
+    ? role === 'teacher'
+      ? '/dashboard/teacher'
+      : '/dashboard/student'
+    : '/';
 
   return (
     <div className="w-screen h-screen flex flex-col bg-gray-50 ">
       {/* Header */}
       <header className="bg-white px-6 py-4 flex items-center justify-between shadow-sm border-b border-gray-100 sticky top-0 z-40">
-        <Link href={`/dashboard/${role}`}>
+        <Link href={logoLink}>
           <img
             src="/logo.png"
-            alt="Logo"
+            alt="Tutogoggy Logo"
             className="h-12 w-auto object-contain cursor-pointer hover:opacity-90 transition"
           />
         </Link>
 
         {/* Mobile menu toggle */}
-        <button
-          className="md:hidden text-gray-700"
-          onClick={() => setNavOpen(!navOpen)}
-        >
-          {navOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
+        {userInfo && (
+          <button
+            className="md:hidden text-gray-700"
+            onClick={() => setNavOpen(!navOpen)}
+          >
+            {navOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
+        )}
 
         {/* Desktop Navbar */}
-        <nav className="hidden md:flex space-x-6">
-          {navItems.map((item) => (
-            <div
-              key={item.href}
-              className="relative flex flex-col items-center group"
-            >
-              <Link
-                href={item.href}
-                className={`font-medium py-2 transition-colors ${
-                  isActiveTab(item.href)
-                    ? 'text-[oklch(0.62_0.2_310.02)]'
-                    : 'text-gray-600 hover:text-[oklch(0.62_0.2_310.02)]'
-                }`}
-                onClick={() => setActivePath(item.href)}
-              >
-                {item.label}
-              </Link>
-              {isActiveTab(item.href) && (
-                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[oklch(0.62_0.2_310.02)] rounded-full"></span>
-              )}
-            </div>
-          ))}
-        </nav>
+        {userInfo && (
+          <nav className="hidden md:flex space-x-6">
+            {navItems.map((item) => (
+              <div key={item.href} className="relative flex flex-col items-center group">
+                <Link
+                  href={item.href}
+                  className={`font-medium py-2 transition-colors ${
+                    isActiveTab(item.href)
+                      ? 'text-[oklch(0.62_0.2_310.02)]'
+                      : 'text-gray-600 hover:text-[oklch(0.62_0.2_310.02)]'
+                  }`}
+                  onClick={() => setActivePath(item.href)}
+                >
+                  {item.label}
+                </Link>
+                {isActiveTab(item.href) && (
+                  <span className="absolute bottom-0 left-0 w-full h-0.5 bg-[oklch(0.62_0.2_310.02)] rounded-full"></span>
+                )}
+              </div>
+            ))}
+          </nav>
+        )}
 
         {/* Right section */}
         <div className="flex items-center space-x-4 relative" ref={dropdownRef}>
-          <MessengerPopup user={userInfo} role={userInfo?.role} />
-          <NotificationBellIcon />
+          {userInfo ? (
+            <>
+              <MessengerPopup user={userInfo} role={userInfo?.role} />
+              <NotificationBellIcon />
 
-          {/* Profile + Dropdown */}
-          <div className="relative">
-            <img
-              src={profileSrc}
-              alt="Profile"
-              className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 shadow-sm cursor-pointer ring-2 ring-transparent hover:ring-[oklch(0.62_0.2_310.02)] transition"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-            />
+              {/* Profile + Dropdown */}
+              <div className="relative">
+                <img
+                  src={profileSrc}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 shadow-sm cursor-pointer ring-2 ring-transparent hover:ring-[oklch(0.62_0.2_310.02)] transition"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                />
+                {dropdownOpen && (
+                  <div className="absolute right-0 top-14 w-64 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
+                    <ul className="flex flex-col text-sm text-gray-800 divide-y divide-gray-100">
+                      {role === 'teacher' && (
+                        <li>
+                          <Link
+                            href="/dashboard/teacher/post-content/view-content"
+                            className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
+                            onClick={() => setDropdownOpen(false)}
+                          >
+                            ✍️ Manage Content
+                          </Link>
+                        </li>
+                      )}
+                      <li>
+                        <Link
+                          href={`/dashboard/${role}/profile`}
+                          className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          <User className="w-4 h-4 mr-2" /> View Profile
+                        </Link>
+                      </li>
+                      <li>
+                        <Link
+                          href={`/dashboard/${role}/settings`}
+                          className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          <Settings className="w-4 h-4 mr-2" /> Settings & Privacy
+                        </Link>
+                      </li>
+                      <li>
+                        <Link
+                          href="/help"
+                          className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
+                          onClick={() => setDropdownOpen(false)}
+                        >
+                          <HelpCircle className="w-4 h-4 mr-2" /> Help
+                        </Link>
+                      </li>
+                      <li>
+                        <button
+                          onClick={() => {
+                            setDropdownOpen(false);
+                            handleLogout();
+                          }}
+                          className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition text-red-600"
+                        >
+                          <LogOut className="w-4 h-4 mr-2" /> Logout
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            // Guest Sign In / Sign Up
+            <>
+              <Link
+                href="/login"
+                className="px-4 py-2 text-sm font-medium text-white bg-[oklch(0.62_0.2_310.02)] rounded-lg hover:bg-[oklch(0.62_0.2_310.02)/90] transition"
+              >
+                Sign In
+              </Link>
 
-            {/* Dropdown */}
-            {dropdownOpen && (
-              <div className="absolute right-0 top-14 w-64 bg-white border border-gray-100 rounded-xl shadow-lg z-50 overflow-hidden">
-                <ul className="flex flex-col text-sm text-gray-800 divide-y divide-gray-100">
-                  {role === 'teacher' && (
+              <button
+                onClick={() => setSignupDropdownOpen(!signupDropdownOpen)}
+                className="px-4 py-2 text-sm font-medium text-[oklch(0.62_0.2_310.02)] border border-[oklch(0.62_0.2_310.02)] rounded-lg flex items-center space-x-1 hover:bg-[oklch(0.62_0.2_310.02)/10] transition"
+              >
+                <span>Sign Up</span>
+                <ChevronDown className="w-4 h-4" />
+              </button>
+
+              {signupDropdownOpen && (
+                <div className="absolute right-0 mt-12 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                  <ul className="flex flex-col text-sm text-gray-700 divide-y divide-gray-100">
                     <li>
                       <Link
-                        href="/dashboard/teacher/post-content/view-content"
-                        className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
-                        onClick={() => setDropdownOpen(false)}
+                        href="/register/student"
+                        className="block px-4 py-2 hover:bg-gray-50 transition"
+                        onClick={() => setSignupDropdownOpen(false)}
                       >
-                        ✍️ Manage Content
+                        Student
                       </Link>
                     </li>
-                  )}
-
-                  <li>
-                    <Link
-                      href={`/dashboard/${role}/profile`}
-                      className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      <User className="w-4 h-4 mr-2" /> View Profile
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href={`/dashboard/${role}/settings`}
-                      className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      <Settings className="w-4 h-4 mr-2" /> Settings & Privacy
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/help"
-                      className="flex items-center px-4 py-3 hover:bg-gray-50 transition"
-                      onClick={() => setDropdownOpen(false)}
-                    >
-                      <HelpCircle className="w-4 h-4 mr-2" /> Help
-                    </Link>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => {
-                        setDropdownOpen(false);
-                        handleLogout();
-                      }}
-                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition text-red-600"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" /> Logout
-                    </button>
-                  </li>
-                </ul>
-              </div>
-            )}
-          </div>
+                    <li>
+                      <Link
+                        href="/register/teacher"
+                        className="block px-4 py-2 hover:bg-gray-50 transition"
+                        onClick={() => setSignupDropdownOpen(false)}
+                      >
+                        Teacher
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </header>
 
       {/* Mobile Navbar */}
-      {navOpen && (
+      {userInfo && navOpen && (
         <div className="md:hidden px-6 py-4 bg-white border-b border-gray-100 shadow-sm space-y-2">
           {navItems.map((item) => (
             <Link
@@ -237,4 +295,3 @@ export default function DashboardLayout({ children }) {
     </div>
   );
 }
-// import AXIOS from '../api/axios' is the right import
