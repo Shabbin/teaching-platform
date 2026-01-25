@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -39,7 +40,7 @@ export default function DashboardLayout({ children }) {
   useEffect(() => {
     if (role === 'teacher') {
       setNavItems([
-        { label: 'Dashboard Home', href: '/dashboard/teacher' },
+        // { label: 'Dashboard Home', href: '/dashboard/teacher' },
         { label: 'Post Content', href: '/dashboard/teacher/post-content' },
         { label: 'Requests', href: '/dashboard/teacher/requests' },
         { label: 'Schedule', href: '/dashboard/teacher/schedule' },
@@ -49,7 +50,7 @@ export default function DashboardLayout({ children }) {
       ]);
     } else if (role === 'student') {
       setNavItems([
-        { label: 'Dashboard Home', href: '/dashboard/student' },
+        // { label: 'Dashboard Home', href: '/dashboard/student' },
         { label: 'Find Teachers', href: '/dashboard/student/teachers' },
         { label: 'My Schedule', href: '/dashboard/student/schedule' },
         { label: 'My Bookings', href: '/dashboard/student/bookings' },
@@ -65,15 +66,15 @@ export default function DashboardLayout({ children }) {
     setActivePath(router.pathname);
   }, [router.pathname]);
 
-const handleLogout = async () => {
-  try {
-    await API.post('/auth/logout', {}, { withCredentials: true });
-    dispatch(logout());
-    router.replace('/'); // replaces history and avoids auto-redirect conflicts
-  } catch (err) {
-    console.error('Logout failed', err);
-  }
-};
+  const handleLogout = async () => {
+    try {
+      await API.post('/auth/logout', {}, { withCredentials: true });
+      dispatch(logout());
+      router.replace('/'); // replaces history and avoids auto-redirect conflicts
+    } catch (err) {
+      console.error('Logout failed', err);
+    }
+  };
 
   // Close dropdowns if click outside
   useEffect(() => {
@@ -109,30 +110,25 @@ const handleLogout = async () => {
   return (
     <div className="w-screen h-screen flex flex-col bg-gray-50 ">
       {/* Header */}
-      <header className="bg-white px-6 py-4 flex items-center justify-between shadow-sm border-b border-gray-100 sticky top-0 z-40">
-        <Link href={logoLink}>
+      <header className="bg-white px-6 flex items-center justify-between shadow-sm border-b border-gray-100 sticky top-0 z-40 h-20 md:h-24 lg:h-24">
+        {/* Left: Logo */}
+        <Link href={logoLink} className="flex items-center gap-2">
           <img
             src="/logo.png"
-            alt="Tutogoggy Logo"
-            className="h-12 w-auto object-contain cursor-pointer hover:opacity-90 transition"
-          />
+            alt="Logo"
+           className="h-12 sm:h-20 w-auto object-contain cursor-pointer transition transform scale-125 translate-x-2 hover:opacity-90"
+/>
+       
         </Link>
 
-        {/* Mobile menu toggle */}
-        {userInfo && (
-          <button
-            className="md:hidden text-gray-700"
-            onClick={() => setNavOpen(!navOpen)}
-          >
-            {navOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        )}
-
-        {/* Desktop Navbar */}
+        {/* Center: Desktop Navbar */}
         {userInfo && (
           <nav className="hidden md:flex space-x-6">
             {navItems.map((item) => (
-              <div key={item.href} className="relative flex flex-col items-center group">
+              <div
+                key={item.href}
+                className="relative flex flex-col items-center group"
+              >
                 <Link
                   href={item.href}
                   className={`font-medium py-2 transition-colors ${
@@ -225,7 +221,6 @@ const handleLogout = async () => {
               </div>
             </>
           ) : (
-            // Guest Sign In / Sign Up
             <>
               <Link
                 href="/login"
@@ -267,6 +262,16 @@ const handleLogout = async () => {
                 </div>
               )}
             </>
+          )}
+
+          {/* Mobile menu toggle */}
+          {userInfo && (
+            <button
+              className="md:hidden text-gray-700 ml-2"
+              onClick={() => setNavOpen(!navOpen)}
+            >
+              {navOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
           )}
         </div>
       </header>
