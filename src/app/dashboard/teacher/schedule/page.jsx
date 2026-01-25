@@ -1,14 +1,14 @@
-// src/app/dashboard/teacher/schedule/page.jsx
 'use client';
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSelector } from 'react-redux';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
 import FixScheduleModal from '../../components/scheduleComponents/fixScheduleModal';
 import { useTeacherSchedules } from '../../../hooks/useSchedules';
 
-// --- Static demo cards (kept as-is) ---
+// --- Static demo cards ---
 const SUBJECTS = [
   { name: 'Physics', studentsCount: 3 },
   { name: 'Chemistry', studentsCount: 4 },
@@ -24,9 +24,10 @@ const getImageUrl = (img) =>
     ? img
     : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${img}`;
 
-/* ---------------- Sidebar (white theme like student) ---------------- */
-const Sidebar = ({ onOpen, teacherName, teacherImage }) => {
+/* ---------------- Sidebar ---------------- */
+const Sidebar = ({ onOpen, teacherName, teacherImage, mobileOpen, onClose }) => {
   const pathname = usePathname();
+  const sidebarRef = useRef();
 
   const links = [
     { label: 'Schedule (Today)', href: '/dashboard/teacher/schedule' },
@@ -43,44 +44,101 @@ const Sidebar = ({ onOpen, teacherName, teacherImage }) => {
         : 'text-slate-700 bg-white/0 hover:bg-slate-50 border-transparent hover:border-slate-200'
     }`;
 
+  // Close sidebar when clicking outside, ignore the hamburger button
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      const hamburger = document.getElementById('mobile-hamburger-btn');
+      if (
+        sidebarRef.current &&
+        !sidebarRef.current.contains(e.target) &&
+        hamburger &&
+        !hamburger.contains(e.target)
+      ) {
+        onClose();
+      }
+    };
+    if (mobileOpen) document.addEventListener('mousedown', handleClickOutside);
+    else document.removeEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [mobileOpen, onClose]);
+
   return (
-    <aside className="w-[260px] bg-white/70 backdrop-blur-sm border-r border-slate-200 p-6 flex flex-col flex-shrink-0">
-      <div className="text-center mb-6">
-        <img
-          src={getImageUrl(teacherImage)}
-          alt={teacherName || 'Teacher'}
-          className="w-16 h-16 rounded-full object-cover mx-auto ring-2 ring-slate-200"
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="w-[260px] bg-white/70 backdrop-blur-sm border-r border-slate-200 p-6 flex flex-col flex-shrink-0 hidden md:flex">
+        <SidebarContent
+          onOpen={onOpen}
+          teacherName={teacherName}
+          teacherImage={teacherImage}
+          links={links}
+          itemClass={itemClass}
+          isActive={isActive}
         />
-        <h3
-          className="mt-2 text-base font-semibold text-slate-800 truncate"
-          title={teacherName || 'Teacher'}
-        >
-          {teacherName || 'Teacher'}
-        </h3>
-      </div>
+      </aside>
 
-      <button
-        onClick={onOpen}
-        className="rounded-lg px-4 py-2 text-sm text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-300"
-      >
-        Fix Schedule
-      </button>
-
-      <h4 className="text-[11px] uppercase tracking-wide text-slate-500 mt-5 mb-2">Menu</h4>
-      <nav className="flex flex-col gap-1.5">
-        {links.map((item) => {
-          const active = isActive(item.href);
-          return (
-            <Link key={item.href} href={item.href} className={itemClass(active)}>
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-    </aside>
+      {/* Mobile Slide-in Sidebar */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.aside
+            ref={sidebarRef}
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            className="fixed inset-0 z-50 w-[260px] bg-white/95 backdrop-blur-sm p-6 flex flex-col border-r border-slate-200 md:hidden shadow-lg"
+          >
+            <SidebarContent
+              onOpen={onOpen}
+              teacherName={teacherName}
+              teacherImage={teacherImage}
+              links={links}
+              itemClass={itemClass}
+              isActive={isActive}
+            />
+          </motion.aside>
+        )}
+      </AnimatePresence>
+    </>
   );
 };
 
+const SidebarContent = ({ onOpen, teacherName, teacherImage, links, itemClass, isActive }) => (
+  <>
+    <div className="text-center mb-6">
+      <img
+        src={getImageUrl(teacherImage)}
+        alt={teacherName || 'Teacher'}
+        className="w-16 h-16 rounded-full object-cover mx-auto ring-2 ring-slate-200"
+      />
+      <h3
+        className="mt-2 text-base font-semibold text-slate-800 truncate"
+        title={teacherName || 'Teacher'}
+      >
+        {teacherName || 'Teacher'}
+      </h3>
+    </div>
+
+    <button
+      onClick={onOpen}
+      className="rounded-lg px-4 py-2 text-sm text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-300 mb-5"
+    >
+      Fix Schedule
+    </button>
+
+    <h4 className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Menu</h4>
+    <nav className="flex flex-col gap-1.5">
+      {links.map((item) => {
+        const active = isActive(item.href);
+        return (
+          <Link key={item.href} href={item.href} className={itemClass(active)}>
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  </>
+);
+
+/* ---------------- Class Overview ---------------- */
 const ClassOverview = ({ subjects }) => (
   <section className="mb-8">
     <h2 className="text-lg font-semibold text-gray-900 mb-4">Class Overview</h2>
@@ -102,6 +160,7 @@ const ClassOverview = ({ subjects }) => (
   </section>
 );
 
+/* ---------------- Student List ---------------- */
 const StudentList = ({ students }) => (
   <section>
     <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Students</h2>
@@ -110,16 +169,13 @@ const StudentList = ({ students }) => (
         <p className="text-sm text-slate-500">No students found from your schedules yet.</p>
       ) : (
         students.map(({ id, name, img }) => (
-          <div key={id || name} className="flex flex-col items-center flex-shrink-0 w-[72px]">
+          <div key={id} className="flex flex-col items-center flex-shrink-0 w-[72px]">
             <img
               src={getImageUrl(img)}
               alt={name || 'Student'}
               className="w-[60px] h-[60px] rounded-full object-cover ring-2 ring-slate-200"
             />
-            <p
-              className="text-xs mt-1 text-gray-700 text-center truncate w-full"
-              title={name || 'Student'}
-            >
+            <p className="text-xs mt-1 text-gray-700 text-center truncate w-full" title={name || 'Student'}>
               {name || 'Student'}
             </p>
           </div>
@@ -129,14 +185,14 @@ const StudentList = ({ students }) => (
   </section>
 );
 
-/* ---------------- Right sidebar (white theme; grouped) ---------------- */
-function RightSidebarDynamic({ announcements }) {
+/* ---------------- Right Sidebar (Dynamic) ---------------- */
+function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
   const schedulesQ = useTeacherSchedules();
 
   const groupedToday = useMemo(() => {
     const all = Array.isArray(schedulesQ.data) ? schedulesQ.data : [];
     const start = new Date(); start.setHours(0, 0, 0, 0);
-    const end = new Date();   end.setHours(23, 59, 59, 999);
+    const end = new Date(); end.setHours(23, 59, 59, 999);
 
     const groups = new Map();
     for (const s of all) {
@@ -148,13 +204,7 @@ function RightSidebarDynamic({ announcements }) {
       const postKey = typeof s.postId === 'object' && s.postId?._id ? s.postId._id : (s.postId || '');
       const key = `${minuteKey}|${s.subject}|${s.type || 'regular'}|${postKey}`;
 
-      const current = groups.get(key) || {
-        date: d,
-        subject: s.subject,
-        type: s.type || 'regular',
-        postId: postKey,
-        count: 0,
-      };
+      const current = groups.get(key) || { date: d, subject: s.subject, type: s.type || 'regular', postId: postKey, count: 0 };
       const added = Array.isArray(s.studentIds) ? s.studentIds.length : 1;
       current.count += added;
       groups.set(key, current);
@@ -163,8 +213,8 @@ function RightSidebarDynamic({ announcements }) {
     return Array.from(groups.values()).sort((a, b) => a.date - b.date);
   }, [schedulesQ.data]);
 
-  return (
-    <aside className="w-[300px] bg-white/70 backdrop-blur-sm p-6 border-l border-slate-200 flex-shrink-0 min-h-screen hidden md:block">
+  const RightSidebarContent = () => (
+    <>
       {/* Announcements */}
       <div className="mb-8">
         <div className="flex items-center mb-3">
@@ -173,17 +223,14 @@ function RightSidebarDynamic({ announcements }) {
         </div>
         <div className="space-y-3">
           {(announcements || []).map((item, i) => (
-            <div
-              key={i}
-              className="p-3 rounded-lg bg-white shadow-sm border border-slate-200 hover:shadow-md transition"
-            >
+            <div key={`ann-${i}`} className="p-3 rounded-lg bg-white shadow-sm border border-slate-200 hover:shadow-md transition">
               <p className="text-sm text-slate-700">{item}</p>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Today's Schedule (grouped) */}
+      {/* Today's Schedule */}
       <div>
         <div className="flex items-center mb-3">
           <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 mr-2">📅</span>
@@ -198,16 +245,14 @@ function RightSidebarDynamic({ announcements }) {
           <div className="space-y-3">
             {groupedToday.map((g, idx) => (
               <div
-                key={`${g.postId}-${g.subject}-${g.type}-${g.date.getTime()}-${idx}`}
+                key={`sched-${idx}-${g.date.getTime()}-${g.subject}-${g.type}-${g.postId || 'none'}`}
                 className="flex items-center justify-between p-3 rounded-lg bg-white shadow-sm border border-slate-200 hover:shadow-md transition"
               >
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-gray-800 truncate">
                     {g.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — {g.subject}
                   </div>
-                  {g.type === 'demo' && (
-                    <div className="text-[11px] text-slate-500">Demo class</div>
-                  )}
+                  {g.type === 'demo' && <div className="text-[11px] text-slate-500">Demo class</div>}
                 </div>
                 <span
                   className="ml-3 inline-flex items-center justify-center text-xs font-semibold rounded-full w-6 h-6 text-white bg-slate-900"
@@ -220,15 +265,40 @@ function RightSidebarDynamic({ announcements }) {
           </div>
         )}
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop */}
+      <aside className="w-[300px] bg-white/70 backdrop-blur-sm p-6 border-l border-slate-200 flex-shrink-0 min-h-screen hidden md:block">
+        <RightSidebarContent />
+      </aside>
+
+      {/* Mobile Bottom Drawer */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.aside
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm p-6 border-t border-slate-200 md:hidden max-h-[80%] overflow-y-auto"
+          >
+            <button onClick={onClose} className="self-end mb-4 text-slate-700 font-bold focus:outline-none">
+              ✕
+            </button>
+            <RightSidebarContent />
+          </motion.aside>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
-/* ---------------- Main area that needs React Query ---------------- */
+/* ---------------- Main Area ---------------- */
 function MainArea() {
   const schedulesQ = useTeacherSchedules();
 
-  // Build a unique student list from schedules (no random avatars)
   const studentsFromSchedules = useMemo(() => {
     const all = Array.isArray(schedulesQ.data) ? schedulesQ.data : [];
     const map = new Map();
@@ -251,9 +321,7 @@ function MainArea() {
           name = 'Student';
           img = '';
         }
-        if (!map.has(id)) {
-          map.set(id, { id, name, img });
-        }
+        if (!map.has(id)) map.set(id, { id, name, img });
       }
     }
 
@@ -271,15 +339,16 @@ function MainArea() {
 /* ---------------- Page ---------------- */
 export default function TeacherClassroom() {
   const [open, setOpen] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileRightOpen, setMobileRightOpen] = useState(false);
   const [client] = useState(() => new QueryClient());
 
-  // Pull teacher info from Redux (prefer teacherDashboard.teacher, fallback to userInfo)
   const { teacherDashboard, userInfo } = useSelector((state) => state.user);
   const teacherObj = teacherDashboard?.teacher || userInfo || {};
   const teacherName = teacherObj?.name || 'Teacher';
   const teacherImage = teacherObj?.profileImage;
 
-  // 🔄 live-refresh schedules via socket
+  // 🔄 Socket live-refresh
   useEffect(() => {
     let detach = () => {};
     let tries = 0;
@@ -289,28 +358,12 @@ export default function TeacherClassroom() {
       const s = typeof window !== 'undefined' ? window.socket : null;
       if (!s) return false;
 
-      const shouldRefresh = (t) =>
-        t === 'new_schedule' ||
-        t === 'schedule_cancelled' ||
-        t === 'schedule_updated' ||
-        t === 'schedule_proposal_update' ||
-        t === 'schedule_response' ||
-        (typeof t === 'string' && t.startsWith('routine_')) ||
-        t === 'schedules_refresh';
-
-      const onNotif = () => {
-        client.invalidateQueries({ queryKey: ['schedules'] });
-      };
-
-      const onRefresh = () => {
-        client.invalidateQueries({ queryKey: ['schedules'] });
-      };
-
-      s.on('new_notification', onNotif);
+      const onRefresh = () => client.invalidateQueries({ queryKey: ['schedules'] });
+      s.on('new_notification', onRefresh);
       s.on('schedules_refresh', onRefresh);
 
       detach = () => {
-        s.off('new_notification', onNotif);
+        s.off('new_notification', onRefresh);
         s.off('schedules_refresh', onRefresh);
       };
 
@@ -322,10 +375,7 @@ export default function TeacherClassroom() {
         tries += 1;
         if (attach() || tries >= maxTries) clearInterval(id);
       }, 500);
-      return () => {
-        clearInterval(id);
-        detach();
-      };
+      return () => { clearInterval(id); detach(); };
     }
 
     return () => detach();
@@ -333,16 +383,42 @@ export default function TeacherClassroom() {
 
   return (
     <QueryClientProvider client={client}>
-      <div className="flex w-full h-screen bg-gradient-to-b from-white to-slate-50">
+      <div className="flex w-full h-screen bg-gradient-to-b from-white to-slate-50 relative">
+        {/* Floating Bottom Hamburger Button (Left Sidebar) */}
+        <button
+          id="mobile-hamburger-btn"
+          className="md:hidden fixed bottom-6 right-6 z-50 p-5 rounded-full bg-white shadow-lg flex items-center justify-center text-2xl"
+          onClick={() => setMobileSidebarOpen(prev => !prev)}
+        >
+          ☰
+        </button>
+
+        {/* Floating Bottom Right Sidebar Button (Mobile) */}
+        <button
+          className="md:hidden fixed bottom-6 left-6 z-50 p-5 rounded-full bg-white shadow-lg flex items-center justify-center text-2xl"
+          onClick={() => setMobileRightOpen(prev => !prev)}
+        >
+          📢
+        </button>
+
         <Sidebar
           onOpen={() => setOpen(true)}
           teacherName={teacherName}
           teacherImage={teacherImage}
+          mobileOpen={mobileSidebarOpen}
+          onClose={() => setMobileSidebarOpen(false)}
         />
+
         <main className="flex-1 overflow-y-auto">
           <MainArea />
         </main>
-        <RightSidebarDynamic announcements={ANNOUNCEMENTS} />
+
+        <RightSidebarDynamic
+          announcements={ANNOUNCEMENTS}
+          mobileOpen={mobileRightOpen}
+          onClose={() => setMobileRightOpen(false)}
+        />
+
         <FixScheduleModal open={open} onClose={() => setOpen(false)} />
       </div>
     </QueryClientProvider>
