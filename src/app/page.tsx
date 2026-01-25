@@ -4,14 +4,11 @@ import { useEffect, useState } from "react";
 
 export default function HomePage() {
   const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      if (window.scrollY > 40) {
-        setScrolled(true);
-      } else {
-        setScrolled(false);
-      }
+      setScrolled(window.scrollY > 40);
     };
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
@@ -25,18 +22,18 @@ export default function HomePage() {
           scrolled ? "bg-white shadow-md" : "bg-transparent"
         }`}
       >
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto px-6 py-2 flex justify-between items-center">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <img
               src="/logo.png"
               alt="Logo"
-              className="h-12 w-auto object-contain cursor-pointer hover:opacity-90 transition"
+              className="h-20 w-auto object-contain cursor-pointer hover:opacity-90 transition"
             />
           </Link>
 
-          {/* Nav */}
-          <nav className="flex gap-10 items-center">
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex gap-10 items-center">
             <Link
               href="/register/teacher"
               className="text-base font-semibold tracking-wide text-gray-800 hover:text-indigo-600 transition-colors"
@@ -50,7 +47,62 @@ export default function HomePage() {
               Login
             </Link>
           </nav>
+
+          {/* Mobile Hamburger */}
+          <div className="md:hidden">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="focus:outline-none"
+              aria-label="Toggle menu"
+            >
+              <svg
+                className="w-8 h-8 text-gray-800"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                {mobileMenuOpen ? (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                ) : (
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 6h16M4 12h16M4 18h16"
+                  />
+                )}
+              </svg>
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-white shadow-md">
+            <nav className="flex flex-col gap-4 px-6 py-4">
+              <Link
+                href="/register/teacher"
+                className="text-base font-semibold tracking-wide text-gray-800 hover:text-indigo-600 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Become a Tutor
+              </Link>
+              <Link
+                href="/login"
+                className="text-base font-semibold tracking-wide text-gray-800 hover:text-indigo-600 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Login
+              </Link>
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* Hero Section */}
@@ -81,7 +133,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-6 sm:gap-8">
             <Link
-            href="/dashboard/student/teachers"
+              href="/dashboard/student/teachers"
               className="inline-block bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-lg font-semibold px-10 py-4 rounded-full shadow-lg hover:opacity-90 focus:outline-none focus:ring-4 focus:ring-indigo-300 transition"
             >
               Find a Teacher
