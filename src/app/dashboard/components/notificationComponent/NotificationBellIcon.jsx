@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Bell } from 'lucide-react';
+import { Bell, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import {
@@ -205,55 +205,110 @@ export default function NotificationBell() {
 
       <AnimatePresence>
         {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className="
-              absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto
-              bg-white border border-gray-200 rounded-xl shadow-lg z-50
-            "
-          >
-            <div className="px-4 py-3 border-b border-gray-100 font-semibold text-gray-700">
-              Notifications
-            </div>
+          <>
+            {/* desktop dropdown remains unchanged */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="
+                hidden md:block
+                absolute right-0 mt-2 w-80 max-h-96 overflow-y-auto
+                bg-white border border-gray-200 rounded-xl shadow-lg z-50
+              "
+            >
+              <div className="px-4 py-3 border-b border-gray-100 font-semibold text-gray-700">
+                Notifications
+              </div>
 
-            {notifications.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">No notifications</div>
-            ) : (
-              <ul>
-                {notifications.map((n) => (
-                  <li
-                    key={n._id || n.id}
-                    className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 ${
-                      !n.read ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={n.profileImage || '/default-avatar.png'}
-                        alt={n.senderName || 'User'}
-                        className="w-10 h-10 rounded-full object-cover border border-gray-200 shadow-sm"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-800 whitespace-pre-wrap break-words leading-5">
-                          {n.senderName ? `${n.senderName} ${n.message}` : n.message}
-                        </p>
-                        <span className="text-xs text-gray-500">{formatWhen(n)}</span>
+              {notifications.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">No notifications</div>
+              ) : (
+                <ul>
+                  {notifications.map((n) => (
+                    <li
+                      key={n._id || n.id}
+                      className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 ${
+                        !n.read ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={n.profileImage || '/default-avatar.png'}
+                          alt={n.senderName || 'User'}
+                          className="w-10 h-10 rounded-full object-cover border border-gray-200 shadow-sm"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 whitespace-pre-wrap break-words leading-5">
+                            {n.senderName ? `${n.senderName} ${n.message}` : n.message}
+                          </p>
+                          <span className="text-xs text-gray-500">{formatWhen(n)}</span>
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-            <div className="text-center p-2">
-              <button onClick={handleClearAll} className="text-indigo-600 hover:underline text-sm">
-                Clear All
-              </button>
-            </div>
-          </motion.div>
+              <div className="text-center p-2">
+                <button onClick={handleClearAll} className="text-indigo-600 hover:underline text-sm">
+                  Clear All
+                </button>
+              </div>
+            </motion.div>
+
+            {/* mobile full-screen modal */}
+            <motion.div
+              className="md:hidden fixed inset-0 z-40 flex flex-col bg-white overflow-y-auto"
+              initial={{ y: '-100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '-100%' }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 font-semibold text-gray-700">
+                Notifications
+                <button onClick={() => setOpen(false)} aria-label="Close" className="p-1 text-gray-500 hover:text-indigo-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {notifications.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">No notifications</div>
+              ) : (
+                <ul>
+                  {notifications.map((n) => (
+                    <li
+                      key={n._id || n.id}
+                      className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 ${
+                        !n.read ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={n.profileImage || '/default-avatar.png'}
+                          alt={n.senderName || 'User'}
+                          className="w-10 h-10 rounded-full object-cover border border-gray-200 shadow-sm"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 whitespace-pre-wrap break-words leading-5">
+                            {n.senderName ? `${n.senderName} ${n.message}` : n.message}
+                          </p>
+                          <span className="text-xs text-gray-500">{formatWhen(n)}</span>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <div className="text-center p-2">
+                <button onClick={handleClearAll} className="text-indigo-600 hover:underline text-sm">
+                  Clear All
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>
