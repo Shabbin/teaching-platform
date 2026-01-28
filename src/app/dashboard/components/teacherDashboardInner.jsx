@@ -7,22 +7,27 @@ import API from '../../../api/axios';
 
 import ViewedPostsTimeline from './ViewedPostsTimeline';
 import { fetchPostViewEvents } from '../../redux/postViewEventSlice';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ImageIcon,
-  ShieldCheck,
-  ShieldOff,
-  CheckCircle,
-  AlertCircle,
-  CreditCard,
-  Users,
-  Star,
-  BookOpen,
-  CalendarClock,
-  MailCheck,
+  ImageIcon, ShieldCheck, ShieldOff, CheckCircle, AlertCircle,
+  CreditCard, Users, Star, BookOpen, CalendarClock, MailCheck,
+  TrendingUp, Activity, MoreHorizontal, ArrowRight
 } from 'lucide-react';
-
-// ✅ use your payments API helper
 import { getTeacherSummary } from '../../../api/payments';
+
+// Animated Counter Component
+const CountUp = ({ to, prefix = '' }) => {
+  return (
+    <motion.span
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="tabular-nums"
+    >
+      {prefix}
+      {typeof to === 'number' ? to.toLocaleString() : to}
+    </motion.span>
+  );
+};
 
 export default function TeacherDashboardInner() {
   const router = useRouter();
@@ -38,10 +43,8 @@ export default function TeacherDashboardInner() {
   } = useSelector((state) => state.user);
   const { userInfo } = useSelector((state) => state.user);
 
-  // monthly payments fallback (if dashboard payload doesn’t include payments)
   const [fallbackPayments, setFallbackPayments] = useState(null);
 
-  // effects (always run in the same order; no early returns)
   useEffect(() => {
     if (userInfo && userInfo._id) {
       dispatch(fetchPostViewEvents(userInfo._id));
@@ -60,7 +63,6 @@ export default function TeacherDashboardInner() {
     }
   }, [dispatch, isAuthenticated, teacherDashboard, dashboardLoading, dashboardError]);
 
-  // ✅ fetch monthly summary once if payments list is missing OR empty
   useEffect(() => {
     const hasAnyPayments =
       (Array.isArray(teacherDashboard?.payments) && teacherDashboard.payments.length > 0) ||
@@ -73,57 +75,35 @@ export default function TeacherDashboardInner() {
     }
   }, [isAuthenticated, teacherDashboard, fallbackPayments]);
 
-  // 🔹 ADD HERE: after your useEffects and before return
-const handleMakeEligible = async () => {
-  if (!teacher._id) {
-    console.error('No teacher ID available!');
-    return;
-  }
+  const handleMakeEligible = async () => {
+    if (!teacher._id) return;
+    try {
+      await API.patch(`/teachers/approve/${teacher._id}`);
+      dispatch(getTeacherDashboard());
+    } catch (err) {
+      console.error('Failed to approve teacher', err.response?.data || err.message);
+    }
+  };
 
-  try {
-    console.log('Approving teacher with ID:', teacher._id);
-    await API.patch(`/teachers/approve/${teacher._id}`);
-    console.log('Approved successfully');
-
-    // Refresh dashboard
-    dispatch(getTeacherDashboard());
-  } catch (err) {
-    console.error('Failed to approve teacher', err.response?.data || err.message);
-  }
-};
-
-
-  // derive data safely even during loading/error (use defaults)
   const teacher = teacherDashboard?.teacher || {};
   const upcomingSessions = teacherDashboard?.upcomingSessions || [];
   const sessionRequests = teacherDashboard?.sessionRequests || [];
 
-  // REAL payment summary
   const { monthlyEarnings, commissionPaid, totalSessions } = useMemo(() => {
     const paymentsRaw =
       (Array.isArray(teacherDashboard?.payments) && teacherDashboard.payments) ||
       (Array.isArray(teacherDashboard?.paymentHistory) && teacherDashboard.paymentHistory) ||
-      (Array.isArray(fallbackPayments) && fallbackPayments) ||
-      [];
+      (Array.isArray(fallbackPayments) && fallbackPayments) || [];
 
-    const schedulesRaw =
-      (Array.isArray(teacherDashboard?.schedules) && teacherDashboard.schedules) || [];
+    const schedulesRaw = (Array.isArray(teacherDashboard?.schedules) && teacherDashboard.schedules) || [];
 
     const now = new Date();
     const sameMonth = (d) => {
       const dd = new Date(d);
-      return (
-        !isNaN(dd) &&
-        dd.getFullYear() === now.getFullYear() &&
-        dd.getMonth() === now.getMonth()
-      );
+      return !isNaN(dd) && dd.getFullYear() === now.getFullYear() && dd.getMonth() === now.getMonth();
     };
 
-    // if fallback used, backend already filtered to this month; still filter defensively
-    const monthPayments = paymentsRaw.filter((p) =>
-      sameMonth(p.createdAt || p.paidAt || p.updatedAt)
-    );
-
+    const monthPayments = paymentsRaw.filter((p) => sameMonth(p.createdAt || p.paidAt || p.updatedAt));
     const sum = (arr, fn) => arr.reduce((acc, x) => acc + (Number(fn(x)) || 0), 0);
 
     const earnedThisMonth = sum(monthPayments, (p) => {
@@ -155,10 +135,8 @@ const handleMakeEligible = async () => {
     };
   }, [teacherDashboard, fallbackPayments]);
 
-  // REAL student stats
   const studentStats = useMemo(() => {
-    const schedulesRaw =
-      (Array.isArray(teacherDashboard?.schedules) && teacherDashboard.schedules) || [];
+    const schedulesRaw = (Array.isArray(teacherDashboard?.schedules) && teacherDashboard.schedules) || [];
     const counts = new Map();
     schedulesRaw.forEach((s) => {
       const ids = Array.isArray(s.studentIds) ? s.studentIds : [];
@@ -169,122 +147,162 @@ const handleMakeEligible = async () => {
     });
     const taught = counts.size;
     const repeat = Array.from(counts.values()).filter((n) => n > 1).length;
-
     const rating = Number(teacher.avgRating ?? teacher.rating ?? 0) || 0;
     const reviews = Number(teacher.reviewsCount ?? teacher.ratingCount ?? teacher.totalReviews ?? 0) || 0;
 
     return { taught, repeat, rating, reviews };
   }, [teacherDashboard, teacher]);
 
-  const profileSrc =
-    teacher && teacher.profileImage
-      ? (String(teacher.profileImage).startsWith('http')
-          ? teacher.profileImage
-          : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${teacher.profileImage}`)
-      : '/default-avatar.png';
+  const profileSrc = teacher && teacher.profileImage
+    ? (String(teacher.profileImage).startsWith('http') ? teacher.profileImage : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${teacher.profileImage}`)
+    : '/default-avatar.png';
 
   const currencyPrefix = teacherDashboard?.currencySymbol || '৳';
-
-  // UI state flags (used inside the single return)
   const isLoading = dashboardLoading;
   const hasError = dashboardError || !teacherDashboard;
 
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 p-6">
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-8">
-        {/* Left: show loading/error panels too */}
-        <aside className="w-full lg:w-72 flex-shrink-0 space-y-6">
-          {isLoading ? (
-            <div className="bg-white/95 rounded-3xl shadow-sm border border-gray-100 p-6 text-gray-500 animate-pulse">
-              Loading your dashboard…
-            </div>
-          ) : hasError ? (
-            <div className="bg-red-50 rounded-3xl shadow-sm border border-red-100 p-6 text-red-700">
-              Unable to load dashboard. Please refresh.
-            </div>
-          ) : (
-            <>
-              {/* Payment Summary */}
-              <div className="bg-white/95 relative rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5" />
-                  <h2 className="text-lg font-semibold">Payment Summary</h2>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-700 text-sm">
-                    Monthly Earnings:
-                    <span className="block text-xl font-bold text-gray-900">
-                      {currencyPrefix} {Number(monthlyEarnings || 0).toLocaleString()}
-                    </span>
-                  </p>
-                  <p className="text-gray-700 text-sm">
-                    Total Sessions:
-                    <span className="block text-lg font-semibold text-indigo-700">
-                      {Number(totalSessions || 0)}
-                    </span>
-                  </p>
-                  <p className="text-gray-700 text-sm">
-                    Commission Paid:
-                    <span className="block text-lg font-semibold text-red-600">
-                      {currencyPrefix} {Number(commissionPaid || 0).toLocaleString()}
-                    </span>
-                  </p>
-                </div>
-              </div>
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
 
-              {/* Student Stats */}
-              <div className="bg-white/95 relative rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-3 flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  <h2 className="text-lg font-semibold">Student Stats</h2>
-                </div>
-                <div className="p-6 space-y-3">
-                  <p className="text-gray-700 text-sm">
-                    Students Taught:
-                    <span className="block text-xl font-bold text-gray-900">{studentStats.taught}</span>
-                  </p>
-                  <p className="text-gray-700 text-sm">
-                    Repeat Students:
-                    <span className="block text-lg font-semibold text-indigo-700">{studentStats.repeat}</span>
-                  </p>
-                  <p className="text-gray-700 text-sm flex items-center gap-1">
-                    Rating:
-                    <span className="block text-lg font-semibold text-yellow-600 flex items-center gap-1">
-                      {studentStats.rating?.toFixed ? studentStats.rating.toFixed(1) : studentStats.rating}
-                      <Star className="w-4 h-4 text-yellow-500" />
-                    </span>
-                  </p>
-                  <p className="text-gray-700 text-sm">
-                    Reviews:
-                    <span className="block text-lg font-semibold text-gray-900">{studentStats.reviews}</span>
-                  </p>
-                </div>
-              </div>
-            </>
-          )}
-        </aside>
+      {/* Top Banner / Welcome Area */}
+      <div className="bg-slate-900 text-white pb-32 pt-12 rounded-b-[3rem] relative overflow-hidden">
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 mix-blend-overlay"></div>
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-500/30 blur-[120px] rounded-full pointer-events-none"></div>
 
-        {/* Main Content */}
-        <main className="flex-1 space-y-8">
-          {/* Profile or loading/error skeletons */}
-          <section className="bg-white/95 p-6 flex flex-col sm:flex-row items-center gap-5 rounded-3xl border border-gray-100 shadow-sm">
-            {isLoading || hasError ? (
-              <div className="text-gray-500">
-                {isLoading ? 'Loading profile…' : 'Dashboard unavailable.'}
+        <div className="max-w-7xl mx-auto px-6 relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div>
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2 text-indigo-300 font-bold uppercase tracking-wider text-xs mb-2"
+            >
+              <Activity size={14} /> Teacher Dashboard
+            </motion.div>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-3xl md:text-5xl font-bold mb-2"
+            >
+              Welcome back, {teacher.name?.split(' ')[0] || 'Teacher'}
+            </motion.h1>
+            <p className="text-slate-400">Here's what's happening with your students today.</p>
+          </div>
+
+          <div className="flex gap-3">
+            <button className="px-5 py-2.5 bg-white/10 backdrop-blur-md border border-white/10 rounded-xl font-semibold hover:bg-white/20 transition-all">
+              Edit Schedule
+            </button>
+            <button className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-semibold shadow-lg shadow-indigo-500/20 transition-all">
+              Create Post
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-6 -mt-24 relative z-20">
+
+        {/* Stats Grid */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+        >
+          {/* Earnings Card */}
+          <motion.div variants={itemVariants} className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <CreditCard size={80} className="text-indigo-600" />
+            </div>
+            <div className="relative z-10">
+              <p className="text-indigo-600 font-bold text-sm uppercase tracking-wide mb-1">Monthly Earnings</p>
+              <h3 className="text-3xl font-bold text-slate-800">
+                <CountUp to={monthlyEarnings} prefix={currencyPrefix + ' '} />
+              </h3>
+              <div className="mt-4 flex items-center text-xs font-semibold text-emerald-600 bg-emerald-50 w-fit px-2 py-1 rounded-lg">
+                <TrendingUp size={12} className="mr-1" /> +12% vs last month
               </div>
-            ) : (
-              <>
-                <div className="relative w-28 h-28 sm:w-36 sm:h-36">
-                  <div className="w-full h-full rounded-full overflow-hidden shadow-md ring-2 ring-indigo-500/60">
-                    <img src={profileSrc} alt="Profile" className="w-full h-full object-cover" />
+            </div>
+          </motion.div>
+
+          {/* Sessions Card */}
+          <motion.div variants={itemVariants} className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <CalendarClock size={80} className="text-blue-600" />
+            </div>
+            <div className="relative z-10">
+              <p className="text-blue-600 font-bold text-sm uppercase tracking-wide mb-1">Total Sessions</p>
+              <h3 className="text-3xl font-bold text-slate-800">
+                <CountUp to={totalSessions} />
+              </h3>
+              <p className="text-slate-400 text-xs mt-4">Completed this month</p>
+            </div>
+          </motion.div>
+
+          {/* Students Card */}
+          <motion.div variants={itemVariants} className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Users size={80} className="text-purple-600" />
+            </div>
+            <div className="relative z-10">
+              <p className="text-purple-600 font-bold text-sm uppercase tracking-wide mb-1">Active Students</p>
+              <h3 className="text-3xl font-bold text-slate-800">
+                <CountUp to={studentStats.taught} />
+              </h3>
+              <div className="mt-4 flex items-center gap-1 text-xs text-slate-500">
+                <span className="font-bold text-purple-600">{studentStats.repeat}</span> returning students
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Rating Card */}
+          <motion.div variants={itemVariants} className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border border-white/50 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Star size={80} className="text-amber-500" />
+            </div>
+            <div className="relative z-10">
+              <p className="text-amber-600 font-bold text-sm uppercase tracking-wide mb-1">Reputation</p>
+              <h3 className="text-3xl font-bold text-slate-800 flex items-center gap-2">
+                {studentStats.rating?.toFixed(1) || '0.0'} <Star size={24} className="text-amber-400 fill-amber-400" />
+              </h3>
+              <p className="text-slate-400 text-xs mt-4">{studentStats.reviews} total reviews</p>
+            </div>
+          </motion.div>
+        </motion.div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+          {/* Left Column: Profile & quick info */}
+          <div className="lg:col-span-1 space-y-6">
+            <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 relative overflow-hidden">
+              <div className="flex flex-col items-center text-center">
+                <div className="relative group">
+                  <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-indigo-500 to-purple-500 mb-4">
+                    <img
+                      src={profileSrc}
+                      alt="Profile"
+                      className="w-full h-full rounded-full object-cover border-4 border-white"
+                    />
                   </div>
                   <button
                     onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                    className="absolute bottom-1.5 right-1.5 bg-indigo-600 text-white p-2 rounded-full shadow-md hover:bg-indigo-700 transition focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                    title="Change Profile Picture"
-                    aria-label="Change Profile Picture"
+                    className="absolute bottom-4 right-2 bg-slate-900 text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all transform hover:scale-110"
                   >
-                    <ImageIcon className="w-4 h-4" />
+                    <ImageIcon size={14} />
                   </button>
                   <input
                     type="file"
@@ -298,152 +316,143 @@ const handleMakeEligible = async () => {
                   />
                 </div>
 
-                <div className="flex flex-col justify-center flex-grow min-w-0 text-center sm:text-left">
-                  <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-gray-900 truncate">
-                      {teacher.name || 'Teacher'}
-                      <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-indigo-700 bg-indigo-50 ring-1 ring-indigo-100 text-xs font-medium">
-                        Verified teacher
-                      </span>
-                    </h1>
+                <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                  {teacher.name}
+                  {teacher.isEligible && <ShieldCheck size={18} className="text-indigo-500" />}
+                </h2>
+                <p className="text-slate-500 text-sm mb-6">{teacher.role || 'Educator'}</p>
 
-                    {/* ✅ ELIGIBILITY BUTTON (ONLY ADDITION) */}
-               {/* ✅ ELIGIBILITY BUTTON (FULLY FUNCTIONAL) */}
-{!teacher.isEligible && (
-  <button
-    type="button"
-    onClick={handleMakeEligible}
-    className="ml-auto px-4 py-2 rounded-full text-sm font-semibold text-white bg-[lab(33_49.49_-85.39)] hover:opacity-90 transition shadow-sm"
-  >
-    Make Eligible
-  </button>
-)}
-
-
-                  </div>
-
-                  <p className="text-gray-600 text-sm flex items-center justify-center sm:justify-start gap-2 mt-1">
-                    <span className="flex items-center gap-1 text-yellow-600 font-semibold">
-                      {(studentStats.rating?.toFixed ? studentStats.rating.toFixed(1) : studentStats.rating) || 0}{' '}
-                      <Star className="w-4 h-4" />
-                    </span>
-                    <span className="text-gray-500">({studentStats.reviews} reviews)</span>
-                  </p>
-
-                  <div className="flex flex-wrap justify-center sm:justify-start gap-2 mt-2">
-                    <span className="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-700 font-medium text-xs rounded-full border border-indigo-100">
-                      Role: {teacher.role || '—'}
-                    </span>
-                    <span
-                      className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full border ${
-                        teacher.isEligible
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
-                          : 'bg-rose-50 text-rose-700 border-rose-100'
-                      }`}
-                    >
-                      {teacher.isEligible ? (
-                        <ShieldCheck className="w-4 h-4 mr-1" />
-                      ) : (
-                        <ShieldOff className="w-4 h-4 mr-1" />
-                      )}
-                      {teacher.isEligible ? 'Eligible' : 'Not Eligible'}
-                    </span>
-                    <span
-                      className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full border ${
-                        teacher.hasPaid
-                          ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
-                          : 'bg-gray-50 text-gray-600 border-gray-200'
-                      }`}
-                    >
-                      {teacher.hasPaid ? (
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                      ) : (
-                        <AlertCircle className="w-4 h-4 mr-1" />
-                      )}
-                      {teacher.hasPaid ? 'Paid' : 'Not Paid'}
-                    </span>
-                  </div>
-                </div>
-              </>
-            )}
-          </section>
-
-          {/* Recently Viewed Posts */}
-          <section className="bg-white/95 rounded-3xl border border-gray-100 shadow-sm ">
-            <div className="px-6 pt-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-indigo-700 bg-indigo-50 ring-1 ring-indigo-100">
-                <BookOpen className="w-4 h-4" />
-                <span className="text-sm font-medium">Recently Viewed Posts</span>
-              </div>
-            </div>
-            <div className="p-6">
-              {isLoading || hasError ? (
-                <div className="text-gray-500">—</div>
-              ) : (
-                <ViewedPostsTimeline />
-              )}
-            </div>
-          </section>
-
-          {/* Upcoming Sessions & Requests */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <section className="bg-white/95 rounded-3xl border border-gray-100 shadow-sm">
-              <div className="px-6 pt-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-indigo-700 bg-indigo-50 ring-1 ring-indigo-100">
-                  <CalendarClock className="w-4 h-4" />
-                  <span className="text-sm font-medium">Upcoming Sessions</span>
-                </div>
-              </div>
-
-              <div className="p-6">
-                {isLoading || hasError ? (
-                  <p className="text-gray-500 text-center py-6">—</p>
-                ) : upcomingSessions.length ? (
-                  upcomingSessions.map((session, i) => (
-                    <div
-                      key={i}
-                      className="p-3 mb-2 border border-gray-100 rounded-lg transition hover:bg-indigo-50/50 hover:border-indigo-200"
-                    >
-                      <h3 className="text-gray-900 font-medium truncate">{session.title}</h3>
-                      <p className="text-gray-500 text-sm">{session.date}</p>
-                      <p className="text-gray-500 text-sm">{session.time}</p>
+                <div className="w-full grid grid-cols-2 gap-3 mb-6">
+                  <div className={`p-3 rounded-2xl border text-center ${teacher.isEligible ? 'bg-indigo-50 border-indigo-100 text-indigo-700' : 'bg-red-50 border-red-100 text-red-700'}`}>
+                    <div className="text-xs font-bold uppercase mb-1">Status</div>
+                    <div className="font-bold text-sm flex items-center justify-center gap-1">
+                      {teacher.isEligible ? 'Verified' : 'Pending'}
                     </div>
-                  ))
-                ) : (
-                  <p className="text-gray-500 text-center py-6">No upcoming sessions scheduled.</p>
+                  </div>
+                  <div className={`p-3 rounded-2xl border text-center ${teacher.hasPaid ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-orange-50 border-orange-100 text-orange-700'}`}>
+                    <div className="text-xs font-bold uppercase mb-1">Payment</div>
+                    <div className="font-bold text-sm flex items-center justify-center gap-1">
+                      {teacher.hasPaid ? 'Active' : 'Unpaid'}
+                    </div>
+                  </div>
+                </div>
+
+                {!teacher.isEligible && (
+                  <button
+                    onClick={handleMakeEligible}
+                    className="w-full py-3 rounded-xl bg-slate-900 text-white font-bold text-sm hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/20"
+                  >
+                    Request Verification
+                  </button>
                 )}
               </div>
             </section>
 
-            <section className="bg-white/95 rounded-3xl border border-gray-100 shadow-sm">
-              <div className="px-6 pt-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-indigo-700 bg-indigo-50 ring-1 ring-indigo-100">
-                  <MailCheck className="w-4 h-4" />
-                  <span className="text-sm font-medium">Session Requests</span>
-                </div>
+            {/* Commission Info (Mini) */}
+            <section className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-6 text-white shadow-lg relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <CreditCard size={100} />
               </div>
-
-              <div className="p-6">
-                {isLoading || hasError ? (
-                  <p className="text-gray-500 text-center py-6">—</p>
-                ) : sessionRequests.length ? (
-                  sessionRequests.map((request, i) => (
-                    <div
-                      key={i}
-                      className="p-3 mb-2 border border-gray-100 rounded-lg transition hover:bg-indigo-50/60 hover:border-indigo-200"
-                    >
-                      <h3 className="text-gray-900 font-medium truncate">{request.studentName}</h3>
-                      <p className="text-gray-500 text-sm truncate">{request.topic}</p>
-                      <p className="text-gray-500 text-sm truncate">{request.status}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-gray-500 text-center py-6">No session requests at the moment.</p>
-                )}
+              <h3 className="font-bold text-lg mb-1">Commission Paid</h3>
+              <p className="text-indigo-200 text-sm mb-4">Total platform fees deducted</p>
+              <div className="text-3xl font-bold mb-2">
+                {currencyPrefix} {Number(commissionPaid || 0).toLocaleString()}
+              </div>
+              <div className="h-1.5 w-full bg-white/20 rounded-full overflow-hidden">
+                <div className="h-full bg-white/80 w-3/4 rounded-full"></div>
               </div>
             </section>
           </div>
-        </main>
+
+          {/* Right Column: Feeds & Lists */}
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* Recent Activity */}
+            <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                  <BookOpen size={18} className="text-indigo-500" /> Recent Activity
+                </h3>
+                <button className="p-2 hover:bg-white rounded-full transition-colors">
+                  <MoreHorizontal size={18} className="text-slate-400" />
+                </button>
+              </div>
+              <div className="p-6">
+                {/* Assuming Timeline is styled, wrapping it */}
+                <ViewedPostsTimeline />
+              </div>
+            </section>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Upcoming Sessions */}
+              <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                <div className="p-6 border-b border-slate-50 bg-slate-50/50">
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                    <CalendarClock size={18} className="text-blue-500" /> Scheduled
+                  </h3>
+                </div>
+                <div className="p-4 flex-1">
+                  {upcomingSessions.length ? (
+                    <div className="space-y-3">
+                      {upcomingSessions.map((session, i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center font-bold text-slate-700 shadow-sm text-xs">
+                            {session.date.split(' ')[0]}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-bold text-slate-900 text-sm truncate">{session.title}</h4>
+                            <p className="text-xs text-slate-500">{session.time}</p>
+                          </div>
+                          <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center py-8 opacity-60">
+                      <CalendarClock size={40} className="text-slate-300 mb-2" />
+                      <p className="text-sm text-slate-400">No upcoming sessions</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* Requests */}
+              <section className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                <div className="p-6 border-b border-slate-50 bg-slate-50/50">
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                    <MailCheck size={18} className="text-purple-500" /> New Requests
+                  </h3>
+                </div>
+                <div className="p-4 flex-1">
+                  {sessionRequests.length ? (
+                    <div className="space-y-3">
+                      {sessionRequests.map((request, i) => (
+                        <div key={i} className="group p-4 bg-slate-50 hover:bg-white rounded-2xl border border-slate-100 hover:shadow-md transition-all">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-bold text-slate-900 text-sm">{request.studentName}</h4>
+                              <p className="text-xs text-slate-500">{request.topic}</p>
+                            </div>
+                            <span className="text-[10px] font-bold uppercase bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full">{request.status}</span>
+                          </div>
+                          <button className="w-full mt-2 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                            Review Request
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center py-8 opacity-60">
+                      <MailCheck size={40} className="text-slate-300 mb-2" />
+                      <p className="text-sm text-slate-400">No pending requests</p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+
+          </div>
+        </div>
       </div>
     </div>
   );
