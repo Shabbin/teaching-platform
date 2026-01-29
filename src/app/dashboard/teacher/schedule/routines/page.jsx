@@ -216,7 +216,7 @@ function RequestsDrawer({ open, onClose, group }) {
         initial={{ x: '100%' }}
         animate={{ x: 0 }}
         exit={{ x: '100%' }}
-        className="relative h-full w-full max-w-2xl bg-white/70 backdrop-blur-3xl shadow-2xl border-l border-white flex flex-col"
+        className="relative h-full w-full max-w-2xl bg-white/80 backdrop-blur-md md:backdrop-blur-3xl shadow-2xl border-l border-white flex flex-col"
       >
         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
           <div>
@@ -268,10 +268,10 @@ function RequestsDrawer({ open, onClose, group }) {
                 return (
                   <motion.div
                     key={String(r._id)}
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="group border border-white bg-white/60 backdrop-blur-xl rounded-[2rem] p-6 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
+                    transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.1 }}
+                    className="group border border-white bg-white/60 backdrop-blur-md md:backdrop-blur-xl rounded-[2rem] p-6 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div>
@@ -540,16 +540,16 @@ function InviteModal({ open, onClose, group, allGroups }) {
               className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
+              initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { scale: 1, opacity: 1 } : { scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-3xl bg-white/70 backdrop-blur-3xl rounded-[3rem] shadow-2xl border border-white overflow-hidden flex flex-col max-h-[90vh]"
+              className="relative w-full max-w-3xl bg-white/80 backdrop-blur-md md:backdrop-blur-3xl rounded-[3rem] shadow-2xl border border-white overflow-hidden flex flex-col max-h-[90vh]"
             >
               {/* Header */}
               <div className="px-10 py-8 bg-slate-900 text-white relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 opacity-50"></div>
                 <div className="relative z-10 flex items-center gap-5">
-                  <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-xl grid place-items-center shadow-lg border border-white/10">
+                  <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-md md:backdrop-blur-xl grid place-items-center shadow-lg border border-white/10">
                     <UserPlus size={24} className="text-white" />
                   </div>
                   <div className="min-w-0">
@@ -1019,7 +1019,7 @@ function ChangeModal({ open, onClose, group, onSent, otherCourseSlots = [] }) {
               <div className="px-10 py-8 bg-slate-900 text-white relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 opacity-50"></div>
                 <div className="relative z-10 flex items-center gap-5">
-                  <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-xl grid place-items-center shadow-lg border border-white/10">
+                  <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-md md:backdrop-blur-xl grid place-items-center shadow-lg border border-white/10">
                     <RefreshCw size={24} className="text-white" />
                   </div>
                   <div className="min-w-0">
@@ -1370,7 +1370,7 @@ export default function TeacherRoutinesPage() {
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
           className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-purple-200/30 blur-[120px] rounded-full"
         />
-        <div className="absolute inset-0 bg-white/40 backdrop-blur-[100px]" />
+        <div className="absolute inset-0 bg-white/40 backdrop-blur-md md:backdrop-blur-[100px]" />
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
       </div>
 
@@ -1426,7 +1426,7 @@ export default function TeacherRoutinesPage() {
                   </div>
                 </div>
               ) : groups.length === 0 ? (
-                <div className="bg-white/40 backdrop-blur-xl rounded-[3rem] p-20 border border-white text-center shadow-2xl shadow-slate-200/50">
+                <div className="bg-white/40 backdrop-blur-md md:backdrop-blur-xl rounded-[3rem] p-20 border border-white text-center shadow-2xl shadow-slate-200/50">
                   <div className="w-20 h-20 rounded-full bg-slate-50 grid place-items-center mx-auto mb-8">
                     <BookOpen size={32} className="text-slate-300" />
                   </div>
@@ -1441,7 +1441,7 @@ export default function TeacherRoutinesPage() {
                   animate="show"
                   variants={{
                     hidden: { opacity: 0 },
-                    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+                    show: { opacity: 1, transition: { staggerChildren: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : 0.1 } }
                   }}
                   className="grid gap-8"
                 >
@@ -1452,7 +1452,7 @@ export default function TeacherRoutinesPage() {
                         hidden: { opacity: 0, y: 20 },
                         show: { opacity: 1, y: 0 }
                       }}
-                      className="group relative bg-white/60 backdrop-blur-2xl rounded-[3rem] p-8 border border-white shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500 hover:translate-y-[-4px]"
+                      className="group relative bg-white/60 backdrop-blur-md md:backdrop-blur-2xl rounded-[3rem] p-8 border border-white shadow-lg md:shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500 hover:translate-y-[-4px]"
                     >
                       <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
                         <div className="space-y-4">

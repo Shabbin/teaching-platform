@@ -42,7 +42,7 @@ export default function StudentTodayScheduleList() {
     return (
       <div className="space-y-4">
         {[1, 2].map(i => (
-          <div key={i} className="h-24 bg-white/40 backdrop-blur-xl rounded-[2rem] border border-white animate-pulse" />
+          <div key={i} className="h-24 bg-white/40 backdrop-blur-md md:backdrop-blur-xl rounded-[2rem] border border-white animate-pulse" />
         ))}
       </div>
     );
@@ -58,7 +58,7 @@ export default function StudentTodayScheduleList() {
 
   if (!todays.length) {
     return (
-      <div className="p-8 rounded-[2rem] bg-white/40 backdrop-blur-xl border border-white text-center">
+      <div className="p-8 rounded-[2rem] bg-white/40 backdrop-blur-md md:backdrop-blur-xl border border-white text-center">
         <div className="w-12 h-12 rounded-full bg-slate-50 grid place-items-center mx-auto mb-4">
           <Calendar size={20} className="text-slate-200" />
         </div>
@@ -72,10 +72,10 @@ export default function StudentTodayScheduleList() {
       {todays.map((s, idx) => (
         <motion.div
           key={s._id}
-          initial={{ opacity: 0, x: -10 }}
+          initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, x: 0 } : { opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: idx * 0.1 }}
-          className="group relative p-5 rounded-[2rem] bg-white/60 backdrop-blur-2xl border border-white shadow-lg shadow-indigo-100/20 hover:shadow-xl hover:shadow-indigo-200/30 transition-all duration-500"
+          transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.1 }}
+          className="group relative p-5 rounded-[2rem] bg-white/60 backdrop-blur-md md:backdrop-blur-2xl border border-white shadow-lg shadow-indigo-100/20 hover:shadow-xl hover:shadow-indigo-200/30 transition-all duration-500"
         >
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">

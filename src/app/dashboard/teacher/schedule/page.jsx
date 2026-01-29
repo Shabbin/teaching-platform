@@ -36,7 +36,7 @@ const StudentAvatar = ({ src, name, size = "w-16 h-16" }) => {
   const initials = name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
 
   return (
-    <div className={`${size} rounded-[1.25rem] bg-slate-100 border-2 border-white shadow-lg overflow-hidden flex items-center justify-center relative group-hover:scale-105 transition-transform duration-500`}>
+    <div className={`${size} rounded-[1.25rem] bg-slate-100 border-2 border-white shadow-sm md:shadow-lg overflow-hidden flex items-center justify-center relative group-hover:scale-105 transition-transform duration-500`}>
       {(!src || error) ? (
         <div className="w-full h-full bg-gradient-to-br from-indigo-50 to-slate-100 flex items-center justify-center">
           <span className="text-xs font-black text-indigo-300 tracking-tighter">{initials}</span>
@@ -93,7 +93,7 @@ const Sidebar = ({ onOpen, teacherName, teacherImage, mobileOpen, onClose }) => 
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="w-[280px] bg-white/40 backdrop-blur-3xl border-r border-white/50 p-6 flex flex-col flex-shrink-0 hidden md:flex relative z-20">
+      <aside className="w-[280px] bg-white/40 backdrop-blur-md md:backdrop-blur-3xl border-r border-white/50 p-6 flex flex-col flex-shrink-0 hidden md:flex relative z-20">
         <SidebarContent
           onOpen={onOpen}
           teacherName={teacherName}
@@ -112,7 +112,7 @@ const Sidebar = ({ onOpen, teacherName, teacherImage, mobileOpen, onClose }) => 
             initial={{ x: '-100%' }}
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
-            className="fixed inset-0 z-50 w-[260px] bg-white/95 backdrop-blur-sm p-6 flex flex-col border-r border-slate-200 md:hidden shadow-lg"
+            className="fixed inset-0 z-50 w-[260px] bg-white/95 backdrop-blur-md p-6 flex flex-col border-r border-slate-200 md:hidden shadow-lg"
           >
             <SidebarContent
               onOpen={onOpen}
@@ -197,10 +197,10 @@ const ClassOverview = ({ subjects }) => (
       {subjects.map(({ name, studentsCount }, idx) => (
         <motion.div
           key={name}
-          initial={{ opacity: 0, y: 20 }}
+          initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: idx * 0.1 }}
-          className="group relative bg-white/60 backdrop-blur-xl p-6 rounded-[2rem] border border-white shadow-xl shadow-indigo-100/20 hover:shadow-2xl hover:shadow-indigo-200/40 hover:-translate-y-1 transition-all duration-500"
+          transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.1 }}
+          className="group relative bg-white/60 backdrop-blur-md md:backdrop-blur-xl p-6 rounded-[2rem] border border-white shadow-xl shadow-indigo-100/20 hover:shadow-2xl hover:shadow-indigo-200/40 hover:-translate-y-1 transition-all duration-500"
         >
           <div className="absolute top-4 right-4 p-2 rounded-xl bg-indigo-50 text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
             <Sparkles size={14} />
@@ -247,7 +247,7 @@ const StudentList = ({ students, loading }) => (
         ))}
       </div>
     ) : students.length === 0 ? (
-      <div className="bg-white/40 backdrop-blur-xl rounded-[3rem] p-16 border border-white text-center shadow-2xl shadow-slate-200/50">
+      <div className="bg-white/40 backdrop-blur-md md:backdrop-blur-xl rounded-[3rem] p-16 border border-white text-center shadow-2xl shadow-slate-200/50">
         <div className="w-16 h-16 rounded-full bg-slate-50 grid place-items-center mx-auto mb-6">
           <Users size={24} className="text-slate-200" />
         </div>
@@ -258,9 +258,9 @@ const StudentList = ({ students, loading }) => (
         {students.map(({ id, name, img }, idx) => (
           <motion.div
             key={id}
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: idx * 0.03 }}
+            transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.03 }}
             className="flex flex-col items-center group"
           >
             <div className="relative mb-4">
@@ -322,10 +322,10 @@ function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
           {(announcements || []).map((item, i) => (
             <motion.div
               key={`ann-${i}`}
-              initial={{ opacity: 0, x: 20 }}
+              initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, x: 0 } : { opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="p-5 rounded-[1.5rem] bg-white/60 backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-purple-100 transition-all cursor-default"
+              transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : i * 0.1 }}
+              className="p-5 rounded-[1.5rem] bg-white/60 backdrop-blur-md md:backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-purple-100 transition-all cursor-default"
             >
               <div className="flex gap-3 mb-2">
                 <div className="w-1 h-8 bg-purple-500 rounded-full"></div>
@@ -362,10 +362,10 @@ function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
             {groupedToday.map((g, idx) => (
               <motion.div
                 key={`sched-${idx}-${g.date.getTime()}`}
-                initial={{ opacity: 0, y: 10 }}
+                initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.05 }}
-                className="group p-4 rounded-2xl bg-white/60 backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-indigo-100 transition-all cursor-default"
+                transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.05 }}
+                className="group p-4 rounded-2xl bg-white/60 backdrop-blur-md md:backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-indigo-100 transition-all cursor-default"
               >
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
@@ -403,7 +403,7 @@ function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
   return (
     <>
       {/* Desktop */}
-      <aside className="w-[320px] bg-white/40 backdrop-blur-3xl p-8 border-l border-white/50 flex-shrink-0 min-h-screen hidden md:block relative z-20 overflow-y-auto">
+      <aside className="w-[320px] bg-white/40 backdrop-blur-md md:backdrop-blur-3xl p-8 border-l border-white/50 flex-shrink-0 min-h-screen hidden md:block relative z-20 overflow-y-auto">
         <RightSidebarContent />
       </aside>
 
@@ -414,7 +414,7 @@ function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm p-6 border-t border-slate-200 md:hidden max-h-[80%] overflow-y-auto"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md p-6 border-t border-slate-200 md:hidden max-h-[80%] overflow-y-auto"
           >
             <button onClick={onClose} className="self-end mb-4 text-slate-700 font-bold focus:outline-none">
               ✕
@@ -512,16 +512,18 @@ export default function TeacherClassroom() {
   }, [client]);
 
   return (
-    <div className="flex w-full h-screen bg-slate-50 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      {/* Legendary Background (Light Edition) */}
+    <div className="flex w-full h-[100dvh] bg-slate-50 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
+      {/* Legendary Background (Light Edition) - Optimized for mobile */}
       <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 right-0 w-[1200px] h-[1200px] bg-indigo-500/5 blur-[180px] rounded-full animate-blob"></div>
-        <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-purple-500/5 blur-[150px] rounded-full animate-blob animation-delay-2000"></div>
+        <div className="hidden md:block">
+          <div className="absolute top-0 right-0 w-[1200px] h-[1200px] bg-indigo-500/5 blur-[180px] rounded-full animate-blob"></div>
+          <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-purple-500/5 blur-[150px] rounded-full animate-blob animation-delay-2000"></div>
+        </div>
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-multiply"></div>
       </div>
 
       {/* Mobile Buttons */}
-      <div className="md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-4 bg-white/70 backdrop-blur-3xl border border-white rounded-[2.5rem] shadow-2xl shadow-indigo-200/50">
+      <div className="md:hidden fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-4 bg-white/80 backdrop-blur-md border border-white rounded-[2.5rem] shadow-2xl shadow-indigo-200/50">
         <button
           id="mobile-hamburger-btn"
           className="p-4 rounded-2xl bg-slate-900 text-white shadow-xl shadow-slate-200 active:scale-95 transition-transform"
@@ -546,8 +548,15 @@ export default function TeacherClassroom() {
         onClose={() => setMobileSidebarOpen(false)}
       />
 
-      <main className="flex-1 overflow-y-auto relative z-10 custom-scrollbar">
-        <div className="w-full">
+      <main
+        className="flex-1 overflow-y-auto relative z-10 custom-scrollbar overscroll-contain touch-pan-y"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          willChange: 'transform',
+          transform: 'translateZ(0)'
+        }}
+      >
+        <div className="w-full transform-gpu">
           <MainArea />
         </div>
       </main>

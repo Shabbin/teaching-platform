@@ -80,7 +80,7 @@ export default function CreatePostWizard({
 
 
 
-  
+
   const defaultValues = {
     title: initialData?.title ?? "",
     description: initialData?.description ?? "",
@@ -105,7 +105,7 @@ export default function CreatePostWizard({
     // 🔑 keep values when a step unmounts
     shouldUnregister: false,
   });
-useEffect(() => {
+  useEffect(() => {
     methods.register("videoFile");
   }, [methods]);
   useEffect(() => {
@@ -305,7 +305,7 @@ useEffect(() => {
 
   const rightPanel = (
     <div className="relative">
-      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur px-6 md:px-10 pt-4">
+      <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-md px-6 md:px-10 pt-4">
         <ProgressSteps steps={steps} currentStep={step} />
       </div>
 
@@ -323,10 +323,10 @@ useEffect(() => {
           <AnimatePresence mode="wait">
             <motion.div
               key={step}
-              initial={{ opacity: 0, x: 60 }}
+              initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -60 }}
-              transition={{ duration: 0.25 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
               className="bg-white rounded-3xl shadow-sm border border-[color-mix(in_oklch,var(--brand)_10%,black)] p-6 md:p-8"
             >
               <CurrentStep

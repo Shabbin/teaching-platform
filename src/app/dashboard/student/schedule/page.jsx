@@ -173,7 +173,7 @@ function StudentSidebar({ studentName, studentImage }) {
   ];
 
   return (
-    <aside className="w-[280px] bg-white/40 backdrop-blur-3xl border-r border-white/50 p-6 flex flex-col flex-shrink-0 hidden md:flex relative z-20">
+    <aside className="w-[280px] bg-white/40 backdrop-blur-md md:backdrop-blur-3xl border-r border-white/50 p-6 flex flex-col flex-shrink-0 hidden md:flex relative z-20">
       <div className="text-center mb-8 relative">
         <div className="absolute inset-0 bg-indigo-500/10 blur-2xl rounded-full scale-150"></div>
         <div className="relative">
@@ -253,9 +253,9 @@ function Agreements({
           return (
             <motion.div
               key={s._id}
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white/60 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white shadow-xl shadow-slate-200/30 group hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
+              className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white shadow-lg md:shadow-xl shadow-slate-200/30 group hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -305,9 +305,9 @@ function Agreements({
           return (
             <motion.div
               key={r._id}
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white/60 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white shadow-xl shadow-slate-200/30 group hover:shadow-2xl hover:shadow-purple-100/50 transition-all duration-500"
+              className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white shadow-lg md:shadow-xl shadow-slate-200/30 group hover:shadow-2xl hover:shadow-purple-100/50 transition-all duration-500"
             >
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -385,9 +385,9 @@ function EnrollmentInvites({ invites, actingId, onPayInvite, onDecline }) {
           return (
             <motion.div
               key={inv._id}
-              initial={{ opacity: 0, y: 10 }}
+              initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white/60 backdrop-blur-2xl p-8 rounded-[3rem] border border-white shadow-xl shadow-indigo-100/20 relative overflow-hidden group"
+              className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl p-8 rounded-[3rem] border border-white shadow-lg md:shadow-xl shadow-indigo-100/20 relative overflow-hidden group"
             >
               <div className="absolute -top-10 -right-10 p-4 opacity-5 group-hover:scale-110 transition-transform duration-700">
                 <GraduationCap size={180} className="text-indigo-600" />
@@ -467,9 +467,9 @@ function RequestsInbox({ requests, onRespond }) {
         {requests.map((r) => (
           <motion.div
             key={r._id}
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="group p-6 bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border border-white shadow-xl shadow-slate-200/30 hover:shadow-2xl hover:shadow-purple-100/50 transition-all duration-500"
+            className="group p-6 bg-white/60 backdrop-blur-md md:backdrop-blur-2xl rounded-[2.5rem] border border-white shadow-lg md:shadow-xl shadow-slate-200/30 hover:shadow-2xl hover:shadow-purple-100/50 transition-all duration-500"
           >
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
@@ -555,9 +555,9 @@ function RoutineList({ routines, meId, onConsent }) {
           return (
             <motion.div
               key={r._id}
-              initial={{ opacity: 0, y: 10 }}
+              initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="group bg-white/60 backdrop-blur-2xl p-8 rounded-[3rem] border border-white shadow-xl shadow-slate-200/30 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
+              className="group bg-white/60 backdrop-blur-md md:backdrop-blur-2xl p-8 rounded-[3rem] border border-white shadow-lg md:shadow-xl shadow-slate-200/30 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
             >
               <div className="flex items-center gap-5 mb-8">
                 <div className="relative">
@@ -673,14 +673,14 @@ function TeacherSections({ teachers, onPay }) {
                 type: 'spring',
                 stiffness: 260,
                 damping: 20,
-                delay: idx * 0.08
+                delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.08
               }}
               className="group relative"
             >
               {/* Card Glow Effect */}
               <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-[3.5rem] blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
 
-              <div className="relative bg-white/70 backdrop-blur-3xl rounded-[3rem] border border-white/80 shadow-2xl shadow-slate-200/50 hover:shadow-indigo-500/10 transition-all duration-500 overflow-hidden">
+              <div className="relative bg-white/70 backdrop-blur-md md:backdrop-blur-3xl rounded-[3rem] border border-white/80 shadow-lg md:shadow-2xl shadow-slate-200/50 hover:shadow-indigo-500/10 transition-all duration-500 overflow-hidden">
                 {/* Decorative background element */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-indigo-500/10 transition-colors"></div>
 
@@ -693,7 +693,7 @@ function TeacherSections({ teachers, onPay }) {
                         <img
                           src={getImageUrl(t.avatar)}
                           alt={t.name}
-                          className="w-20 h-20 rounded-[1.8rem] object-cover"
+                          className="w-20 h-20 rounded-[1.8rem] object-cover shadow-sm"
                         />
                       </div>
                       <div className="absolute -bottom-2 -right-2 p-1.5 bg-emerald-500 rounded-2xl border-4 border-white shadow-lg z-20">
@@ -757,7 +757,7 @@ function TeacherSections({ teachers, onPay }) {
                           initial={{ opacity: 0, y: 20, scale: 0.9 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                          className="absolute bottom-full left-0 right-0 mb-6 p-6 bg-white/95 backdrop-blur-3xl rounded-[2.5rem] border border-slate-100 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] z-30"
+                          className="absolute bottom-full left-0 right-0 mb-6 p-6 bg-white/95 backdrop-blur-md md:backdrop-blur-3xl rounded-[2.5rem] border border-slate-100 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] z-30"
                         >
                           <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 text-center">Payment Directory</div>
                           <div className="space-y-3">
@@ -827,7 +827,7 @@ function RightSidebar({ teachers }) {
   }, [teachers]);
 
   return (
-    <aside className="w-[320px] bg-white/40 backdrop-blur-3xl p-8 border-l border-white/50 flex-shrink-0 min-h-screen hidden md:block relative z-20 overflow-y-auto">
+    <aside className="w-[320px] bg-white/40 backdrop-blur-md md:backdrop-blur-3xl p-8 border-l border-white/50 flex-shrink-0 min-h-screen hidden md:block relative z-20 overflow-y-auto">
       <div className="flex flex-col h-full space-y-8">
         {/* Announcements */}
         <div className="relative">
@@ -1253,90 +1253,101 @@ export default function StudentSchedulePage() {
 
 
   return (
-    <div className="flex w-full h-screen bg-slate-50 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="flex w-full h-[100dvh] bg-slate-50 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
       {/* Legendary Background (Light Edition) */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      <div className="fixed inset-0 pointer-events-none z-0 hidden md:block">
         <div className="absolute top-0 right-0 w-[1200px] h-[1200px] bg-indigo-500/5 blur-[180px] rounded-full animate-blob"></div>
         <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-purple-500/5 blur-[150px] rounded-full animate-blob animation-delay-2000"></div>
+      </div>
+      <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-multiply"></div>
       </div>
 
       <StudentSidebar studentName={studentName} studentImage={studentImage} />
 
-      <main className="flex-1 overflow-y-auto relative z-10 custom-scrollbar">
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-12">
+      <main
+        className="flex-1 overflow-y-auto relative z-10 custom-scrollbar overscroll-contain touch-pan-y"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          willChange: 'transform',
+          transform: 'translateZ(0)'
+        }}
+      >
+        <div className="w-full transform-gpu">
+          <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-12">
 
-          {/* Today's Schedule Feed */}
-          <StudentScheduleList
-            schedules={schedules}
-            loading={initialLoading}
-            error={error}
-            onRefresh={() => fetchSchedules({ silent: true })}
-          />
+            {/* Today's Schedule Feed */}
+            <StudentScheduleList
+              schedules={schedules}
+              loading={initialLoading}
+              error={error}
+              onRefresh={() => fetchSchedules({ silent: true })}
+            />
 
-          <Agreements
-            pendingSchedules={pendingSchedules}
-            pendingRoutines={pendingRoutines}
-            onAcceptSchedule={onAcceptSchedule}
-            onRejectSchedule={onRejectSchedule}
-            onAcceptRoutine={onAcceptRoutine}
-            onRejectRoutine={onRejectRoutine}
-            busyScheduleIds={busyScheduleIds}
-            busyRoutineIds={busyRoutineIds}
-            conflictMsg={conflictMsg}
-          />
+            <Agreements
+              pendingSchedules={pendingSchedules}
+              pendingRoutines={pendingRoutines}
+              onAcceptSchedule={onAcceptSchedule}
+              onRejectSchedule={onRejectSchedule}
+              onAcceptRoutine={onAcceptRoutine}
+              onRejectRoutine={onRejectRoutine}
+              busyScheduleIds={busyScheduleIds}
+              busyRoutineIds={busyRoutineIds}
+              conflictMsg={conflictMsg}
+            />
 
-          <EnrollmentInvites
-            invites={enrollmentInvites}
-            actingId={actingInviteId}
-            onPayInvite={onPayInvite}
-            onDecline={onDeclineInvite}
-          />
+            <EnrollmentInvites
+              invites={enrollmentInvites}
+              actingId={actingInviteId}
+              onPayInvite={onPayInvite}
+              onDecline={onDeclineInvite}
+            />
 
-          <RequestsInbox
-            requests={incoming}
-            onRespond={onRespondChange}
-          />
+            <RequestsInbox
+              requests={incoming}
+              onRespond={onRespondChange}
+            />
 
-          <RoutineList
-            routines={routines}
-            meId={userId}
-            onConsent={onConsent}
-          />
+            <RoutineList
+              routines={routines}
+              meId={userId}
+              onConsent={onConsent}
+            />
 
-          {/* Connected Teachers Grid */}
-          <section>
-            <div className="mb-10 px-2 flex flex-col items-start gap-4">
-              <h2 className="text-4xl font-black text-slate-900 tracking-tighter">My Educators</h2>
-              <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-200 border border-indigo-500 group hover:scale-[1.03] transition-all duration-500 cursor-default">
-                <div className="p-1.5 rounded-lg bg-white/20 shadow-inner">
-                  <Users size={16} className="text-white fill-white/20" />
+            {/* Connected Teachers Grid */}
+            <section>
+              <div className="mb-10 px-2 flex flex-col items-start gap-4">
+                <h2 className="text-4xl font-black text-slate-900 tracking-tighter">My Educators</h2>
+                <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-200 border border-indigo-500 group hover:scale-[1.03] transition-all duration-500 cursor-default">
+                  <div className="p-1.5 rounded-lg bg-white/20 shadow-inner">
+                    <Users size={16} className="text-white fill-white/20" />
+                  </div>
+                  <span className="text-[11px] font-black uppercase tracking-[0.2em]">{teachers.length} Connected Teachers</span>
                 </div>
-                <span className="text-[11px] font-black uppercase tracking-[0.2em]">{teachers.length} Connected Teachers</span>
               </div>
-            </div>
 
-            {initialLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="animate-pulse bg-white/40 h-64 rounded-[2rem] border border-white" />
-                ))}
-              </div>
-            ) : error ? (
-              <div className="bg-rose-50/50 p-8 rounded-[2rem] border border-rose-100 text-rose-600 font-black uppercase tracking-tight text-xs">
-                {error}
-              </div>
-            ) : teachers.length === 0 ? (
-              <div className="bg-white/40 backdrop-blur-xl rounded-[3rem] p-16 border border-white text-center shadow-2xl shadow-slate-200/50">
-                <div className="w-16 h-16 rounded-full bg-slate-50 grid place-items-center mx-auto mb-6">
-                  <BookOpen size={24} className="text-slate-200" />
+              {initialLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="animate-pulse bg-white/40 h-64 rounded-[2rem] border border-white" />
+                  ))}
                 </div>
-                <p className="text-sm font-black text-slate-400 uppercase tracking-tighter">No classes yet. You’ll see them here when teachers schedule.</p>
-              </div>
-            ) : (
-              <TeacherSections teachers={teachers} onPay={onPay} />
-            )}
-          </section>
+              ) : error ? (
+                <div className="bg-rose-50/50 p-8 rounded-[2rem] border border-rose-100 text-rose-600 font-black uppercase tracking-tight text-xs">
+                  {error}
+                </div>
+              ) : teachers.length === 0 ? (
+                <div className="bg-white/40 backdrop-blur-xl rounded-[3rem] p-16 border border-white text-center shadow-2xl shadow-slate-200/50">
+                  <div className="w-16 h-16 rounded-full bg-slate-50 grid place-items-center mx-auto mb-6">
+                    <BookOpen size={24} className="text-slate-200" />
+                  </div>
+                  <p className="text-sm font-black text-slate-400 uppercase tracking-tighter">No classes yet. You’ll see them here when teachers schedule.</p>
+                </div>
+              ) : (
+                <TeacherSections teachers={teachers} onPay={onPay} />
+              )}
+            </section>
+          </div>
         </div>
       </main>
 
@@ -1364,6 +1375,6 @@ export default function StudentSchedulePage() {
           background: rgba(0, 0, 0, 0.1);
         }
       `}</style>
-    </div>
+    </div >
   );
 }

@@ -73,10 +73,12 @@ export default function RequestsPage() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-slate-950 px-6 py-12 md:py-20">
-      {/* Legendary Background */}
+      {/* Legendary Background - Optimized for mobile */}
       <div className="fixed inset-0 pointer-events-none">
-        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-600/10 blur-[150px] rounded-full animate-pulse transition-opacity duration-1000"></div>
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-600/10 blur-[120px] rounded-full animate-blob animation-delay-2000"></div>
+        <div className="hidden md:block">
+          <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-indigo-600/10 blur-[150px] rounded-full animate-pulse transition-opacity duration-1000"></div>
+          <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-600/10 blur-[120px] rounded-full animate-blob animation-delay-2000"></div>
+        </div>
         <div className="absolute top-1/2 left-1/3 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-overlay"></div>
       </div>
 
@@ -120,7 +122,7 @@ export default function RequestsPage() {
             <p className="text-rose-400 font-medium">{error}</p>
           </div>
         ) : requests.length === 0 ? (
-          <div className="bg-white/[0.03] backdrop-blur-3xl border border-white/10 p-20 rounded-[3rem] text-center">
+          <div className="bg-white/[0.03] backdrop-blur-md md:backdrop-blur-3xl border border-white/10 p-12 md:p-20 rounded-[3rem] text-center">
             <MailCheck className="mx-auto text-slate-700 mb-6" size={64} />
             <p className="text-white font-black text-2xl mb-2">No Requests Yet</p>
             <p className="text-slate-500 font-medium max-w-xs mx-auto">When students inquire about your courses, they'll appear right here.</p>
@@ -143,7 +145,7 @@ export default function RequestsPage() {
                     hidden: { opacity: 0, y: 20, scale: 0.98 },
                     visible: { opacity: 1, y: 0, scale: 1 }
                   }}
-                  className="group relative bg-white/[0.03] backdrop-blur-2xl border border-white/5 hover:border-indigo-500/30 rounded-[2.5rem] p-8 transition-all duration-500 overflow-hidden"
+                  className="group relative bg-white/[0.03] backdrop-blur-md md:backdrop-blur-2xl border border-white/5 hover:border-indigo-500/30 rounded-[2.5rem] p-6 md:p-8 transition-all duration-500 overflow-hidden"
                 >
                   <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-indigo-500 to-purple-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
@@ -176,7 +178,7 @@ export default function RequestsPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       {req.status === 'pending' && (
                         <>
                           <button

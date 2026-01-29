@@ -114,7 +114,7 @@ function StudentSidebar({ studentName, studentImage }) {
   ];
 
   return (
-    <aside className="w-[280px] bg-white/40 backdrop-blur-3xl border-r border-white/50 p-6 flex flex-col flex-shrink-0 hidden md:flex relative z-20">
+    <aside className="w-[280px] bg-white/40 backdrop-blur-md md:backdrop-blur-3xl border-r border-white/50 p-6 flex flex-col flex-shrink-0 hidden md:flex relative z-20">
       <div className="text-center mb-8 relative">
         <div className="absolute inset-0 bg-indigo-500/10 blur-2xl rounded-full scale-150"></div>
         <div className="relative">
@@ -175,10 +175,10 @@ function RoutineList({ routines }) {
         {routines.map((r, idx) => (
           <motion.div
             key={r._id}
-            initial={{ opacity: 0, y: 20 }}
+            initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="group relative bg-white/60 backdrop-blur-3xl rounded-[2.5rem] border border-white shadow-xl shadow-slate-200/40 p-8 overflow-hidden"
+            transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.1 }}
+            className="group relative bg-white/60 backdrop-blur-md md:backdrop-blur-3xl rounded-[2.5rem] border border-white shadow-lg md:shadow-xl shadow-slate-200/40 p-8 overflow-hidden"
           >
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-purple-500/10 transition-colors"></div>
 
@@ -261,13 +261,13 @@ function TeacherSections({ teachers, onPay }) {
                 type: 'spring',
                 stiffness: 260,
                 damping: 20,
-                delay: idx * 0.08
+                delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.08
               }}
               className="group relative"
             >
               <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-[3.5rem] blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
 
-              <div className="relative bg-white/70 backdrop-blur-3xl rounded-[3rem] border border-white/80 shadow-2xl shadow-slate-200/50 hover:shadow-indigo-500/10 transition-all duration-500 overflow-hidden">
+              <div className="relative bg-white/70 backdrop-blur-md md:backdrop-blur-3xl rounded-[3rem] border border-white/80 shadow-lg md:shadow-2xl shadow-slate-200/50 hover:shadow-indigo-500/10 transition-all duration-500 overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-indigo-500/10 transition-colors"></div>
 
                 <div className="p-8">
@@ -340,7 +340,7 @@ function TeacherSections({ teachers, onPay }) {
                           initial={{ opacity: 0, y: 20, scale: 0.9 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                          className="absolute bottom-full left-0 right-0 mb-6 p-6 bg-white/95 backdrop-blur-3xl rounded-[2.5rem] border border-slate-100 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] z-30"
+                          className="absolute bottom-full left-0 right-0 mb-6 p-6 bg-white/95 backdrop-blur-md md:backdrop-blur-3xl rounded-[2.5rem] border border-slate-100 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] z-30"
                         >
                           <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 text-center">Payment Directory</div>
                           <div className="space-y-3">
@@ -409,7 +409,7 @@ function RightSidebar({ teachers }) {
   }, [teachers]);
 
   return (
-    <aside className="w-[320px] bg-white/40 backdrop-blur-3xl p-8 border-l border-white/50 flex-shrink-0 min-h-screen hidden md:block relative z-20 overflow-y-auto">
+    <aside className="w-[320px] bg-white/40 backdrop-blur-md md:backdrop-blur-3xl p-8 border-l border-white/50 flex-shrink-0 min-h-screen hidden md:block relative z-20 overflow-y-auto">
       <div className="flex flex-col h-full space-y-8">
         <div className="relative">
           <div className="flex items-center gap-3 mb-6">
@@ -419,7 +419,7 @@ function RightSidebar({ teachers }) {
             <h3 className="text-base font-black text-slate-900 tracking-tight">Broadcasts</h3>
           </div>
           <div className="space-y-4">
-            <div className="p-5 rounded-[1.5rem] bg-white/60 backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-purple-100 transition-all pointer-events-none">
+            <div className="p-5 rounded-[1.5rem] bg-white/60 backdrop-blur-md md:backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-purple-100 transition-all pointer-events-none">
               <div className="flex gap-3 mb-2">
                 <div className="w-1 h-8 bg-purple-500 rounded-full"></div>
                 <p className="text-xs font-bold text-slate-600 leading-relaxed uppercase tracking-tight">Real-time sync active. Routines update instantly as teachers modify them.</p>
@@ -449,7 +449,7 @@ function RightSidebar({ teachers }) {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="group p-4 rounded-2xl bg-white/60 backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-indigo-100 transition-all"
+                  className="group p-4 rounded-2xl bg-white/60 backdrop-blur-md md:backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-indigo-100 transition-all"
                 >
                   <div className="flex items-center justify-between">
                     <div className="min-w-0">
@@ -544,45 +544,56 @@ export default function StudentScheduleRoutinesPage() {
   };
 
   return (
-    <div className="flex w-full h-screen bg-slate-50 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="flex w-full h-[100dvh] bg-slate-50 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
       {/* Legendary Background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      <div className="fixed inset-0 pointer-events-none z-0 hidden md:block">
         <div className="absolute top-0 right-0 w-[1200px] h-[1200px] bg-purple-500/5 blur-[180px] rounded-full animate-blob"></div>
         <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-indigo-500/5 blur-[150px] rounded-full animate-blob animation-delay-2000"></div>
+      </div>
+      <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-multiply"></div>
       </div>
 
       <StudentSidebar studentName={studentName} studentImage={studentImage} />
 
-      <main className="flex-1 overflow-y-auto relative z-10 custom-scrollbar">
-        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-16">
-          <RoutineList routines={routines} />
+      <main
+        className="flex-1 overflow-y-auto relative z-10 custom-scrollbar overscroll-contain touch-pan-y"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          willChange: 'transform',
+          transform: 'translateZ(0)'
+        }}
+      >
+        <div className="w-full transform-gpu">
+          <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-16">
+            <RoutineList routines={routines} />
 
-          <section>
-            <div className="mb-10 px-2 flex flex-col items-start gap-4">
-              <h2 className="text-4xl font-black text-slate-900 tracking-tighter">My Educators</h2>
-              <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-200 border border-indigo-500 group hover:scale-[1.03] transition-all duration-500 cursor-default">
-                <div className="p-1.5 rounded-lg bg-white/20 shadow-inner">
-                  <Users size={16} className="text-white fill-white/20" />
+            <section>
+              <div className="mb-10 px-2 flex flex-col items-start gap-4">
+                <h2 className="text-4xl font-black text-slate-900 tracking-tighter">My Educators</h2>
+                <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-200 border border-indigo-500 group hover:scale-[1.03] transition-all duration-500 cursor-default">
+                  <div className="p-1.5 rounded-lg bg-white/20 shadow-inner">
+                    <Users size={16} className="text-white fill-white/20" />
+                  </div>
+                  <span className="text-[11px] font-black uppercase tracking-[0.2em]">{teachers.length} Connected Teachers</span>
                 </div>
-                <span className="text-[11px] font-black uppercase tracking-[0.2em]">{teachers.length} Connected Teachers</span>
               </div>
-            </div>
 
-            {loading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="animate-pulse bg-white/40 h-64 rounded-[3rem] border border-white" />
-                ))}
-              </div>
-            ) : error ? (
-              <div className="bg-rose-50/50 p-8 rounded-[3rem] text-rose-600 font-black uppercase text-xs">
-                {error}
-              </div>
-            ) : (
-              <TeacherSections teachers={teachers} onPay={onPay} />
-            )}
-          </section>
+              {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="animate-pulse bg-white/40 h-64 rounded-[3rem] border border-white" />
+                  ))}
+                </div>
+              ) : error ? (
+                <div className="bg-rose-50/50 p-8 rounded-[3rem] text-rose-600 font-black uppercase text-xs">
+                  {error}
+                </div>
+              ) : (
+                <TeacherSections teachers={teachers} onPay={onPay} />
+              )}
+            </section>
+          </div>
         </div>
       </main>
 
@@ -603,6 +614,6 @@ export default function StudentScheduleRoutinesPage() {
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.05); border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.1); }
       `}</style>
-    </div>
+    </div >
   );
 }
