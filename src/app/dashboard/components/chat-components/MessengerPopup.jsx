@@ -1,7 +1,7 @@
 // src/app/dashboard/components/notificationComponent/MessengerPopup.jsx
 'use client';
 
-import { useEffect, useMemo, useCallback, useRef, useState } from 'react';
+import { useEffect, useMemo, useCallback, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
 import {
@@ -24,7 +24,7 @@ import { FiMessageCircle } from 'react-icons/fi';
 import API from '../../../../api/axios';
 import MiniChatWindow from './miniChatWindow';
 
-export default function MessengerPopup({ role: propRole }) {
+const MessengerPopup = forwardRef(function MessengerPopup({ role: propRole }, ref) {
   const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
@@ -46,6 +46,13 @@ export default function MessengerPopup({ role: propRole }) {
 
   // mini chat windows
   const [miniChats, setMiniChats] = useState([]); // [{ threadId, chat }]
+
+  // Expose close method to parent via ref
+  useImperativeHandle(ref, () => ({
+    close: () => {
+      setOpen(false);
+    }
+  }), []);
 
   const openMiniChat = useCallback((chat) => {
     const tid = chat?.threadId || chat?._id || chat?.requestId;
@@ -365,9 +372,8 @@ export default function MessengerPopup({ role: propRole }) {
                       />
                       <span
                         title={isOnline(chat) ? 'Online' : 'Offline'}
-                        className={`absolute bottom-0 right-0 block w-3 h-3 rounded-full ring-2 ring-white ${
-                          isOnline(chat) ? 'bg-green-500' : 'bg-gray-400'
-                        }`}
+                        className={`absolute bottom-0 right-0 block w-3 h-3 rounded-full ring-2 ring-white ${isOnline(chat) ? 'bg-green-500' : 'bg-gray-400'
+                          }`}
                       />
                     </div>
 
@@ -383,9 +389,8 @@ export default function MessengerPopup({ role: propRole }) {
                         )}
                       </div>
                       <p
-                        className={`text-sm truncate ${
-                          chat.unreadCount > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'
-                        }`}
+                        className={`text-sm truncate ${chat.unreadCount > 0 ? 'font-semibold text-gray-900' : 'text-gray-600'
+                          }`}
                       >
                         {chat.lastMessage ||
                           (chat.status === 'pending' ? 'Pending approval…' : 'No messages yet')}
@@ -393,13 +398,12 @@ export default function MessengerPopup({ role: propRole }) {
                     </div>
 
                     <div
-                      className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${
-                        chat.status === 'approved'
-                          ? 'bg-green-100 text-green-800'
-                          : chat.status === 'rejected'
+                      className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${chat.status === 'approved'
+                        ? 'bg-green-100 text-green-800'
+                        : chat.status === 'rejected'
                           ? 'bg-red-100 text-red-800'
                           : 'bg-yellow-100 text-yellow-800'
-                      }`}
+                        }`}
                     >
                       {chat.status}
                     </div>
@@ -439,4 +443,6 @@ export default function MessengerPopup({ role: propRole }) {
       ))}
     </div>
   );
-}
+});
+
+export default MessengerPopup;
