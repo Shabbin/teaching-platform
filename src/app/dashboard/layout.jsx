@@ -21,8 +21,17 @@ import {
 import MessengerPopup from './components/chat-components/MessengerPopup';
 import NotificationBellIcon from './components/notificationComponent/NotificationBellIcon';
 import API from '../../api/axios';
+import DashboardProviders from './DashboardProviders';
 
 export default function DashboardLayout({ children }) {
+  return (
+    <DashboardProviders>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </DashboardProviders>
+  );
+}
+
+function DashboardLayoutInner({ children }) {
   const router = useRouter();
   const dispatch = useDispatch();
   const dropdownRef = useRef(null);
@@ -128,7 +137,7 @@ export default function DashboardLayout({ children }) {
       {/* Header Container */}
       <header
         className={`
-          flex items-center justify-between z-40 h-20 md:h-24 lg:h-24 relative flex-shrink-0
+          flex items-center justify-between z-40 h-20 relative flex-shrink-0 overflow-visible
           transition-all duration-500 ease-out
         `}
       >
@@ -143,16 +152,18 @@ export default function DashboardLayout({ children }) {
           `}
         />
 
-        {/* Left: Logo with glow */}
-        <div className="px-6 flex items-center justify-between w-full h-full">
-          <Link href={logoLink} className="flex items-center gap-2 group">
-            <div className="relative">
+        {/* Left: Logo with glow and overflow behavior matching page.tsx */}
+        <div className="px-6 flex items-center justify-between w-full h-full relative overflow-visible">
+          <Link href={logoLink} className="flex items-center relative z-50 group overflow-visible">
+            <div className="relative flex items-center justify-center overflow-visible">
+              {/* Glow behind logo */}
+              <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-0 group-hover:opacity-30 transition-opacity rounded-full" />
+              {/* Actual logo */}
               <img
                 src="/logo.png"
                 alt="Logo"
-                className="h-12 sm:h-20 w-auto object-contain cursor-pointer transition-all duration-300 transform scale-125 translate-x-2 group-hover:scale-[1.35] group-hover:drop-shadow-xl"
+                className="h-32 md:h-44 w-auto relative z-10 cursor-pointer object-contain"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full blur-2xl opacity-0 group-hover:opacity-20 transition-opacity duration-500"></div>
             </div>
           </Link>
 

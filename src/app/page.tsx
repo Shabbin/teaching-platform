@@ -34,19 +34,22 @@ export default function HomePage() {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5 }}
-        className={`fixed w-full top-0 left-0 z-50 transition-all duration-300 ${scrolled
-            ? "bg-white/80 backdrop-blur-xl border-b border-slate-200 shadow-sm py-3"
-            : "bg-transparent py-5"
+        className={`fixed w-full top-0 left-0 z-50 transition-all duration-300 h-20 ${scrolled
+            ? "bg-white/80 backdrop-blur-xl border-b border-slate-200 shadow-sm"
+            : "bg-transparent"
           }`}
       >
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="relative">
-              <div className="absolute inset-0 bg-indigo-500 blur-lg opacity-20 group-hover:opacity-40 transition-opacity rounded-full" />
+        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center h-full relative overflow-visible">
+          {/* Logo */}
+          <Link href="/" className="flex items-center relative z-10 group overflow-visible">
+            <div className="relative flex items-center justify-center overflow-visible">
+              {/* Glow behind logo */}
+              <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-30 group-hover:opacity-50 transition-opacity rounded-full" />
+              {/* Actual logo */}
               <img
                 src="/logo.png"
                 alt="Logo"
-                className="h-12 w-auto relative z-10"
+                className="h-32 md:h-44 w-auto relative z-10"
               />
             </div>
           </Link>
@@ -57,7 +60,9 @@ export default function HomePage() {
               <Link
                 key={link.name}
                 href={link.href}
-                className={`text-sm font-semibold tracking-wide transition-colors relative group ${scrolled || mobileMenuOpen ? "text-slate-600 hover:text-indigo-600" : "text-white/90 hover:text-white"
+                className={`text-sm font-semibold tracking-wide transition-colors relative group ${scrolled || mobileMenuOpen
+                    ? "text-slate-600 hover:text-indigo-600"
+                    : "text-white/90 hover:text-white"
                   }`}
               >
                 {link.name}
@@ -66,7 +71,9 @@ export default function HomePage() {
             ))}
             <Link
               href="/register"
-              className={`px-5 py-2.5 rounded-full text-sm font-bold text-white transition-all transform hover:scale-105 hover:shadow-lg ${scrolled ? "bg-slate-900 hover:bg-slate-800" : "bg-white/20 backdrop-blur-md border border-white/30 hover:bg-white/30"
+              className={`px-5 py-2.5 rounded-full text-sm font-bold text-white transition-all transform hover:scale-105 hover:shadow-lg ${scrolled
+                  ? "bg-slate-900 hover:bg-slate-800"
+                  : "bg-white/20 backdrop-blur-md border border-white/30 hover:bg-white/30"
                 }`}
             >
               Get Started

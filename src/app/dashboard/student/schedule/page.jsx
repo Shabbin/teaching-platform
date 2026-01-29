@@ -1,15 +1,24 @@
 // src/app/dashboard/student/schedule/page.jsx
 'use client';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useRouter, usePathname } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  Users, Calendar, Bell, Settings, LogOut,
+  ChevronRight, Search, Plus, Filter,
+  BookOpen, Clock, AlertCircle, Sparkles,
+  Layout, Grid, List, CheckCircle2,
+  CalendarDays, Megaphone, User, GraduationCap,
+  ShieldCheck, RefreshCw, Mail, ArrowRight,
+  MoreHorizontal, CreditCard
+} from 'lucide-react';
+
 import API from '../../../../api/axios';
 import useSocket from '../../../hooks/useSocket';
+import { useQueryClient } from '@tanstack/react-query';
 
-// 🔌 React Query provider (fixes: No QueryClient set)
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-// ✅ integrate the student list component
+// ✅ Component imports
 import StudentScheduleList from '../components/studentScheduleList';
 
 // ✅ routines APIs
@@ -40,10 +49,10 @@ import { startInvitePayment, startTuition } from '../../../../api/payments';
 const brand = 'oklch(0.49 0.25 277)';
 
 const getImageUrl = (img) => {
-  if (!img) return '/default-avatar.png';
+  if (!img || String(img).trim() === '') return null;
   const s = String(img);
-  if (s.startsWith('http') || s.startsWith('data:')) return s;
-  return `${process.env.NEXT_PUBLIC_API_BASE_URL}/${s}`;
+  if (s.startsWith('http')) return s;
+  return `${process.env.NEXT_PUBLIC_API_BASE_URL}/${s.startsWith('/') ? s.slice(1) : s}`;
 };
 
 const formatDhaka = (iso) => {
@@ -149,45 +158,56 @@ function StudentSidebar({ studentName, studentImage }) {
     pathname === path || (path !== '/' && pathname?.startsWith(path));
 
   const itemClass = (active) =>
-    `rounded-lg px-3 py-2 text-sm text-left transition border ${
-      active
-        ? 'bg-slate-900 text-white border-slate-900'
-        : 'text-slate-700 bg-white/0 hover:bg-slate-50 border-transparent hover:border-slate-200'
+    `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold transition-all duration-300 border ${active
+      ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-200 scale-[1.02]'
+      : 'text-slate-500 bg-transparent border-transparent hover:bg-white hover:border-slate-100 hover:text-slate-900'
     }`;
 
+  const navItems = [
+    { label: 'My Schedule', path: '/dashboard/student/schedule', icon: <CalendarDays size={18} /> },
+    { label: 'Regular Routine', path: '/dashboard/student/schedule/routines', icon: <RefreshCw size={18} /> },
+    { label: 'My Courses', path: '/dashboard/student/courses', icon: <BookOpen size={18} /> },
+    { label: 'Find Teachers', path: '/dashboard/student/find-teachers', icon: <Search size={18} /> },
+    { label: 'Messages', path: '/dashboard/student/messages', icon: <Mail size={18} /> },
+    { label: 'Settings', path: '/dashboard/student/settings', icon: <Settings size={18} /> },
+  ];
+
   return (
-    <aside className="w-[260px] bg-white/70 backdrop-blur-sm border-r border-slate-200 p-6 flex flex-col flex-shrink-0">
-      <div className="text-center mb-6">
-        <img
-          src={getImageUrl(studentImage)}
-          alt={studentName || 'Student'}
-          className="w-16 h-16 rounded-full object-cover mx-auto ring-2 ring-slate-200"
-        />
-        <h3 className="mt-2 text-base font-semibold text-slate-800 truncate" title={studentName || 'Student'}>
+    <aside className="w-[280px] bg-white/40 backdrop-blur-3xl border-r border-white/50 p-6 flex flex-col flex-shrink-0 hidden md:flex relative z-20">
+      <div className="text-center mb-8 relative">
+        <div className="absolute inset-0 bg-indigo-500/10 blur-2xl rounded-full scale-150"></div>
+        <div className="relative">
+          <img
+            src={getImageUrl(studentImage)}
+            alt={studentName || 'Student'}
+            className="w-20 h-20 rounded-3xl object-cover mx-auto ring-4 ring-white shadow-xl shadow-slate-200/50"
+          />
+          <div className="absolute -bottom-2 right-1/2 translate-x-1/2 px-3 py-1 rounded-full bg-slate-900 text-[10px] font-black uppercase tracking-widest text-white shadow-lg">
+            Student
+          </div>
+        </div>
+        <h3 className="mt-6 text-lg font-black text-slate-900 truncate tracking-tight" title={studentName || 'Student'}>
           {studentName || 'Student'}
         </h3>
       </div>
 
-      <h4 className="text-[11px] uppercase tracking-wide text-slate-500 mb-2">Menu</h4>
-      <div className="flex flex-col gap-1.5">
-        <button type="button" onClick={go('/dashboard/student/schedule')} className={itemClass(isActive('/dashboard/student/schedule'))}>
-          <span className="mr-2">🗓️</span>My Schedule
-        </button>
-        <button type="button" onClick={go('/dashboard/student/schedule/routines')} className={itemClass(isActive('/dashboard/student/schedule/routines'))}>
-          <span className="mr-2">🔁</span>Regular Routine
-        </button>
-        <button type="button" onClick={go('/dashboard/student/courses')} className={itemClass(isActive('/dashboard/student/courses'))}>
-          <span className="mr-2">📚</span>My Courses
-        </button>
-        <button type="button" onClick={go('/dashboard/student/find-teachers')} className={itemClass(isActive('/dashboard/student/find-teachers'))}>
-          <span className="mr-2">🔎</span>Find Teachers
-        </button>
-        <button type="button" onClick={go('/dashboard/student/messages')} className={itemClass(isActive('/dashboard/student/messages'))}>
-          <span className="mr-2">✉️</span>Messages
-        </button>
-        <button type="button" onClick={go('/dashboard/student/settings')} className={itemClass(isActive('/dashboard/student/settings'))}>
-          <span className="mr-2">⚙️</span>Settings
-        </button>
+      <div className="flex-1 space-y-8">
+        <div>
+          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4 ml-2">Navigation</h4>
+          <nav className="flex flex-col gap-2">
+            {navItems.map((item) => (
+              <button
+                key={item.path}
+                type="button"
+                onClick={go(item.path)}
+                className={itemClass(isActive(item.path))}
+              >
+                {item.icon}
+                <span className="tracking-tight">{item.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
       </div>
     </aside>
   );
@@ -209,92 +229,129 @@ function Agreements({
   if (!hasAny) return null;
 
   return (
-    <section className="mb-6">
-      <h3 className="text-base font-semibold text-slate-900 mb-3">
-        Requests (Need your agreement)
-      </h3>
+    <section className="animate-in fade-in duration-700">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 shadow-sm border border-amber-100">
+          <Bell size={18} />
+        </div>
+        <div>
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">Agreements Required</h3>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Please review proposal details</p>
+        </div>
+      </div>
 
-      {conflictMsg ? (
-        <div className="mb-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+      {conflictMsg && (
+        <div className="mb-6 p-4 rounded-[1.5rem] bg-rose-50/50 border border-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-tight flex items-center gap-3">
+          <AlertCircle size={14} />
           {conflictMsg}
         </div>
-      ) : null}
+      )}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2">
         {(pendingSchedules || []).map((s) => {
           const busy = busyScheduleIds?.has?.(s._id);
           return (
-            <div key={s._id} className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="text-sm font-medium text-slate-900">
-                Proposed {s.type === 'demo' ? 'demo' : 'class'} — {s.subject}
+            <motion.div
+              key={s._id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white/60 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white shadow-xl shadow-slate-200/30 group hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">
+                    Proposed {s.type === 'demo' ? 'demo' : 'class'}
+                  </div>
+                  <h4 className="text-lg font-black text-slate-900 tracking-tight uppercase">{s.subject}</h4>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <Calendar size={18} />
+                </div>
               </div>
-              <div className="text-xs text-slate-600 mt-0.5">
-                {formatDhaka(s.date)} • {s.durationMinutes} mins
+
+              <div className="space-y-2 mb-6">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                  <Clock size={14} className="text-indigo-400" />
+                  {formatDhaka(s.date)} • {s.durationMinutes} mins
+                </div>
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+                  <User size={14} className="text-indigo-400" />
+                  Educator: {s.teacherId?.name || 'Teacher'}
+                </div>
               </div>
-              <div className="text-xs text-slate-500 mt-1">
-                Teacher: {s.teacherId?.name || 'Teacher'}
-              </div>
-              <div className="mt-3 flex gap-2">
+
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => !busy && onRejectSchedule(s._id)}
-                  className="px-3 py-1.5 rounded-lg border disabled:opacity-60"
+                  className="py-3.5 rounded-2xl border border-slate-100 bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all active:scale-95 disabled:opacity-50"
                   disabled={!!busy}
                 >
-                  {busy ? 'Working…' : 'Reject'}
+                  {busy ? 'Syncing...' : 'Reject'}
                 </button>
                 <button
                   onClick={() => !busy && onAcceptSchedule(s._id)}
-                  className="px-3 py-1.5 rounded-lg text-white disabled:opacity-60"
-                  style={{ backgroundColor: brand }}
+                  className="py-3.5 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:opacity-50"
                   disabled={!!busy}
                 >
-                  {busy ? 'Working…' : 'Accept'}
+                  {busy ? 'Syncing...' : 'Accept'}
                 </button>
               </div>
-            </div>
+            </motion.div>
           );
         })}
 
         {(pendingRoutines || []).map((r) => {
           const busy = busyRoutineIds?.has?.(r._id);
           return (
-            <div key={r._id} className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="text-sm font-medium text-slate-900">
-                Routine invite — {r.post?.title || 'Course'}
+            <motion.div
+              key={r._id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white/60 backdrop-blur-2xl p-6 rounded-[2.5rem] border border-white shadow-xl shadow-slate-200/30 group hover:shadow-2xl hover:shadow-purple-100/50 transition-all duration-500"
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-1">
+                    Routine Invite
+                  </div>
+                  <h4 className="text-lg font-black text-slate-900 tracking-tight uppercase">{r.post?.title || 'Course'}</h4>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 text-slate-400 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                  <RefreshCw size={18} />
+                </div>
               </div>
-              <div className="text-xs text-slate-600 mt-0.5">
-                Timezone: {r.timezone || 'Asia/Dhaka'}
-              </div>
-              <ul className="mt-2 text-sm text-slate-700 space-y-1">
-                {(r.slots || []).map((s, i) => {
-                  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][s.weekday];
-                  return (
-                    <li key={`${r._id}-${i}`} className="flex items-center justify-between">
-                      <span>{day} • {s.timeHHMM}</span>
-                      <span className="text-xs text-slate-500">{s.durationMinutes} mins</span>
-                    </li>
-                  );
-                })}
-              </ul>
 
-              <div className="mt-3 flex gap-2">
+              <div className="bg-slate-50/50 rounded-2xl p-4 mb-6">
+                <ul className="space-y-2">
+                  {(r.slots || []).map((s, i) => {
+                    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                    return (
+                      <li key={`${r._id}-${i}`} className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-700">{days[s.weekday]} • {s.timeHHMM}</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{s.durationMinutes} mins</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => !busy && onRejectRoutine(r._id)}
-                  className="px-3 py-1.5 rounded-lg border disabled:opacity-60"
+                  className="py-3.5 rounded-2xl border border-slate-100 bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all active:scale-95 disabled:opacity-50"
                   disabled={!!busy}
                 >
-                  {busy ? 'Working…' : 'Reject'}
+                  {busy ? 'Syncing...' : 'Reject'}
                 </button>
                 <button
                   onClick={() => !busy && onAcceptRoutine(r._id)}
-                  className="px-3 py-1.5 rounded-lg text-white disabled:opacity-60"
-                  style={{ backgroundColor: brand }}
+                  className="py-3.5 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 transition-all active:scale-95 shadow-xl shadow-slate-200 disabled:opacity-50"
                   disabled={!!busy}
                 >
-                  {busy ? 'Working…' : 'Accept'}
+                  {busy ? 'Syncing...' : 'Accept'}
                 </button>
               </div>
-            </div>
+            </motion.div>
           );
         })}
       </div>
@@ -310,56 +367,80 @@ function EnrollmentInvites({ invites, actingId, onPayInvite, onDecline }) {
   const remainingDue = (inv) => Math.max(0, Number(inv.upfrontDueTk || inv.advanceTk || 0) - Number(inv.paidTk || 0));
 
   return (
-    <section className="mb-6">
-      <h3 className="text-base font-semibold text-slate-900 mb-3">Course Invites</h3>
-      <div className="space-y-3">
+    <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100">
+          <Sparkles size={18} />
+        </div>
+        <div>
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">Enrollment Offers</h3>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Complete payment to start learning</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
         {invites.map((inv) => {
           const due = remainingDue(inv);
           const disabled = actingId === inv._id || inv.status !== 'pending' || due <= 0;
           return (
-            <div key={inv._id} className="border rounded-xl p-4 bg-white">
-              <div className="flex items-start gap-3">
-                <div className="grow">
-                  <div className="text-sm font-semibold">
-                    {inv.courseTitle || inv?.postId?.title || 'Course'}
-                  </div>
-                  <div className="text-xs text-slate-600 mt-0.5">
-                    Fee: {moneyBDT(inv.courseFeeTk)} {' • '}
-                    {inv.advanceTk
-                      ? <>Advance required: {moneyBDT(inv.advanceTk)}</>
-                      : <>Upfront due (15%): {moneyBDT(inv.upfrontDueTk)}</>}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    Paid: {moneyBDT(inv.paidTk)} • Status: {inv.paymentStatus || 'unpaid'}
-                  </div>
-                  {inv.note && <div className="text-xs text-slate-600 mt-1">Note: {inv.note}</div>}
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full ring-1 bg-amber-50 text-amber-700 ring-amber-200">
-                  {inv.status}
-                </span>
+            <motion.div
+              key={inv._id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white/60 backdrop-blur-2xl p-8 rounded-[3rem] border border-white shadow-xl shadow-indigo-100/20 relative overflow-hidden group"
+            >
+              <div className="absolute -top-10 -right-10 p-4 opacity-5 group-hover:scale-110 transition-transform duration-700">
+                <GraduationCap size={180} className="text-indigo-600" />
               </div>
 
-              {inv.status === 'pending' && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    disabled={disabled}
-                    onClick={() => onPayInvite(inv)}
-                    className={`px-3 py-1.5 rounded-lg text-white ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    style={{ backgroundColor: brand }}
-                    title={due <= 0 ? 'No amount due' : undefined}
-                  >
-                    {due > 0 ? `Pay ${moneyBDT(due)} now` : 'Paid'}
-                  </button>
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded-full uppercase tracking-widest">
+                      {inv.status}
+                    </span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                      Payment: {inv.paymentStatus || 'pending'}
+                    </span>
+                  </div>
+                  <h4 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">
+                    {inv.courseTitle || inv?.postId?.title || 'Academic Course'}
+                  </h4>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="text-xs font-bold text-slate-500 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                      Total Fee: <span className="text-slate-900">{moneyBDT(inv.courseFeeTk)}</span>
+                    </div>
+                    <div className="text-xs font-bold text-slate-500 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                      {inv.advanceTk ? 'Advance' : 'Upfront'}: <span className="text-emerald-600">{moneyBDT(inv.upfrontDueTk || inv.advanceTk)}</span>
+                    </div>
+                  </div>
+                  {inv.note && (
+                    <p className="text-xs italic text-slate-400 bg-slate-50/50 p-3 rounded-2xl border border-slate-100 mt-2">
+                      " {inv.note} "
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
                   <button
                     disabled={actingId === inv._id}
                     onClick={() => onDecline(inv._id)}
-                    className="px-3 py-1.5 rounded-lg border"
+                    className="px-8 py-4 rounded-2xl border border-slate-100 bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-95 shadow-lg shadow-slate-100"
                   >
                     Decline
                   </button>
+                  <button
+                    disabled={disabled}
+                    onClick={() => onPayInvite(inv)}
+                    className="px-10 py-4 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all active:scale-95 shadow-2xl shadow-slate-200 disabled:opacity-50"
+                  >
+                    {due > 0 ? `Pay ${moneyBDT(due)} Now` : 'Verified'}
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            </motion.div>
           );
         })}
       </div>
@@ -371,25 +452,64 @@ function EnrollmentInvites({ invites, actingId, onPayInvite, onDecline }) {
 function RequestsInbox({ requests, onRespond }) {
   if (!Array.isArray(requests) || requests.length === 0) return null;
   return (
-    <section className="mb-6">
-      <h3 className="text-base font-semibold text-slate-900 mb-3">Requests</h3>
-      <div className="grid gap-3">
+    <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 shadow-sm border border-purple-100">
+          <Mail size={18} />
+        </div>
+        <div>
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">One-off Adjustments</h3>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Incoming schedule change proposals</p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
         {requests.map((r) => (
-          <div key={r._id} className="bg-white border rounded-xl p-4">
-            <div className="text-sm font-medium">Proposed one-off change</div>
-            <div className="text-xs text-slate-600">
-              {new Date(r.proposedDate).toLocaleString('en-GB', { hour12: false })} • {r.durationMinutes} mins
+          <motion.div
+            key={r._id}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="group p-6 bg-white/60 backdrop-blur-2xl rounded-[2.5rem] border border-white shadow-xl shadow-slate-200/30 hover:shadow-2xl hover:shadow-purple-100/50 transition-all duration-500"
+          >
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 group-hover:bg-purple-600 group-hover:text-white transition-colors">
+                <RefreshCw size={20} />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">Proposed Change</h4>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                  {new Date(r.proposedDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}
+                </p>
+              </div>
             </div>
-            {r.note ? <div className="text-xs text-slate-500 mt-1">“{r.note}”</div> : null}
-            <div className="mt-3 flex gap-2">
-              <button onClick={() => onRespond(r._id, 'reject')} className="px-3 py-1.5 rounded-lg border">
+
+            <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 mb-6">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-600 mb-2">
+                <span>Duration</span>
+                <span className="text-slate-900">{r.durationMinutes} mins</span>
+              </div>
+              {r.note && (
+                <p className="text-xs italic text-slate-400 mt-2 border-t border-slate-100 pt-2">
+                  " {r.note} "
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => onRespond(r._id, 'reject')}
+                className="py-3.5 rounded-2xl border border-slate-100 bg-white text-slate-400 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-95"
+              >
                 Reject
               </button>
-              <button onClick={() => onRespond(r._id, 'accept')} className="px-3 py-1.5 rounded-lg text-white bg-slate-900 hover:bg-black">
+              <button
+                onClick={() => onRespond(r._id, 'accept')}
+                className="py-3.5 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-purple-600 transition-all active:scale-95 shadow-xl shadow-slate-200"
+              >
                 Accept
               </button>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
     </section>
@@ -400,23 +520,32 @@ function RequestsInbox({ requests, onRespond }) {
 function RoutineList({ routines, meId, onConsent }) {
   if (!Array.isArray(routines) || routines.length === 0) return null;
 
-  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const fmtNext = (iso, tz = 'Asia/Dhaka') =>
     iso
       ? new Date(iso).toLocaleString('en-GB', {
-          day: '2-digit',
-          month: 'short',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-          timeZone: tz,
-        })
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: tz,
+      })
       : '';
 
   return (
-    <section className="mb-6">
-      <h3 className="text-base font-semibold text-slate-900 mb-3">Regular Routine</h3>
-      <div className="grid gap-4 md:grid-cols-2">
+    <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100">
+          <RefreshCw size={18} />
+        </div>
+        <div>
+          <h3 className="text-xl font-black text-slate-900 tracking-tight">Regular Routines</h3>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Your recurring learning schedule</p>
+        </div>
+      </div>
+
+      <div className="grid gap-8 md:grid-cols-2">
         {routines.map((r) => {
           const pendingSet = new Set((r.pendingBy || []).map(String));
           const mePending = meId && pendingSet.has(String(meId));
@@ -424,91 +553,92 @@ function RoutineList({ routines, meId, onConsent }) {
             (r.requiresAcceptance && (r.pendingBy || []).length === 0) || !r.requiresAcceptance;
 
           return (
-            <div key={r._id} className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center gap-3">
-                <img
-                  src={getImageUrl(r.teacher?.profileImage)}
-                  alt=""
-                  className="w-9 h-9 rounded-full object-cover"
-                />
-                <div className="min-w-0">
-                  <div className="text-sm font-medium text-slate-900">
-                    {r.teacher?.name || 'Teacher'} • {r.post?.title || 'Course'}
-                  </div>
-                  <div className="text-[12px] text-slate-500">
-                    {(Array.isArray(r.post?.subjects)
-                      ? r.post.subjects.join(' | ')
-                      : r.post?.subjects) || '—'}
-                  </div>
+            <motion.div
+              key={r._id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="group bg-white/60 backdrop-blur-2xl p-8 rounded-[3rem] border border-white shadow-xl shadow-slate-200/30 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
+            >
+              <div className="flex items-center gap-5 mb-8">
+                <div className="relative">
+                  <img
+                    src={getImageUrl(r.teacher?.profileImage)}
+                    alt=""
+                    className="w-16 h-16 rounded-[1.5rem] object-cover ring-4 ring-white shadow-xl shadow-slate-200"
+                  />
+                  <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow-md ${r.status === 'active' ? 'bg-emerald-500' : 'bg-amber-500'
+                    }`} />
                 </div>
-                <span
-                  className={`ml-auto text-[10px] px-2 py-0.5 rounded-full ring-1 ${
-                    r.status === 'active'
-                      ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                      : r.status === 'paused'
-                      ? 'bg-amber-50 text-amber-700 ring-amber-200'
-                      : 'bg-slate-100 text-slate-700 ring-slate-200'
-                  }`}
-                >
-                  {r.status}
-                </span>
+                <div className="min-w-0">
+                  <h4 className="text-lg font-black text-slate-900 truncate tracking-tight uppercase group-hover:text-indigo-600 transition-colors">
+                    {r.teacher?.name || 'Educator'}
+                  </h4>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                    {r.post?.title || 'Academic Course'}
+                  </p>
+                </div>
               </div>
 
-              <ul className="mt-3 text-sm text-slate-700 space-y-1">
-                {(r.slots || []).map((s, i) => (
-                  <li key={`${r._id}-slot-${i}`} className="flex items-center justify-between">
-                    <span>
-                      {day[s.weekday]} • {s.timeHHMM}
-                    </span>
-                    <span className="text-xs text-slate-500">{s.durationMinutes} mins</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="bg-slate-50/50 rounded-[2rem] p-6 mb-8 border border-slate-100/50">
+                <ul className="space-y-3">
+                  {(r.slots || []).map((s, i) => (
+                    <li key={`${r._id}-slot-${i}`} className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 font-bold text-slate-700">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                        {dayNames[s.weekday]} • {s.timeHHMM}
+                      </div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-3 py-1 rounded-full border border-slate-100 self-start">
+                        {s.durationMinutes} MIN
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-              {!!(r.slots || []).length && (
-                <div className="mt-3 text-[12px] text-slate-500">
-                  Next{' '}
-                  {fmtNext(
-                    (r.slots || [])
-                      .map((s) => s.nextRunAt)
-                      .filter(Boolean)
-                      .sort((a, b) => new Date(a) - new Date(b))[0],
-                    r.timezone || 'Asia/Dhaka'
-                  )}
-                </div>
-              )}
+              <div className="flex items-center justify-between">
+                {!!(r.slots || []).length && (
+                  <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                    <Clock size={12} />
+                    Next: {fmtNext(
+                      (r.slots || [])
+                        .map((s) => s.nextRunAt)
+                        .filter(Boolean)
+                        .sort((a, b) => new Date(a) - new Date(b))[0],
+                      r.timezone || 'Asia/Dhaka'
+                    )}
+                  </div>
+                )}
 
-              {r.requiresAcceptance && (
-                <div className="mt-3">
-                  {mePending ? (
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => onConsent(r._id, 'accept')}
-                        className="px-3 py-1.5 rounded-lg text-white"
-                        style={{ backgroundColor: brand }}
-                      >
-                        Accept routine
-                      </button>
-                      <button
-                        onClick={() => onConsent(r._id, 'reject')}
-                        className="px-3 py-1.5 rounded-lg border"
-                      >
-                        Reject
-                      </button>
-                      <span className="text-[11px] text-slate-500">Waiting for your agreement</span>
-                    </div>
-                  ) : allAccepted ? (
-                    <div className="text-[11px] text-emerald-700 bg-emerald-50 ring-1 ring-emerald-200 px-2 py-0.5 rounded">
-                      All students agreed
-                    </div>
-                  ) : (
-                    <div className="text-[11px] text-amber-700 bg-amber-50 ring-1 ring-amber-200 px-2 py-0.5 rounded">
-                      Waiting for others to agree
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                {r.requiresAcceptance && (
+                  <div className="ml-auto">
+                    {mePending ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => onConsent(r._id, 'accept')}
+                          className="px-4 py-2 rounded-xl bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg shadow-slate-200"
+                        >
+                          Agree
+                        </button>
+                        <button
+                          onClick={() => onConsent(r._id, 'reject')}
+                          className="px-4 py-2 rounded-xl border border-slate-100 bg-white text-slate-400 text-[9px] font-black uppercase tracking-widest hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : allAccepted ? (
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-xl uppercase tracking-widest">
+                        Synced
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-black text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-xl uppercase tracking-widest flex items-center gap-2">
+                        <RefreshCw size={10} className="animate-spin" /> Pending
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
           );
         })}
       </div>
@@ -516,177 +646,158 @@ function RoutineList({ routines, meId, onConsent }) {
   );
 }
 
-/* ---------- TEACHER-SECTIONS ---------- */
 function TeacherSections({ teachers, onPay }) {
   const [openPayFor, setOpenPayFor] = useState(null);
   const toggleMenu = (teacherId) =>
     setOpenPayFor((cur) => (cur === teacherId ? null : teacherId));
 
   return (
-    <section className="space-y-6">
-      {teachers.map((t) => {
-        const completedDemos = t.courses.reduce(
-          (acc, c) =>
-            acc +
-            c.classes.filter((cl) => cl.type === 'demo' && cl.status === 'completed').length,
-          0
-        );
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+      <AnimatePresence mode="popLayout">
+        {teachers.map((t, idx) => {
+          const completedDemos = t.courses.reduce(
+            (acc, c) =>
+              acc +
+              c.classes.filter((cl) => cl.type === 'demo' && cl.status === 'completed').length,
+            0
+          );
 
-        return (
-          <div
-            key={t.id}
-            className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
-          >
-            {/* Teacher header */}
-            <div className="relative flex items-center gap-4 p-5 bg-gradient-to-r from-white to-slate-50 border-b border-slate-200">
-              <img
-                src={getImageUrl(t.avatar)}
-                alt={t.name}
-                className="w-12 h-12 rounded-full ring-2 ring-slate-200 object-cover"
-              />
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-slate-900">{t.name}</h3>
-                <p className="text-[11px] text-slate-500">Courses: {t.courses.length}</p>
-              </div>
+          return (
+            <motion.div
+              key={t.id}
+              layout
+              initial={{ opacity: 0, y: 30, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              transition={{
+                type: 'spring',
+                stiffness: 260,
+                damping: 20,
+                delay: idx * 0.08
+              }}
+              className="group relative"
+            >
+              {/* Card Glow Effect */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/20 to-purple-500/20 rounded-[3.5rem] blur-2xl opacity-0 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
 
-              {/* Pay control near teacher name */}
-              <div className="ml-auto relative">
-                <button
-                  type="button"
-                  onClick={() => toggleMenu(t.id)}
-                  className="rounded-md border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 px-3 py-1.5 text-sm shadow-sm"
-                >
-                  Pay ▾
-                </button>
+              <div className="relative bg-white/70 backdrop-blur-3xl rounded-[3rem] border border-white/80 shadow-2xl shadow-slate-200/50 hover:shadow-indigo-500/10 transition-all duration-500 overflow-hidden">
+                {/* Decorative background element */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -mr-16 -mt-16 group-hover:bg-indigo-500/10 transition-colors"></div>
 
-                {completedDemos >= 3 && (
-                  <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 ring-1 ring-amber-200">
-                    3 demos used
-                  </span>
-                )}
-
-                {openPayFor === t.id && (
-                  <div className="absolute right-0 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-md z-20">
-                    <div className="px-3 py-2 text-[11px] text-slate-500 border-b">Choose plan</div>
-
-                    {t.courses.length === 1 ? (
-                      <div className="p-3 flex gap-2">
-                        <button
-                          onClick={() => {
-                            setOpenPayFor(null);
-                            onPay(t.id, t.courses[0].id, 'HALF');
-                          }}
-                          className="flex-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 text-sm"
-                        >
-                          Pay Half
-                        </button>
-                        <button
-                          onClick={() => {
-                            setOpenPayFor(null);
-                            onPay(t.id, t.courses[0].id, 'FULL');
-                          }}
-                          className="flex-1 rounded-md bg-slate-900 hover:bg-black text-white px-3 py-2 text-sm"
-                        >
-                          Pay Full
-                        </button>
+                <div className="p-8">
+                  {/* Teacher Header */}
+                  <div className="flex items-center gap-6 mb-8">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-3xl scale-125 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <div className="relative z-10 p-1 rounded-[2.2rem] bg-gradient-to-br from-indigo-100 to-white shadow-xl">
+                        <img
+                          src={getImageUrl(t.avatar)}
+                          alt={t.name}
+                          className="w-20 h-20 rounded-[1.8rem] object-cover"
+                        />
                       </div>
-                    ) : (
-                      <ul className="max-h-64 overflow-y-auto">
-                        {t.courses.map((c) => (
-                          <li key={c.id} className="px-3 py-2 border-t first:border-t-0">
-                            <div className="text-xs font-medium text-slate-700 truncate">
-                              {c.title}
-                            </div>
-                            <div className="mt-2 flex gap-2">
-                              <button
-                                onClick={() => {
-                                  setOpenPayFor(null);
-                                  onPay(t.id, c.id, 'HALF');
-                                }}
-                                className="flex-1 rounded-md border border-slate-300 bg-white hover:bg-slate-50 px-2 py-1.5 text-xs"
-                              >
-                                Half
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setOpenPayFor(null);
-                                  onPay(t.id, c.id, 'FULL');
-                                }}
-                                className="flex-1 rounded-md bg-slate-900 hover:bg-black text-white px-2 py-1.5 text-xs"
-                              >
-                                Full
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+                      <div className="absolute -bottom-2 -right-2 p-1.5 bg-emerald-500 rounded-2xl border-4 border-white shadow-lg z-20">
+                        <ShieldCheck size={12} className="text-white" />
+                      </div>
+                    </div>
 
-            {/* Courses grid */}
-            <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {t.courses.map((course) => (
-                <div
-                  key={course.id}
-                  className="border border-slate-200 rounded-xl p-4 bg-white hover:shadow-md transition"
-                >
-                  <div className="mb-2">
-                    <h4 className="text-sm font-semibold text-slate-900">{course.title}</h4>
-                    <p className="text-[12px] text-slate-600">
-                      Subject{' '}
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-slate-800 bg-slate-100 ring-1 ring-slate-200 ml-1">
-                        {course.subject}
-                      </span>
-                    </p>
-                  </div>
-
-                  <ul className="mt-3 divide-y divide-slate-100">
-                    {course.classes.map((cls) => {
-                      const cancelled = cls.status === 'cancelled';
-                      const completed = cls.status === 'completed';
-                      return (
-                        <li
-                          key={cls.id}
-                          className={`flex items-center justify-between py-2.5 ${cancelled ? 'opacity-60' : ''}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[13px] ${cancelled ? 'line-through text-slate-500' : 'text-slate-800'}`}>
-                              {cls.name}
-                            </span>
-                            {cls.type === 'demo' && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 ring-1 ring-slate-200">
-                                Demo
-                              </span>
-                            )}
-                            {completed && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 ring-emerald-200">
-                                Completed
-                              </span>
-                            )}
-                            {cancelled && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-rose-50 text-rose-700 ring-rose-200">
-                                Cancelled
-                              </span>
-                            )}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase group-hover:text-indigo-600 transition-colors leading-none">
+                        {t.name}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <div className="px-3 py-1 rounded-full bg-slate-900 text-[8px] font-black text-white uppercase tracking-[0.15em] border border-slate-900">
+                          {t.courses.length} Courses
+                        </div>
+                        {completedDemos > 0 && (
+                          <div className="px-3 py-1 rounded-full bg-indigo-50 text-[8px] font-black text-indigo-600 uppercase tracking-[0.15em] border border-indigo-100/50">
+                            {completedDemos} Demos
                           </div>
-                          <span className="text-[12px] text-slate-500">
-                            {formatDhaka(cls.date)}
-                            {cls.participantsCount > 1 ? ` • Group (${cls.participantsCount})` : ''}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Course Feed */}
+                  <div className="space-y-4 mb-8">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Active Learning</h4>
+                    {t.courses.map((c) => (
+                      <div key={c.id} className="relative p-5 rounded-[2rem] bg-slate-50/40 border border-slate-100/50 group/course hover:bg-white hover:border-indigo-100 transition-all duration-300">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10px] font-black text-indigo-600 bg-indigo-50/50 px-2.5 py-1 rounded-full border border-indigo-100/50 uppercase tracking-widest">{c.subject}</span>
+                          <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                            <Clock size={12} />
+                            {c.classes.length} Sessions
+                          </div>
+                        </div>
+                        <div className="text-sm font-black text-slate-800 uppercase tracking-tight leading-tight">{c.title || 'Untitled Session'}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Action Belt */}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => toggleMenu(t.id)}
+                      className="w-full h-16 rounded-[1.5rem] bg-slate-900 text-white group-hover:bg-indigo-600 transition-all active:scale-[0.97] shadow-xl shadow-slate-200 flex items-center justify-between px-6 overflow-hidden"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="p-2.5 rounded-xl bg-white/20 shadow-inner">
+                          <CreditCard size={22} />
+                        </div>
+                        <span className="text-[12px] font-black uppercase tracking-[0.15em]">Manage Tuition Payments</span>
+                      </div>
+                      <ChevronRight size={18} className={`transition-transform duration-500 ${openPayFor === t.id ? 'rotate-90' : 'rotate-0'}`} />
+                    </button>
+
+                    <AnimatePresence>
+                      {openPayFor === t.id && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                          className="absolute bottom-full left-0 right-0 mb-6 p-6 bg-white/95 backdrop-blur-3xl rounded-[2.5rem] border border-slate-100 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] z-30"
+                        >
+                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 text-center">Payment Directory</div>
+                          <div className="space-y-3">
+                            {t.courses.map((c) => (
+                              <div key={`pay-opts-${c.id}`} className="group/opt p-4 rounded-2xl border border-slate-50 bg-slate-50/30 hover:border-indigo-100 hover:bg-white transition-all">
+                                <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3 truncate px-1">{c.title}</div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <button
+                                    onClick={() => {
+                                      onPay(t.id, c.id, 'HALF');
+                                      setOpenPayFor(null);
+                                    }}
+                                    className="py-3.5 rounded-xl border border-indigo-100 bg-white text-indigo-600 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all active:scale-95 shadow-sm"
+                                  >
+                                    Split Pay
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      onPay(t.id, c.id, 'FULL');
+                                      setOpenPayFor(null);
+                                    }}
+                                    className="py-3.5 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all active:scale-95 shadow-lg shadow-indigo-100"
+                                  >
+                                    Full Pay
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-    </section>
+              </div>
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -716,49 +827,79 @@ function RightSidebar({ teachers }) {
   }, [teachers]);
 
   return (
-    <aside className="w-[300px] bg-white/70 backdrop-blur-sm p-6 border-l border-slate-200 flex-shrink-0 min-h-screen hidden lg:block">
-      <div className="mb-6">
-        <h3 className="text-sm font-semibold text-slate-900 mb-2">Announcements</h3>
-        <div className="rounded-xl bg-white border border-slate-200 p-3 text-sm text-slate-700 shadow-sm">
-          Your classes update live as teachers schedule or cancel.
-        </div>
-      </div>
-
-      <div>
-        <h3 className="text-sm font-semibold text-slate-900 mb-2">Today’s Schedule</h3>
-        {todayItems.length === 0 ? (
-          <div className="text-sm text-slate-500">No classes scheduled today.</div>
-        ) : (
-          <div className="space-y-3">
-            {todayItems.map((it) => (
-              <div key={it.id} className="p-3 rounded-xl bg-white shadow-sm border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-slate-800">
-                    {new Date(it.time).toLocaleTimeString('en-GB', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: false,
-                      timeZone: 'Asia/Dhaka',
-                    })}{' '}
-                    — {it.subject}
-                  </div>
-                  {it.status !== 'scheduled' && (
-                    <span
-                      className={`ml-2 text-[10px] px-2 py-0.5 rounded-full ring-1 ${
-                        it.status === 'completed'
-                          ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                          : 'bg-rose-50 text-rose-700 ring-rose-200'
-                      }`}
-                    >
-                      {it.status}
-                    </span>
-                  )}
-                </div>
-                <div className="text-[12px] text-slate-500">{it.teacher}</div>
-              </div>
-            ))}
+    <aside className="w-[320px] bg-white/40 backdrop-blur-3xl p-8 border-l border-white/50 flex-shrink-0 min-h-screen hidden md:block relative z-20 overflow-y-auto">
+      <div className="flex flex-col h-full space-y-8">
+        {/* Announcements */}
+        <div className="relative">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2.5 rounded-xl bg-purple-50 text-purple-600 shadow-sm border border-purple-100">
+              <Megaphone size={18} />
+            </div>
+            <h3 className="text-base font-black text-slate-900 tracking-tight">Announcements</h3>
           </div>
-        )}
+          <div className="space-y-4">
+            <div className="p-5 rounded-[1.5rem] bg-white/60 backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-purple-100 transition-all cursor-default">
+              <div className="flex gap-3 mb-2">
+                <div className="w-1 h-8 bg-purple-500 rounded-full"></div>
+                <p className="text-xs font-bold text-slate-600 leading-relaxed uppercase tracking-tight">Your classes update live as teachers schedule or cancel.</p>
+              </div>
+              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-2">{new Date().toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Today's Schedule */}
+        <div className="relative flex-1">
+          <div className="flex items-center gap-3 mb-6 pt-8 border-t border-slate-100">
+            <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600 shadow-sm border border-indigo-100">
+              <CalendarDays size={18} />
+            </div>
+            <h3 className="text-base font-black text-slate-900 tracking-tight">Today</h3>
+          </div>
+
+          {todayItems.length === 0 ? (
+            <div className="p-8 text-center rounded-3xl bg-slate-50/50 border border-dashed border-slate-200">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Quiet day today</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {todayItems.map((it, idx) => (
+                <motion.div
+                  key={it.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="group p-4 rounded-2xl bg-white/60 backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-indigo-100 transition-all cursor-default"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock size={12} className="text-indigo-400" />
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          {new Date(it.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <div className="text-sm font-black text-slate-900 truncate tracking-tight uppercase">
+                        {it.subject}
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 truncate mt-1">{it.teacher}</p>
+                    </div>
+                    {it.status !== 'scheduled' && (
+                      <span
+                        className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest border ${it.status === 'completed'
+                          ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                          : 'bg-rose-50 text-rose-600 border-rose-100'
+                          }`}
+                      >
+                        {it.status}
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );
@@ -898,7 +1039,7 @@ export default function StudentSchedulePage() {
         fetchSchedules({ silent: true });
         fetchRoutines();
       }
-    } catch {}
+    } catch { }
   }, []); // run once on mount
 
   // Single socket connection; refresh on notifications
@@ -1110,76 +1251,119 @@ export default function StudentSchedulePage() {
     }
   };
 
-  // 🧠 local QueryClient for this page (fixes the runtime error)
-  const queryClientRef = useRef(null);
-  if (!queryClientRef.current) {
-    queryClientRef.current = new QueryClient();
-  }
 
   return (
-    <QueryClientProvider client={queryClientRef.current}>
-      <div className="flex w-full h-screen bg-gradient-to-b from-white to-slate-50">
-        <StudentSidebar studentName={studentName} studentImage={studentImage} />
+    <div className="flex w-full h-screen bg-slate-50 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
+      {/* Legendary Background (Light Edition) */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+        <div className="absolute top-0 right-0 w-[1200px] h-[1200px] bg-indigo-500/5 blur-[180px] rounded-full animate-blob"></div>
+        <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-purple-500/5 blur-[150px] rounded-full animate-blob animation-delay-2000"></div>
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-multiply"></div>
+      </div>
 
-        <main className="flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-6xl px-6 py-8">
+      <StudentSidebar studentName={studentName} studentImage={studentImage} />
 
-            {/* 🔌 Integrated: Student schedule list (uses tanstack query via hook) */}
-            <StudentScheduleList
-              schedules={schedules}
-              loading={initialLoading}
-              error={error}
-              onRefresh={() => fetchSchedules({ silent: true })}
-            />
+      <main className="flex-1 overflow-y-auto relative z-10 custom-scrollbar">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-12">
 
-            {/* Accept/Reject inbox (class proposals + routine invitations incl. demos) */}
-            <Agreements
-              pendingSchedules={pendingSchedules}
-              pendingRoutines={pendingRoutines}
-              onAcceptSchedule={onAcceptSchedule}
-              onRejectSchedule={onRejectSchedule}
-              onAcceptRoutine={onAcceptRoutine}
-              onRejectRoutine={onRejectRoutine}
-              busyScheduleIds={busyScheduleIds}
-              busyRoutineIds={busyRoutineIds}
-              conflictMsg={conflictMsg}
-            />
+          {/* Today's Schedule Feed */}
+          <StudentScheduleList
+            schedules={schedules}
+            loading={initialLoading}
+            error={error}
+            onRefresh={() => fetchSchedules({ silent: true })}
+          />
 
-            {/* ✅ Course Invites inside Schedule (BDT + SSLCommerz redirect) */}
-            <EnrollmentInvites
-              invites={enrollmentInvites}
-              actingId={actingInviteId}
-              onPayInvite={onPayInvite}
-              onDecline={onDeclineInvite}
-            />
+          <Agreements
+            pendingSchedules={pendingSchedules}
+            pendingRoutines={pendingRoutines}
+            onAcceptSchedule={onAcceptSchedule}
+            onRejectSchedule={onRejectSchedule}
+            onAcceptRoutine={onAcceptRoutine}
+            onRejectRoutine={onRejectRoutine}
+            busyScheduleIds={busyScheduleIds}
+            busyRoutineIds={busyRoutineIds}
+            conflictMsg={conflictMsg}
+          />
 
-            {/* Requests (one-off change requests) */}
-            <RequestsInbox requests={incoming} onRespond={onRespondChange} />
+          <EnrollmentInvites
+            invites={enrollmentInvites}
+            actingId={actingInviteId}
+            onPayInvite={onPayInvite}
+            onDecline={onDeclineInvite}
+          />
 
-            {/* Regular Routine */}
-            <RoutineList routines={routines} meId={userId} onConsent={onConsent} />
+          <RequestsInbox
+            requests={incoming}
+            onRespond={onRespondChange}
+          />
 
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">Teachers & Courses</h2>
-              <p className="text-sm text-slate-500">A clear view of your upcoming lessons.</p>
+          <RoutineList
+            routines={routines}
+            meId={userId}
+            onConsent={onConsent}
+          />
+
+          {/* Connected Teachers Grid */}
+          <section>
+            <div className="mb-10 px-2 flex flex-col items-start gap-4">
+              <h2 className="text-4xl font-black text-slate-900 tracking-tighter">My Educators</h2>
+              <div className="inline-flex items-center gap-3 px-5 py-2.5 rounded-2xl bg-indigo-600 text-white shadow-xl shadow-indigo-200 border border-indigo-500 group hover:scale-[1.03] transition-all duration-500 cursor-default">
+                <div className="p-1.5 rounded-lg bg-white/20 shadow-inner">
+                  <Users size={16} className="text-white fill-white/20" />
+                </div>
+                <span className="text-[11px] font-black uppercase tracking-[0.2em]">{teachers.length} Connected Teachers</span>
+              </div>
             </div>
 
             {initialLoading ? (
-              <div className="text-sm text-slate-500">Loading…</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="animate-pulse bg-white/40 h-64 rounded-[2rem] border border-white" />
+                ))}
+              </div>
             ) : error ? (
-              <div className="text-sm text-rose-600">{error}</div>
+              <div className="bg-rose-50/50 p-8 rounded-[2rem] border border-rose-100 text-rose-600 font-black uppercase tracking-tight text-xs">
+                {error}
+              </div>
             ) : teachers.length === 0 ? (
-              <div className="text-sm text-slate-500">
-                No classes yet. You’ll see them here when teachers schedule.
+              <div className="bg-white/40 backdrop-blur-xl rounded-[3rem] p-16 border border-white text-center shadow-2xl shadow-slate-200/50">
+                <div className="w-16 h-16 rounded-full bg-slate-50 grid place-items-center mx-auto mb-6">
+                  <BookOpen size={24} className="text-slate-200" />
+                </div>
+                <p className="text-sm font-black text-slate-400 uppercase tracking-tighter">No classes yet. You’ll see them here when teachers schedule.</p>
               </div>
             ) : (
               <TeacherSections teachers={teachers} onPay={onPay} />
             )}
-          </div>
-        </main>
+          </section>
+        </div>
+      </main>
 
-        <RightSidebar teachers={teachers} />
-      </div>
-    </QueryClientProvider>
+      <RightSidebar teachers={teachers} />
+
+      <style jsx global>{`
+        @keyframes blob {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+        .animate-blob { animation: blob 15s infinite; }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(0, 0, 0, 0.05);
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 0, 0, 0.1);
+        }
+      `}</style>
+    </div>
   );
 }

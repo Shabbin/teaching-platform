@@ -115,6 +115,10 @@ const userSlice = createSlice({
       state.error = null;
       state.studentDashboard = null;
       state.teacherDashboard = null;
+      // Clear dev auth shim if present
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('devUserId');
+      }
     },
     clearError: (state) => {
       state.error = null;

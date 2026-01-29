@@ -3,6 +3,14 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Plus, Users, MessageSquare, Clock,
+  Calendar, CheckCircle2, AlertCircle,
+  ChevronRight, ArrowRight, UserPlus,
+  Settings, Trash2, X, RefreshCw,
+  Sparkles, Megaphone, BookOpen, Crown
+} from 'lucide-react';
 import useSocket from '../../../../hooks/useSocket';
 
 import { getMyRoutines, setRoutineStatus } from '../../../../../api/routines';
@@ -16,8 +24,8 @@ import {
   createEnrollmentInvite,
 } from '../../../../../api/enrollmentInvites';
 
-// React Query (for TodayScheduleList)
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// React Query
+import { useQueryClient } from '@tanstack/react-query';
 // Reuse the “today + join” widget you added in step 6
 import TodayScheduleList from "../../../components/scheduleComponents/todayScheduleList";
 
@@ -29,24 +37,31 @@ const brand = 'oklch(0.49 0.25 277)';
 
 /* -------------------------------- UI helpers ------------------------------- */
 
-function Pill({ children }) {
+function Pill({ children, tone = 'default' }) {
+  const tones = {
+    default: 'bg-slate-100 text-slate-500 ring-slate-200',
+    active: 'bg-indigo-50 text-indigo-600 ring-indigo-200 shadow-sm shadow-indigo-100/50',
+    paused: 'bg-amber-50 text-amber-600 ring-amber-200',
+    success: 'bg-emerald-50 text-emerald-600 ring-emerald-200',
+    danger: 'bg-rose-50 text-rose-500 ring-rose-200',
+  };
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-slate-100 ring-1 ring-slate-200">
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ring-1 ${tones[tone] || tones.default}`}>
       {children}
     </span>
   );
 }
 function StudentChip({ u, tiny = false, tone = 'default' }) {
   const name = u?.name || String(u?._id ?? u).slice(0, 8);
-  const img  = u?.profileImage || 'https://i.pravatar.cc/24';
+  const img = u?.profileImage || 'https://i.pravatar.cc/24';
   const toneCls =
-    tone === 'accepted' ? 'border-emerald-300 bg-emerald-50' :
-    tone === 'rejected' ? 'border-rose-300 bg-rose-50' :
-    tone === 'pending'  ? 'border-amber-300 bg-amber-50' :
-                          'border-slate-200 bg-white';
+    tone === 'accepted' ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-100' :
+      tone === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-600 shadow-sm shadow-rose-100' :
+        tone === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-700 shadow-sm shadow-amber-100' :
+          'border-white/50 bg-white shadow-sm shadow-slate-200/50';
   return (
-    <span className={`inline-flex items-center gap-2 ${tiny ? 'px-1.5 py-0.5 text-[11px]' : 'px-2 py-1 text-xs'} rounded-full border ${toneCls}`}>
-      <img src={img} alt="" className={`${tiny ? 'w-3.5 h-3.5' : 'w-4 h-4'} rounded-full object-cover`} />
+    <span className={`inline-flex items-center gap-2 ${tiny ? 'px-2 py-1 text-[10px]' : 'px-3 py-1.5 text-xs'} rounded-full border font-black uppercase tracking-tight ${toneCls} transition-all hover:scale-105`}>
+      <img src={img} alt="" className={`${tiny ? 'w-4 h-4' : 'w-5 h-5'} rounded-full object-cover ring-1 ring-white shadow-sm`} />
       {name}
     </span>
   );
@@ -54,8 +69,8 @@ function StudentChip({ u, tiny = false, tone = 'default' }) {
 
 /* ------------------------------- data utils -------------------------------- */
 
-const WD_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const WD_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const WD_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const WD_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 const normalizeId = (v) => String(v?._id ?? v);
 const dedupeByKey = (arr, getKey) => {
@@ -127,7 +142,7 @@ function groupByPost(routines) {
         if (!seen.has(key)) { seen.add(key); union.push({ ...s, key }); }
       }
     }
-    union.sort((a,b) => (a.weekday - b.weekday) || (timeToMinutes(a.timeHHMM) - timeToMinutes(b.timeHHMM)));
+    union.sort((a, b) => (a.weekday - b.weekday) || (timeToMinutes(a.timeHHMM) - timeToMinutes(b.timeHHMM)));
 
     let status = 'active';
     if (g.statusSet.size) {
@@ -148,7 +163,7 @@ function groupByPost(routines) {
     });
   }
 
-  groups.sort((a,b) => (a.post?.title || '').localeCompare(b.post?.title || ''));
+  groups.sort((a, b) => (a.post?.title || '').localeCompare(b.post?.title || ''));
   return groups;
 }
 
@@ -180,7 +195,7 @@ function RequestsDrawer({ open, onClose, group }) {
   useEffect(() => { if (open) fetch(); }, [open]); // eslint-disable-line
 
   if (!open) return null;
-  const fmt = iso => new Date(iso).toLocaleString('en-GB', { hour12:false });
+  const fmt = iso => new Date(iso).toLocaleString('en-GB', { hour12: false });
   const chipTone = (id, r) => {
     const sid = String(id);
     if ((r.acceptedBy || []).map(String).includes(sid)) return 'accepted';
@@ -189,46 +204,94 @@ function RequestsDrawer({ open, onClose, group }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-end bg-black/30">
-      <div className="h-full w-full max-w-2xl bg-white shadow-2xl border-l overflow-y-auto">
-        <div className="px-5 py-4 border-b flex items-center">
-          <h3 className="font-semibold">Pending changes</h3>
-          <div className="ml-auto flex gap-2">
-            <button onClick={fetch} className="text-xs rounded-md border px-2.5 py-1">Refresh</button>
-            <button onClick={onClose} className="text-xs text-slate-600">Close</button>
+    <div className="fixed inset-0 z-[100] flex justify-end">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm"
+      />
+      <motion.div
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        className="relative h-full w-full max-w-2xl bg-white/70 backdrop-blur-3xl shadow-2xl border-l border-white flex flex-col"
+      >
+        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 tracking-tighter">Pending Changes</h3>
+            <p className="text-xs font-medium text-slate-400">Manage your course modifications.</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={fetch}
+              className="p-2.5 rounded-2xl border border-slate-100 bg-white hover:bg-slate-50 transition-colors text-slate-600"
+            >
+              <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2.5 rounded-2xl bg-slate-100 text-slate-900 hover:bg-slate-200 transition-colors"
+            >
+              <X size={18} />
+            </button>
           </div>
         </div>
-        <div className="p-5">
+        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
           {loading ? (
-            <div className="text-sm text-slate-500">Loading…</div>
+            <div className="flex flex-col items-center justify-center p-20 gap-4">
+              <div className="w-10 h-10 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin"></div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Loading requests...</p>
+            </div>
           ) : items.length === 0 ? (
-            <div className="text-sm text-slate-500">No requests yet.</div>
+            <div className="p-12 text-center rounded-[2.5rem] bg-slate-50 border-2 border-dashed border-slate-200">
+              <Megaphone className="mx-auto text-slate-300 mb-4" size={32} />
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No active requests found</p>
+            </div>
           ) : (
-            <div className="space-y-4">
-              {items.map(r => {
+            <div className="space-y-6">
+              {items.map((r, idx) => {
                 const isWeekly = r.changeType === 'weekly';
                 const header = isWeekly
                   ? (r.op === 'add'
                     ? `Add ${WD_SHORT[r.weekday]} ${r.timeHHMM}`
                     : r.op === 'update'
-                    ? `Update ${WD_SHORT[r.targetWeekday]} ${r.targetTimeHHMM} → ${WD_SHORT[r.weekday]} ${r.timeHHMM}`
-                    : `Remove ${WD_SHORT[r.targetWeekday]} ${r.targetTimeHHMM}`)
+                      ? `Update ${WD_SHORT[r.targetWeekday]} ${r.targetTimeHHMM} → ${WD_SHORT[r.weekday]} ${r.timeHHMM}`
+                      : `Remove ${WD_SHORT[r.targetWeekday]} ${r.targetTimeHHMM}`)
                   : `One-off: ${fmt(r.proposedDate)} • ${r.durationMinutes}m`;
                 const total = (r.studentIds || []).length;
                 const pend = (r.pendingBy || []).length;
-                const acc  = (r.acceptedBy || []).length;
-                const rej  = (r.rejectedBy || []).length;
+                const acc = (r.acceptedBy || []).length;
+                const rej = (r.rejectedBy || []).length;
 
                 return (
-                  <div key={String(r._id)} className="border rounded-xl p-4">
-                    <div className="flex items-center gap-2">
-                      <div className="text-sm font-medium">{header}</div>
-                      <Pill>{r.status}</Pill>
-                      <div className="ml-auto text=[11px] text-slate-500">{fmt(r.createdAt)}</div>
+                  <motion.div
+                    key={String(r._id)}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="group border border-white bg-white/60 backdrop-blur-xl rounded-[2rem] p-6 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <div className="text-lg font-black text-slate-900 tracking-tight">{header}</div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Pill tone={r.status === 'pending' ? 'paused' : 'active'}>{r.status}</Pill>
+                          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{fmt(r.createdAt)}</span>
+                        </div>
+                      </div>
+                      <div className="w-12 h-12 rounded-2xl bg-slate-900 text-white flex flex-col items-center justify-center shadow-lg shadow-slate-200">
+                        <span className="text-xs font-black">{total}</span>
+                        <Users size={10} />
+                      </div>
                     </div>
-                    {r.note ? <div className="mt-1 text-xs text-slate-600">Note: {r.note}</div> : null}
-                    <div className="mt-2 text-xs text-slate-600">{acc} accepted • {pend} pending • {rej} rejected (of {total})</div>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    {r.note && (
+                      <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 mb-4">
+                        <p className="text-xs font-medium text-slate-600 line-clamp-2 italic">“{r.note}”</p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
                       {(r.studentIds || []).map(sid => (
                         <StudentChip
                           key={String(sid)}
@@ -238,13 +301,29 @@ function RequestsDrawer({ open, onClose, group }) {
                         />
                       ))}
                     </div>
-                  </div>
+                    <div className="mt-6 pt-6 border-t border-slate-50 flex items-center justify-between">
+                      <div className="flex gap-4">
+                        <div className="text-center">
+                          <div className="text-xs font-black text-emerald-600">{acc}</div>
+                          <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Accepted</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs font-black text-amber-600">{pend}</div>
+                          <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Pending</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs font-black text-rose-500">{rej}</div>
+                          <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Rejected</div>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
                 );
               })}
             </div>
           )}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
@@ -283,7 +362,7 @@ function InviteModal({ open, onClose, group, allGroups }) {
     for (const rid of group.routineIds || []) {
       const r = group.routinesMap.get(String(rid));
       const label = (r?.slots || [])
-        .sort((a,b) => (a.weekday - b.weekday) || (timeToMinutes(a.timeHHMM) - timeToMinutes(b.timeHHMM)))
+        .sort((a, b) => (a.weekday - b.weekday) || (timeToMinutes(a.timeHHMM) - timeToMinutes(b.timeHHMM)))
         .map(s => `${WD_SHORT[s.weekday]} ${s.timeHHMM} · ${s.durationMinutes}m`)
         .join(' • ');
       opts.push({
@@ -334,9 +413,9 @@ function InviteModal({ open, onClose, group, allGroups }) {
       : uniq;
   }, [allGroups, group?.key, group?.students, q, enrolledSet]);
 
-  const toggle = (id) => setSel(cur => cur.includes(id) ? cur.filter(x=>x!==id) : [...cur, id]);
-  const selectAll = () => setSel(candidates.map(s=>s._id));
-  const clearAll  = () => setSel([]);
+  const toggle = (id) => setSel(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
+  const selectAll = () => setSel(candidates.map(s => s._id));
+  const clearAll = () => setSel([]);
 
   // Helper: quick weekly clash check (same weekday and time)
   const selectedRoutineSlots = useMemo(() => {
@@ -449,161 +528,211 @@ function InviteModal({ open, onClose, group, allGroups }) {
   if (!open || !group) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl border overflow-hidden">
-        {/* Header */}
-        <div
-          className="px-6 py-4 text-white"
-          style={{ background: `linear-gradient(90deg, ${brand}, color-mix(in oklch, ${brand} 70%, white 30%))` }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-white/20 grid place-items-center">📩</div>
-            <div className="min-w-0">
-              <div className="text-base font-semibold">Invite students to this course</div>
-              <div className="text-xs/5 opacity-90">
-                {group?.post?.title || 'Course'} • {(Array.isArray(group?.post?.subjects) ? group.post.subjects.join(' | ') : group?.post?.subjects) || '—'}
-              </div>
-            </div>
-            <button className="ml-auto bg-white/15 hover:bg-white/25 rounded-md px-3 py-1.5 text-xs" onClick={onClose}>Close</button>
-          </div>
-        </div>
-
-        <div className="px-6 py-4 space-y-4">
-          {/* Target routine selector */}
-          <div className="grid gap-3 md:grid-cols-3">
-            <label className="block md:col-span-3">
-              <span className="text-[11px] text-slate-500">Target routine in this course</span>
-              <select
-                value={routineId}
-                onChange={(e)=>setRoutineId(e.target.value)}
-                className="mt-1 w-full rounded-lg border px-3 py-2"
-              >
-                {routineOptions.length === 0 && <option value="">No routines found</option>}
-                {routineOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label || 'Routine'} {typeof opt.count === 'number' ? ` • ${opt.count} students` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {/* Search + candidates list */}
-          <div>
-            <div className="flex items-center gap-2">
-              <input
-                placeholder="Search students by name…"
-                value={q}
-                onChange={e=>setQ(e.target.value)}
-                className="w-full rounded-lg border px-3 py-2"
-              />
-              <button className="px-3 py-1.5 rounded-lg border" onClick={selectAll}>Select all</button>
-              <button className="px-3 py-1.5 rounded-lg border" onClick={clearAll}>Clear</button>
-            </div>
-            <div className="mt-3 max-h-64 overflow-auto rounded-xl border p-3">
-              {candidates.length === 0 ? (
-                <div className="text-sm text-slate-500">No eligible students found from your other courses.</div>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {candidates.map(s => {
-                    const checked = sel.includes(s._id);
-                    return (
-                      <label key={s._id} className={`flex items-center gap-2 px-2 py-1 rounded-full border ${checked ? 'bg-white' : 'bg-white/70'}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={()=>toggle(s._id)}
-                          className="h-4 w-4 rounded border-slate-300"
-                          style={{ accentColor: brand }}
-                        />
-                        <StudentChip u={s} />
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* BDT fields + note */}
-          <div className="grid md:grid-cols-3 gap-3">
-            <label className="block">
-              <span className="text-[11px] text-slate-500">Course fee (BDT) {defaultFeeTk ? '(pre-filled)' : '(required)'}</span>
-              <input
-                type="number"
-                min={1}
-                step="1"
-                value={courseFeeTk}
-                onChange={e=>setCourseFeeTk(e.target.value)}
-                className="mt-1 w-full rounded-lg border px-3 py-2"
-                placeholder={defaultFeeTk ? String(defaultFeeTk) : 'e.g., 3000'}
-              />
-            </label>
-            <label className="block">
-              <span className="text:[11px] text-slate-500">Advance (BDT, optional)</span>
-              <input
-                type="number"
-                min={0}
-                step="1"
-                value={advanceTk}
-                onChange={e=>setAdvanceTk(e.target.value)}
-                className="mt-1 w-full rounded-lg border px-3 py-2"
-                placeholder="Leave empty to require 15%"
-              />
-            </label>
-            <label className="block">
-              <span className="text:[11px] text-slate-500">Expires at (optional)</span>
-              <input
-                type="datetime-local"
-                value={expiresAt}
-                onChange={e=>setExpiresAt(e.target.value)}
-                className="mt-1 w-full rounded-lg border px-3 py-2"
-              />
-            </label>
-
-            <div className="md:col-span-3">
-              <div className="text-[12px] text-slate-600">
-                Upfront due per student: <span className="font-semibold">{upfrontDueTk || 0} BDT</span> {Number(advanceTk) ? '(advance)' : '(15% of course fee)'}
-                {conflictCount > 0 && (
-                  <span className="ml-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
-                    {conflictCount} may have timing conflicts
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <label className="block md:col-span-3">
-              <span className="text-[11px] text-slate-500">Note (optional)</span>
-              <textarea
-                value={note}
-                onChange={e=>setNote(e.target.value)}
-                rows={3}
-                className="mt-1 w-full rounded-lg border px-3 py-2"
-                placeholder="Add a short welcome message or instructions."
-              />
-            </label>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t bg-white flex items-center justify-between">
-          <div className="text-xs text-slate-500">
-            Selected students will receive an invite. They must pay the advance (or 15%) to be enrolled automatically.
-          </div>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 bg-white">Cancel</button>
-            <button
-              disabled={!canSend}
-              onClick={send}
-              className="px-4 py-2 rounded-lg text-white disabled:opacity-60"
-              style={{ backgroundColor: brand }}
-              title={!routineId ? 'Pick a routine to invite to' : undefined}
+    <div className="fixed inset-0 z-[100] grid place-items-center p-4">
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+              className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-3xl bg-white/70 backdrop-blur-3xl rounded-[3rem] shadow-2xl border border-white overflow-hidden flex flex-col max-h-[90vh]"
             >
-              {sending ? 'Sending…' : 'Send invites'}
-            </button>
-          </div>
-        </div>
-      </div>
+              {/* Header */}
+              <div className="px-10 py-8 bg-slate-900 text-white relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 opacity-50"></div>
+                <div className="relative z-10 flex items-center gap-5">
+                  <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-xl grid place-items-center shadow-lg border border-white/10">
+                    <UserPlus size={24} className="text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-2xl font-black tracking-tighter">Invite Students</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                      {group?.post?.title || 'Course'} • {(Array.isArray(group?.post?.subjects) ? group.post.subjects.join(' | ') : group?.post?.subjects) || '—'}
+                    </p>
+                  </div>
+                  <button
+                    className="ml-auto p-3 rounded-2xl bg-white/10 hover:bg-white/20 transition-colors"
+                    onClick={onClose}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
+                {/* Target routine selector */}
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">
+                    <Grid size={12} />
+                    Target Routine
+                  </label>
+                  <select
+                    value={routineId}
+                    onChange={(e) => setRoutineId(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-3.5 px-6 text-slate-900 text-sm font-bold outline-none transition-all shadow-inner appearance-none"
+                  >
+                    {routineOptions.length === 0 && <option value="">No routines found</option>}
+                    {routineOptions.map(opt => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label || 'Routine'} {typeof opt.count === 'number' ? ` (${opt.count} students)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Search + candidates list */}
+                <div className="space-y-4">
+                  <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">
+                    <Search size={12} />
+                    Select Candidates
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 relative">
+                      <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        placeholder="Search students..."
+                        value={q}
+                        onChange={e => setQ(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-3 pl-10 pr-4 text-xs font-bold outline-none transition-all shadow-inner"
+                      />
+                    </div>
+                    <button
+                      className="px-4 py-3 rounded-2xl border border-slate-100 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                      onClick={selectAll}
+                    >
+                      All
+                    </button>
+                    <button
+                      className="px-4 py-3 rounded-2xl border border-slate-100 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-colors"
+                      onClick={clearAll}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="max-h-56 overflow-auto rounded-[2rem] bg-slate-50/50 border border-slate-100 p-6 custom-scrollbar">
+                    {candidates.length === 0 ? (
+                      <div className="py-12 text-center">
+                        <Users className="mx-auto text-slate-200 mb-3" size={24} />
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">No candidates available</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-3">
+                        {candidates.map(s => {
+                          const checked = sel.includes(s._id);
+                          return (
+                            <label key={s._id} className={`group flex items-center gap-3 px-4 py-2.5 rounded-2xl border cursor-pointer transition-all ${checked ? 'bg-indigo-600 border-indigo-600 shadow-lg shadow-indigo-100 scale-105' : 'bg-white border-slate-100 hover:border-slate-300'}`}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggle(s._id)}
+                                className="hidden"
+                              />
+                              <img src={s.profileImage || 'https://i.pravatar.cc/40'} className="w-6 h-6 rounded-full border border-white" />
+                              <span className={`text-xs font-black uppercase tracking-tight ${checked ? 'text-white' : 'text-slate-900'}`}>{s.name}</span>
+                              {checked && <CheckCircle2 size={14} className="text-white" />}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* BDT fields + note */}
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Fee (BDT)</label>
+                    <input
+                      type="number"
+                      value={courseFeeTk}
+                      onChange={e => setCourseFeeTk(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-3 px-5 text-sm font-bold outline-none transition-all shadow-inner"
+                      placeholder={defaultFeeTk ? String(defaultFeeTk) : '3000'}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Advance</label>
+                    <input
+                      type="number"
+                      value={advanceTk}
+                      onChange={e => setAdvanceTk(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-3 px-5 text-sm font-bold outline-none transition-all shadow-inner"
+                      placeholder="Empty = 15%"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Expiry</label>
+                    <input
+                      type="datetime-local"
+                      value={expiresAt}
+                      onChange={e => setExpiresAt(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-3 px-5 text-[11px] font-bold outline-none transition-all shadow-inner"
+                    />
+                  </div>
+
+                  <div className="md:col-span-3">
+                    <div className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Sparkles size={16} className="text-indigo-600" />
+                        <span className="text-xs font-black uppercase tracking-tight text-indigo-900">Upfront Due:</span>
+                        <span className="text-lg font-black text-indigo-600 tracking-tight">{upfrontDueTk || 0} BDT</span>
+                      </div>
+                      {conflictCount > 0 && (
+                        <div className="flex items-center gap-2 text-[10px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 px-3 py-1.5 rounded-full border border-rose-100 animate-pulse">
+                          <AlertCircle size={12} />
+                          {conflictCount} Conflicts
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="md:col-span-3 space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Welcome Note</label>
+                    <textarea
+                      value={note}
+                      onChange={e => setNote(e.target.value)}
+                      rows={3}
+                      className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-[2rem] py-4 px-6 text-sm font-bold outline-none transition-all shadow-inner resize-none"
+                      placeholder="Instructions or welcome message..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest max-w-[200px] leading-relaxed">
+                  Students must pay the advance to self-enroll.
+                </p>
+                <div className="flex gap-4">
+                  <button
+                    onClick={onClose}
+                    className="px-8 py-4 rounded-2xl border border-slate-200 bg-white font-black uppercase tracking-widest text-[10px] hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={!canSend}
+                    onClick={send}
+                    className="px-8 py-4 rounded-2xl bg-slate-900 text-white font-black uppercase tracking-widest text-[10px] shadow-xl shadow-slate-200 active:scale-95 disabled:opacity-50 transition-all overflow-hidden relative group"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-indigo-600 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <span className="relative z-10">{sending ? 'Sending...' : 'Send Invites'}</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -633,8 +762,8 @@ function ChangeModal({ open, onClose, group, onSent, otherCourseSlots = [] }) {
       if (!byDay.has(slot.weekday)) byDay.set(slot.weekday, []);
       byDay.get(slot.weekday).push(slot);
     }
-    const days = Array.from(byDay.keys()).sort((a,b)=>a-b);
-    for (const w of days) byDay.get(w).sort((a,b) => timeToMinutes(a.timeHHMM) - timeToMinutes(b.timeHHMM));
+    const days = Array.from(byDay.keys()).sort((a, b) => a - b);
+    for (const w of days) byDay.get(w).sort((a, b) => timeToMinutes(a.timeHHMM) - timeToMinutes(b.timeHHMM));
 
     return { days, map: byDay };
   }, [group]);
@@ -724,13 +853,13 @@ function ChangeModal({ open, onClose, group, onSent, otherCourseSlots = [] }) {
 
   const toggleStudent = (id) => {
     if (removalMode) return; // locked in remove mode
-    setSelIds(cur => cur.includes(id) ? cur.filter(x=>x!==id) : [...cur, id]);
+    setSelIds(cur => cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
   };
   const selectAll = () => {
     if (!selectedSlot) return;
     setSelIds(selectedSlot.students.map(s => s._id));
   };
-  const clearAll  = () => {
+  const clearAll = () => {
     if (removalMode) return;
     setSelIds([]);
   };
@@ -859,7 +988,7 @@ function ChangeModal({ open, onClose, group, onSent, otherCourseSlots = [] }) {
   if (!open || !group) return null;
 
   const dayButtons = dayTime.days.map(w => ({ value: w, label: WD_FULL[w] }));
-  const timeButtons = selectedDay==null ? [] : (dayTime.map.get(selectedDay) || [])
+  const timeButtons = selectedDay == null ? [] : (dayTime.map.get(selectedDay) || [])
     .map(s => ({ key: s.key, label: `${s.timeHHMM} • ${s.durationMinutes}m`, count: s.students.length }));
 
   const slotHuman = selectedSlot
@@ -869,306 +998,281 @@ function ChangeModal({ open, onClose, group, onSent, otherCourseSlots = [] }) {
   const selectedCount = selIds.length;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl border overflow-hidden">
-        {/* Header */}
-        <div
-          className="px-6 py-4 text-white"
-          style={{ background: `linear-gradient(90deg, ${brand}, color-mix(in oklch, ${brand} 70%, white 30%))` }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-white/20 grid place-items-center">🗓️</div>
-            <div className="min-w-0">
-              <div className="text-base font-semibold">Propose change</div>
-              <div className="text-xs/5 opacity-90">
-                {group?.post?.title || 'Course'} • {(Array.isArray(group?.post?.subjects) ? group.post.subjects.join(' | ') : group?.post?.subjects) || '—'}
-              </div>
-            </div>
-            <button className="ml-auto bg-white/15 hover:bg-white/25 rounded-md px-3 py-1.5 text-xs" onClick={onClose}>Close</button>
-          </div>
-
-          {/* Tabs */}
-          <div className="mt-3 flex gap-2">
-            {[{k:'oneoff',label:'One-off change'},{k:'weekly',label:'Edit weekly slot'}].map(t=>(
-              <button
-                key={t.k}
-                onClick={()=>setTab(t.k)}
-                className={`px-3 py-1.5 rounded-md text-sm border transition ${tab===t.k ? 'text-white' : 'bg-white/10 border-white/25'}`}
-                style={tab===t.k ? { backgroundColor:'transparent', borderColor:'transparent' } : {}}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Day → Time picker */}
-        <div className="px-6 py-4 border-b bg-white">
-          <div className="grid md:grid-cols-2 gap-3">
-            <div>
-              <div className="text-[11px] text-slate-500">Choose day</div>
-              <div className="mt-1 flex flex-wrap gap-2">
-                {dayButtons.length === 0 ? (
-                  <span className="text-xs text-slate-400">No weekly slots yet.</span>
-                ) : dayButtons.map(d => (
-                  <button
-                    key={d.value}
-                    onClick={() => {
-                      setSelectedDay(d.value);
-                      const first = (dayTime.map.get(d.value) || [])[0];
-                      setSelectedSlotKey(first?.key || '');
-                    }}
-                    className={`px-3 py-1.5 rounded-lg border text-sm ${selectedDay===d.value ? 'bg-slate-900 text-white border-slate-900' : 'bg-white hover:bg-slate-50'}`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <div className="text-[11px] text-slate-500">Choose time (for selected day)</div>
-              <div className="mt-1 flex flex-wrap gap-2">
-                {timeButtons.length === 0 ? (
-                  <span className="text-xs text-slate-400">Pick a day first.</span>
-                ) : timeButtons.map(t => (
-                  <button
-                    key={t.key}
-                    onClick={() => setSelectedSlotKey(t.key)}
-                    className={`px-3 py-1.5 rounded-lg border text-sm ${selectedSlotKey===t.key ? 'bg-slate-900 text-white border-slate-900' : 'bg-white hover:bg-slate-50'}`}
-                    title={`${t.count} ${t.count===1?'student':'students'}`}
-                  >
-                    {t.label} <span className="ml-1 text-[11px] opacity-80">({t.count})</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Slot summary + student selection */}
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-2">
-            <div className="text-sm font-medium">{slotHuman}</div>
-            {selectedSlot && <Pill>{selectedSlot.students.length} {selectedSlot.students.length===1?'student':'students'}</Pill>}
-            <div className="ml-auto flex gap-2">
-              <button onClick={selectAll} className="text-[11px] rounded-md border px-2 py-0.5" disabled={removalMode}>Select all</button>
-              <button onClick={clearAll} className="text-[11px] rounded-md border px-2 py-0.5" disabled={removalMode}>Clear</button>
-            </div>
-          </div>
-
-          <div className="mt-3 rounded-xl border border-slate-200 p-3">
-            {!selectedSlot ? (
-              <div className="text-sm text-slate-500">Pick a day and time to see students.</div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {selectedSlot.students.map(s => {
-                  const checked = selIds.includes(s._id);
-                  return (
-                    <label key={s._id} className={`flex items-center gap-2 px-2 py-1 rounded-full border ${checked ? 'bg-white' : 'bg-white/70'} ${removalMode ? 'opacity-70 cursor-not-allowed' : ''}`}>
-                      {!removalMode && (
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={()=>toggleStudent(s._id)}
-                          className="h-4 w-4 rounded border-slate-300"
-                          style={{ accentColor: brand }}
-                        />
-                      )}
-                      <StudentChip u={s} />
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* REMOVE banner */}
-          {removalMode && selectedSlot && (
-            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Removing a weekly slot will notify all students currently in this slot.
-              It applies only for students who accept (others remain on the original routine).
-            </div>
-          )}
-        </div>
-
-        {/* Editors */}
-        <div className="px-6 pb-2">
-          {tab === 'oneoff' ? (
-            <div className="rounded-xl border border-slate-200 p-4 grid md:grid-cols-3 gap-3">
-              <label className="block md:col-span-2">
-                <span className="text-[11px] text-slate-500">Date & Time</span>
-                <input
-                  type="datetime-local"
-                  value={oneoff.proposedDate}
-                  onChange={(e)=>setOneoff(o => ({ ...o, proposedDate: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border px-3 py-2"
-                />
-                {oneoffConflicts.conflict && (
-                  <div className="mt-1 text-[11px] text-rose-600">
-                    This time conflicts with {oneoffConflicts.with.join(', ')}. Pick a different time.
+    <div className="fixed inset-0 z-[100] grid place-items-center p-4">
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={onClose}
+              className="absolute inset-0 bg-slate-900/10 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative w-full max-w-5xl bg-white/70 backdrop-blur-3xl rounded-[3rem] shadow-2xl border border-white overflow-hidden flex flex-col max-h-[95vh]"
+            >
+              {/* Header */}
+              <div className="px-10 py-8 bg-slate-900 text-white relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-600/20 to-purple-600/20 opacity-50"></div>
+                <div className="relative z-10 flex items-center gap-5">
+                  <div className="h-14 w-14 rounded-2xl bg-white/10 backdrop-blur-xl grid place-items-center shadow-lg border border-white/10">
+                    <RefreshCw size={24} className="text-white" />
                   </div>
-                )}
-              </label>
-              <label className="block">
-                <span className="text-[11px] text-slate-500">Duration (minutes)</span>
-                <input
-                  type="number"
-                  min={1}
-                  value={oneoff.durationMinutes}
-                  onChange={(e)=>setOneoff(o => ({ ...o, durationMinutes: e.target.value }))}
-                  className="mt-1 w-full rounded-lg border px-3 py-2"
-                />
-              </label>
-              <label className="block md:col-span-3">
-                <span className="text-[11px] text-slate-500">Note (optional)</span>
-                <textarea
-                  value={oneoff.note}
-                  onChange={(e)=>setOneoff(o => ({ ...o, note: e.target.value }))}
-                  rows={3}
-                  className="mt-1 w-full rounded-lg border px-3 py-2"
-                />
-              </label>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-slate-200 p-4 space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <input type="radio" name="op" checked={weekly.op === 'update'} onChange={()=>setWeekly(w => ({ ...w, op: 'update' }))} /> Update selected slot
-                </label>
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <input type="radio" name="op" checked={weekly.op === 'remove'} onChange={()=>setWeekly(w => ({ ...w, op: 'remove' }))} /> Remove selected slot
-                </label>
-                <label className="inline-flex items-center gap-2 text-sm">
-                  <input type="radio" name="op" checked={weekly.op === 'add'} onChange={()=>setWeekly(w => ({ ...w, op: 'add' }))} /> Add a new slot
-                </label>
+                  <div className="min-w-0">
+                    <h3 className="text-2xl font-black tracking-tighter">Modify Routine</h3>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                      {group.post?.title} • Weekly or One-off changes
+                    </p>
+                  </div>
+                  <button
+                    className="ml-auto p-3 rounded-2xl bg-white/10 hover:bg-white/20 transition-colors"
+                    onClick={onClose}
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
-              {(weekly.op === 'update' || weekly.op === 'remove') && (
-                <div className="rounded-lg border border-slate-200 p-3 bg-slate-50">
-                  <div className="text-[11px] text-slate-500 mb-1">Target slot</div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm font-medium">{selectedSlot ? `${WD_FULL[selectedSlot.weekday]} • ${selectedSlot.timeHHMM} • ${selectedSlot.durationMinutes}m` : '—'}</div>
-                    <Pill>{selectedCount} selected</Pill>
+              <div className="flex max-h-full overflow-hidden flex-1">
+                {/* Left Panel: Tabs & Selection */}
+                <div className="w-80 border-r border-slate-100 p-8 overflow-y-auto custom-scrollbar bg-slate-50/30">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Change Type</h4>
+                  <div className="space-y-3 mb-10">
+                    <button
+                      onClick={() => setTab('oneoff')}
+                      className={`w-full flex items-center gap-3 p-4 rounded-2xl border transition-all ${tab === 'oneoff' ? 'bg-white border-indigo-600 shadow-xl shadow-indigo-100 stroke-[3px]' : 'bg-transparent border-slate-100 hover:border-slate-300'}`}
+                    >
+                      <div className={`p-2 rounded-xl ${tab === 'oneoff' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                        <Sparkles size={16} />
+                      </div>
+                      <div className="text-left">
+                        <div className={`text-xs font-black uppercase tracking-tight ${tab === 'oneoff' ? 'text-slate-900' : 'text-slate-400'}`}>One-off</div>
+                        <div className="text-[9px] font-bold text-slate-400">Fixed date change</div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setTab('weekly')}
+                      className={`w-full flex items-center gap-3 p-4 rounded-2xl border transition-all ${tab === 'weekly' ? 'bg-white border-purple-600 shadow-xl shadow-purple-100' : 'bg-transparent border-slate-100 hover:border-slate-300'}`}
+                    >
+                      <div className={`p-2 rounded-xl ${tab === 'weekly' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                        <Calendar size={16} />
+                      </div>
+                      <div className="text-left">
+                        <div className={`text-xs font-black uppercase tracking-tight ${tab === 'weekly' ? 'text-slate-900' : 'text-slate-400'}`}>Weekly</div>
+                        <div className="text-[9px] font-bold text-slate-400">Permanent routine update</div>
+                      </div>
+                    </button>
                   </div>
-                  {weekly.op === 'remove' && (
-                    <div className="mt-1 text-xs text-slate-600">
-                      Removal will notify everyone in this slot. It applies only for students who accept; others keep their current routine.
+
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Source Slot</h4>
+                  <div className="space-y-4">
+                    {dayTime.days.map(d => (
+                      <div key={d} className="space-y-2">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1 mb-1">{WD_FULL[d]}</div>
+                        <div className="grid grid-cols-1 gap-2">
+                          {dayTime.map.get(d).map(s => {
+                            const active = selectedSlotKey === s.key;
+                            return (
+                              <button
+                                key={s.key}
+                                onClick={() => {
+                                  setSelectedDay(d);
+                                  setSelectedSlotKey(s.key);
+                                }}
+                                className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${active ? 'bg-slate-900 text-white border-slate-900 shadow-lg shadow-slate-200' : 'bg-white border-slate-100 hover:border-slate-300'}`}
+                              >
+                                <span className="text-[11px] font-black">{s.timeHHMM}</span>
+                                <div className={`px-2 py-0.5 rounded-lg text-[9px] font-black ${active ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                                  {s.students.length} <Users size={8} className="inline ml-0.5" />
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right Panel: Content */}
+                <div className="flex-1 p-10 overflow-y-auto custom-scrollbar">
+                  {!selectedSlot ? (
+                    <div className="h-full flex flex-col items-center justify-center p-20 text-center">
+                      <div className="w-16 h-16 rounded-3xl bg-slate-50 border border-slate-100 grid place-items-center text-slate-300 mb-6 font-black uppercase tracking-widest">
+                        ?
+                      </div>
+                      <h4 className="text-lg font-black text-slate-900 tracking-tight mb-2">Select a source slot</h4>
+                      <p className="text-xs font-medium text-slate-400 leading-relaxed">Choose which existing routine session you want to modify from the left sidebar.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {/* Students selection */}
+                      <div>
+                        <label className="flex items-center justify-between mb-4">
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Affected Students</span>
+                          <div className="flex gap-4">
+                            <button onClick={selectAll} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline transition-all">All</button>
+                            <button onClick={clearAll} className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:underline transition-all">None</button>
+                          </div>
+                        </label>
+                        <div className="p-6 rounded-[2rem] bg-slate-50/50 border border-slate-100 flex flex-wrap gap-3">
+                          {selectedSlot.students.map(u => {
+                            const checked = selIds.includes(u._id);
+                            return (
+                              <div
+                                key={u._id}
+                                onClick={() => toggleStudent(u._id)}
+                                className={`flex items-center gap-3 px-4 py-2 rounded-2xl border transition-all cursor-pointer ${checked ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100 translate-y-[-2px]' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-300'}`}
+                              >
+                                <img src={u.profileImage || `https://i.pravatar.cc/24?u=${u._id}`} className="w-5 h-5 rounded-full ring-2 ring-white/20" />
+                                <span className="text-[10px] font-black uppercase tracking-tight">{u.name}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {removalMode && (
+                          <div className="mt-4 p-4 rounded-2xl bg-amber-50 border border-amber-100 flex items-start gap-3">
+                            <AlertCircle size={16} className="text-amber-600 mt-0.5" />
+                            <p className="text-[11px] font-bold text-amber-700 leading-relaxed uppercase tracking-tight">
+                              Removing this weekly slot will notify all {selectedSlot.students.length} students. They must agree to the change.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Form area */}
+                      <div className="pt-8 border-t border-slate-100">
+                        {tab === 'oneoff' ? (
+                          <div className="grid grid-cols-2 gap-8">
+                            <div className="space-y-3">
+                              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Proposed Date & Time</label>
+                              <input
+                                type="datetime-local"
+                                value={oneoff.proposedDate}
+                                onChange={e => setOneoff({ ...oneoff, proposedDate: e.target.value })}
+                                className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-4 px-6 text-xs font-black outline-none transition-all shadow-inner"
+                              />
+                            </div>
+                            <div className="space-y-3">
+                              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Duration (Min)</label>
+                              <input
+                                type="number"
+                                value={oneoff.durationMinutes}
+                                onChange={e => setOneoff({ ...oneoff, durationMinutes: e.target.value })}
+                                className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-4 px-6 text-sm font-black outline-none transition-all shadow-inner"
+                              />
+                            </div>
+                            {oneoffConflicts.conflict && (
+                              <div className="col-span-2 p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-500 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 animate-pulse">
+                                <AlertCircle size={14} />
+                                Conflict with: {oneoffConflicts.with.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-8">
+                            <div className="flex gap-2 p-2 rounded-2xl bg-slate-100 w-fit">
+                              {['add', 'update', 'remove'].map(op => (
+                                <button
+                                  key={op}
+                                  onClick={() => setWeekly({ ...weekly, op })}
+                                  className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${weekly.op === op ? 'bg-white text-slate-900 shadow-xl' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                  {op}
+                                </button>
+                              ))}
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-8">
+                              <div className="space-y-3">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Weekday</label>
+                                <select
+                                  disabled={removalMode}
+                                  value={weekly.weekday}
+                                  onChange={e => setWeekly({ ...weekly, weekday: Number(e.target.value) })}
+                                  className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-4 px-6 text-xs font-black outline-none transition-all shadow-inner appearance-none disabled:opacity-50"
+                                >
+                                  {WD_FULL.map((label, i) => (<option key={i} value={i}>{label}</option>))}
+                                </select>
+                              </div>
+                              <div className="space-y-3">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Time (HH:MM)</label>
+                                <input
+                                  disabled={removalMode}
+                                  value={weekly.timeHHMM}
+                                  onChange={e => setWeekly({ ...weekly, timeHHMM: e.target.value })}
+                                  className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-4 px-6 text-sm font-black outline-none transition-all shadow-inner disabled:opacity-50"
+                                  placeholder="e.g., 18:30"
+                                />
+                              </div>
+                              <div className="space-y-3">
+                                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Duration</label>
+                                <input
+                                  disabled={removalMode}
+                                  value={weekly.durationMinutes}
+                                  onChange={e => setWeekly({ ...weekly, durationMinutes: e.target.value })}
+                                  className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-2xl py-4 px-6 text-sm font-black outline-none transition-all shadow-inner disabled:opacity-50"
+                                />
+                              </div>
+                            </div>
+                            {weeklyConflicts.conflict && (
+                              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-100 text-rose-500 font-black text-[10px] uppercase tracking-widest flex items-center gap-2 animate-pulse">
+                                <AlertCircle size={14} />
+                                Weekly Conflict with: {weeklyConflicts.with.join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="mt-8 space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Reason / Note</label>
+                          <textarea
+                            value={tab === 'oneoff' ? oneoff.note : weekly.note}
+                            onChange={e => tab === 'oneoff' ? setOneoff({ ...oneoff, note: e.target.value }) : setWeekly({ ...weekly, note: e.target.value })}
+                            className="w-full bg-slate-50 border border-slate-100 focus:border-indigo-500 focus:bg-white rounded-[2rem] py-5 px-8 text-sm font-bold outline-none transition-all shadow-inner resize-none"
+                            rows={3}
+                            placeholder="Brief explaining for this change..."
+                          />
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
-              )}
+              </div>
 
-              {weekly.op === 'update' && (
-                <div className="grid md:grid-cols-3 gap-3">
-                  <label className="block">
-                    <span className="text-[11px] text-slate-500">New weekday</span>
-                    <select
-                      value={weekly.weekday}
-                      onChange={(e)=>setWeekly(w => ({ ...w, weekday: Number(e.target.value) }))}
-                      className="mt-1 w-full rounded-lg border px-3 py-2"
-                    >
-                      {WD_SHORT.map((d,i)=>(<option key={i} value={i}>{d}</option>))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="text-[11px] text-slate-500">New time (HH:mm)</span>
-                    <input
-                      value={weekly.timeHHMM}
-                      onChange={(e)=>setWeekly(w => ({ ...w, timeHHMM: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border px-3 py-2"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[11px] text-slate-500">New duration (mins)</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={weekly.durationMinutes}
-                      onChange={(e)=>setWeekly(w => ({ ...w, durationMinutes: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border px-3 py-2"
-                    />
-                  </label>
-                  {weeklyConflicts.conflict && (
-                    <div className="md:col-span-3 text-[11px] text-rose-600">
-                      This weekly time conflicts with {weeklyConflicts.with.join(', ')}.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {weekly.op === 'add' && (
-                <div className="grid md:grid-cols-3 gap-3">
-                  <label className="block">
-                    <span className="text-[11px] text-slate-500">Weekday</span>
-                    <select
-                      value={weekly.weekday}
-                      onChange={(e)=>setWeekly(w => ({ ...w, weekday: Number(e.target.value) }))}
-                      className="mt-1 w-full rounded-lg border px-3 py-2"
-                    >
-                      {WD_SHORT.map((d,i)=>(<option key={i} value={i}>{d}</option>))}
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="text-[11px] text-slate-500">Time (HH:mm)</span>
-                    <input
-                      value={weekly.timeHHMM}
-                      onChange={(e)=>setWeekly(w => ({ ...w, timeHHMM: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border px-3 py-2"
-                    />
-                  </label>
-                  <label className="block">
-                    <span className="text-[11px] text-slate-500">Duration (mins)</span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={weekly.durationMinutes}
-                      onChange={(e)=>setWeekly(w => ({ ...w, durationMinutes: e.target.value }))}
-                      className="mt-1 w-full rounded-lg border px-3 py-2"
-                    />
-                  </label>
-                  {weeklyConflicts.conflict && (
-                    <div className="md:col-span-3 text-[11px] text-rose-600">
-                      This weekly time conflicts with {weeklyConflicts.with.join(', ')}.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t bg-white flex items-center justify-between">
-          <div className="text-xs text-slate-500">
-            {selectedCount} selected — changes apply only after students accept.
-          </div>
-          <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 bg-white">Cancel</button>
-            {tab === 'oneoff' ? (
-              <button
-                disabled={!oneoffValid}
-                onClick={submitOneoff}
-                className="px-4 py-2 rounded-lg text-white disabled:opacity-60"
-                style={{ backgroundColor: brand }}
-                title={oneoffConflicts.conflict ? `Conflicts with ${oneoffConflicts.with.join(', ')}` : ''}
-              >
-                Send request
-              </button>
-            ) : (
-              <button
-                disabled={!weeklyValid}
-                onClick={submitWeekly}
-                className="px-4 py-2 rounded-lg text-white disabled:opacity-60"
-                style={{ backgroundColor: brand }}
-                title={weeklyConflicts.conflict ? `Conflicts with ${weeklyConflicts.with.join(', ')}` : ''}
-              >
-                Propose weekly change
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+              {/* Footer */}
+              <div className="px-10 py-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-6 overflow-visible shrink-0 items-center">
+                <p className="mr-auto text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Clock size={12} />
+                  Changes apply only after student approval
+                </p>
+                <button
+                  onClick={onClose}
+                  className="px-10 py-4 rounded-2xl border border-slate-200 bg-white font-black uppercase tracking-widest text-[11px] hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={tab === 'oneoff' ? submitOneoff : submitWeekly}
+                  disabled={tab === 'oneoff' ? !oneoffValid : !weeklyValid}
+                  className={`px-12 py-4 rounded-2xl text-white font-black uppercase tracking-widest text-[11px] shadow-2xl shadow-indigo-200 active:scale-95 disabled:opacity-50 transition-all overflow-hidden relative group`}
+                  style={{ minWidth: '240px' }}
+                >
+                  <div className={`absolute inset-0 bg-gradient-to-r ${tab === 'oneoff' ? 'from-indigo-600 to-purple-600' : 'from-purple-600 to-pink-600'} opacity-100 group-hover:scale-110 transition-transform`}></div>
+                  <span className="relative z-10 flex items-center justify-center gap-3">
+                    <RefreshCw size={16} />
+                    {tab === 'oneoff' ? 'Apply One-off' : 'Propose Weekly'}
+                  </span>
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1177,8 +1281,6 @@ function ChangeModal({ open, onClose, group, onSent, otherCourseSlots = [] }) {
 
 export default function TeacherRoutinesPage() {
   const userId = useSelector((s) => s?.auth?.user?._id);
-
-  const [client] = useState(() => new QueryClient()); // 👈 local QueryClient for TodayScheduleList
 
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1239,7 +1341,7 @@ export default function TeacherRoutinesPage() {
 
   // Optional: outgoing cache (unused directly)
   const outgoingRef = useRef([]);
-  useEffect(() => { (async () => { try { outgoingRef.current = await listOutgoingRoutineChanges(); } catch {} })(); }, []);
+  useEffect(() => { (async () => { try { outgoingRef.current = await listOutgoingRoutineChanges(); } catch { } })(); }, []);
 
   const onToggleGroupStatus = async (g, next) => {
     try {
@@ -1249,93 +1351,210 @@ export default function TeacherRoutinesPage() {
   };
 
   return (
-    <QueryClientProvider client={client}>
-      <div className="p-6 max-w-6xl mx-auto">
-        <div className="mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">My Weekly Routines</h2>
-          <p className="text-sm text-slate-600">Grouped by course. Manage time/day changes with student agreements.</p>
-        </div>
+    <div className="relative min-h-screen bg-slate-50 overflow-hidden isolate">
+      {/* Legendary Background */}
+      <div className="fixed inset-0 -z-10 pointer-events-none">
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            rotate: [0, 45, 0],
+          }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+          className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-indigo-200/30 blur-[120px] rounded-full"
+        />
+        <motion.div
+          animate={{
+            scale: [1.2, 1, 1.2],
+            rotate: [45, 0, 45],
+          }}
+          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+          className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-purple-200/30 blur-[120px] rounded-full"
+        />
+        <div className="absolute inset-0 bg-white/40 backdrop-blur-[100px]" />
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+      </div>
 
-        {/* Quick join for anything happening today */}
-        <div className="mb-6">
-          <TodayScheduleList />
-        </div>
+      <div className="relative z-10 flex flex-col min-h-screen p-8 lg:p-12">
 
-        {loading ? (
-          <div className="text-sm text-slate-500">Loading…</div>
-        ) : groups.length === 0 ? (
-          <div className="text-sm text-slate-500">No routines yet.</div>
-        ) : (
-          <div className="grid gap-4">
-            {groups.map(g => {
-              const title = g.post?.title || 'Course';
-              const subjects = Array.isArray(g.post?.subjects) ? g.post.subjects.join(' | ') : (g.post?.subjects || '');
-              const studentCount = g.students.length;
-              const slotCount = g.slotUnion.length;
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-7xl mx-auto w-full mb-12"
+        >
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-slate-200/60">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-900 grid place-items-center shadow-2xl shadow-slate-200">
+                  <Calendar className="text-white" size={24} />
+                </div>
+                <h1 className="text-4xl font-black text-slate-900 tracking-tighter">My Routines</h1>
+              </div>
+              <p className="text-sm font-bold text-slate-400 uppercase tracking-[0.2em] ml-1">Grouped by course • Sync with students</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right hidden sm:block">
+                <div className="text-xs font-black text-slate-400 uppercase tracking-widest">Active Groups</div>
+                <div className="text-2xl font-black text-slate-900">{groups.filter(g => g.status === 'active').length} / {groups.length}</div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
 
-              return (
-                <div key={g.key} className="bg-white border rounded-2xl p-5">
-                  <div className="flex items-center gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-900">{title}</div>
-                      <div className="text-[12px] text-slate-600">{subjects}</div>
+        <div className="max-w-7xl mx-auto w-full flex-1">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            {/* Sidebar Left: Today's Schedule */}
+            <div className="lg:col-span-4 space-y-10">
+              <div className="space-y-6">
+                <h3 className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">
+                  <Sparkles size={14} className="text-indigo-600" />
+                  Happening Today
+                </h3>
+                <TodayScheduleList />
+              </div>
+            </div>
+
+            {/* Main Column: Course List */}
+            <div className="lg:col-span-8">
+              {loading ? (
+                <div className="grid place-items-center py-40">
+                  <div className="relative">
+                    <RefreshCw className="animate-spin text-slate-200" size={48} />
+                    <div className="absolute inset-0 grid place-items-center">
+                      <div className="w-2 h-2 rounded-full bg-indigo-600" />
                     </div>
-                    <Pill>{studentCount} {studentCount === 1 ? 'student' : 'students'}</Pill>
-                    <Pill>{slotCount} {slotCount === 1 ? 'slot' : 'slots'}</Pill>
-                    <span className={`ml-auto text-[10px] px-2 py-0.5 rounded-full ring-1 ${
-                      g.status === 'active'
-                        ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-                        : g.status === 'paused'
-                        ? 'bg-amber-50 text-amber-700 ring-amber-200'
-                        : 'bg-slate-100 text-slate-700 ring-slate-200'
-                    }`}>{g.status}</span>
-                  </div>
-
-                  <div className="mt-4 flex gap-2 flex-wrap">
-                    {g.status !== 'active' ? (
-                      <button onClick={()=>onToggleGroupStatus(g, 'active')} className="px-3 py-1.5 rounded-lg border">Resume</button>
-                    ) : (
-                      <button onClick={()=>onToggleGroupStatus(g, 'paused')} className="px-3 py-1.5 rounded-lg border">Pause</button>
-                    )}
-                    <button
-                      onClick={()=>setModalGroup(g)}
-                      className="px-3 py-1.5 rounded-lg text-white"
-                      style={{ backgroundColor: brand }}
-                    >
-                      Propose change
-                    </button>
-                    <button
-                      onClick={()=>setDrawerGroup(g)}
-                      className="px-3 py-1.5 rounded-lg border"
-                    >
-                      Pending changes
-                    </button>
-                    {/* Invite to this course */}
-                    <button
-                      onClick={()=>setInviteGroup(g)}
-                      className="px-3 py-1.5 rounded-lg border"
-                    >
-                      Invite to course
-                    </button>
                   </div>
                 </div>
-              );
-            })}
+              ) : groups.length === 0 ? (
+                <div className="bg-white/40 backdrop-blur-xl rounded-[3rem] p-20 border border-white text-center shadow-2xl shadow-slate-200/50">
+                  <div className="w-20 h-20 rounded-full bg-slate-50 grid place-items-center mx-auto mb-8">
+                    <BookOpen size={32} className="text-slate-300" />
+                  </div>
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight mb-3">No routines found</h3>
+                  <p className="text-sm font-medium text-slate-400 leading-relaxed max-w-sm mx-auto uppercase tracking-tighter">
+                    Routines are created automatically when a post starts accepting enrollments.
+                  </p>
+                </div>
+              ) : (
+                <motion.div
+                  initial="hidden"
+                  animate="show"
+                  variants={{
+                    hidden: { opacity: 0 },
+                    show: { opacity: 1, transition: { staggerChildren: 0.1 } }
+                  }}
+                  className="grid gap-8"
+                >
+                  {groups.map(g => (
+                    <motion.div
+                      key={g.key}
+                      variants={{
+                        hidden: { opacity: 0, y: 20 },
+                        show: { opacity: 1, y: 0 }
+                      }}
+                      className="group relative bg-white/60 backdrop-blur-2xl rounded-[3rem] p-8 border border-white shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500 hover:translate-y-[-4px]"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-4">
+                            <h3 className="text-2xl font-black text-slate-900 tracking-tighter group-hover:text-indigo-600 transition-colors">
+                              {g.post?.title || 'Unknown Course'}
+                            </h3>
+                            <span className={`px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest ring-1 ${g.status === 'active'
+                              ? 'bg-emerald-50 text-emerald-700 ring-emerald-100 shadow-sm shadow-emerald-50'
+                              : 'bg-amber-50 text-amber-700 ring-amber-100 shadow-sm shadow-amber-50'
+                              }`}>
+                              {g.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-slate-100 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
+                              <BookOpen size={14} />
+                            </div>
+                            <p className="text-sm font-black text-slate-400 uppercase tracking-tight line-clamp-1">{Array.isArray(g.post?.subjects) ? g.post.subjects.join(' • ') : (g.post?.subjects || '')}</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3">
+                            <Pill tone="active"><Users size={12} className="inline mr-1" /> {g.students.length} Students</Pill>
+                            <Pill><Clock size={12} className="inline mr-1" /> {g.slotUnion.length} Weekly Slots</Pill>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col gap-3 min-w-[180px]">
+                          {g.status !== 'active' ? (
+                            <button onClick={() => onToggleGroupStatus(g, 'active')} className="w-full bg-slate-900 text-white rounded-2xl py-3 text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg active:scale-95">
+                              Resume Course
+                            </button>
+                          ) : (
+                            <button onClick={() => onToggleGroupStatus(g, 'paused')} className="w-full bg-white border border-slate-100 text-slate-900 rounded-2xl py-3 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95">
+                              Pause Activity
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Action Toolbar */}
+                      <div className="pt-8 border-t border-slate-100/60 flex flex-wrap gap-4">
+                        <button
+                          onClick={() => setModalGroup(g)}
+                          className="bg-indigo-600 text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 group/btn"
+                        >
+                          <div className="p-1 rounded-lg bg-white/10 group-hover/btn:scale-110 transition-transform">
+                            <RefreshCw size={14} />
+                          </div>
+                          Propose Changes
+                        </button>
+                        <button
+                          onClick={() => setDrawerGroup(g)}
+                          className="bg-white border border-slate-100 text-slate-900 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-50 transition-all active:scale-95"
+                        >
+                          <Settings size={14} className="text-slate-400" />
+                          Pending changes
+                        </button>
+                        <button
+                          onClick={() => setInviteGroup(g)}
+                          className="bg-white border border-slate-100 text-indigo-600 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-indigo-50 hover:border-indigo-100 transition-all active:scale-95"
+                        >
+                          <UserPlus size={14} />
+                          Invite Students
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </motion.div>
+              )}
+            </div>
           </div>
-        )}
-
-        <ChangeModal
-          open={!!modalGroup}
-          group={modalGroup}
-          onClose={()=>setModalGroup(null)}
-          onSent={fetchRoutines}
-          otherCourseSlots={allWeeklySlots}
-        />
-        <RequestsDrawer open={!!drawerGroup} group={drawerGroup} onClose={()=>setDrawerGroup(null)} />
-
-        {/* Invite UI */}
-        <InviteModal open={!!inviteGroup} group={inviteGroup} onClose={()=>setInviteGroup(null)} allGroups={groups} />
+        </div>
       </div>
-    </QueryClientProvider>
+
+      {/* Portals */}
+      <AnimatePresence>
+        {modalGroup && (
+          <ChangeModal
+            open={!!modalGroup}
+            group={modalGroup}
+            onClose={() => setModalGroup(null)}
+            onSent={fetchRoutines}
+            otherCourseSlots={allWeeklySlots}
+          />
+        )}
+        {drawerGroup && (
+          <RequestsDrawer
+            open={!!drawerGroup}
+            group={drawerGroup}
+            onClose={() => setDrawerGroup(null)}
+          />
+        )}
+        {inviteGroup && (
+          <InviteModal
+            open={!!inviteGroup}
+            group={inviteGroup}
+            onClose={() => setInviteGroup(null)}
+            allGroups={groups}
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
+
