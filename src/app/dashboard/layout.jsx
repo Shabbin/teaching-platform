@@ -46,16 +46,8 @@ function DashboardLayoutInner({ children }) {
   const [signupDropdownOpen, setSignupDropdownOpen] = useState(false);
   const [navItems, setNavItems] = useState([]);
   const [activePath, setActivePath] = useState('');
-  const [scrolled, setScrolled] = useState(false);
 
-  // Handle scroll for header glassmorphism
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  // Scroll listener removed for better mobile performance (using CSS-only approach)
 
   // Update nav items based on role
   useEffect(() => {
@@ -143,14 +135,11 @@ function DashboardLayoutInner({ children }) {
           transition-all duration-500 ease-out
         `}
       >
-        {/* Glass Background - Sibling div to avoid trapping fixed children */}
+        {/* Glass Background - CSS Only for better performance */}
         <div
           className={`
-            absolute inset-0 -z-10 transition-all duration-500
-            ${scrolled
-              ? 'bg-white/70 backdrop-blur-2xl shadow-lg shadow-indigo-100/20 border-b border-white/50'
-              : 'bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100'
-            }
+            absolute inset-0 -z-10 transition-all duration-300
+            bg-white/70 backdrop-blur-md md:backdrop-blur-xl shadow-sm border-b border-gray-100/50
           `}
         />
 
@@ -430,8 +419,15 @@ function DashboardLayoutInner({ children }) {
         />
       )}
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto relative z-10">
+      {/* Main Content scroller - Optimized for "App-like" performance */}
+      <main
+        className="flex-1 overflow-y-auto relative z-10 overscroll-contain touch-pan-y"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          scrollBehavior: 'smooth',
+          willChange: 'transform'
+        }}
+      >
         {children}
       </main>
 

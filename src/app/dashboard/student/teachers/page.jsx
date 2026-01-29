@@ -157,10 +157,12 @@ const ViewTeachers = () => {
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-x-hidden font-sans text-slate-900">
 
-      {/* Background Decor */}
+      {/* Background Decor - Optimized for mobile */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-[20%] -right-[10%] w-[800px] h-[800px] bg-indigo-200/20 rounded-full blur-[100px]" />
-        <div className="absolute top-[40%] -left-[10%] w-[600px] h-[600px] bg-blue-200/20 rounded-full blur-[100px]" />
+        <div className="hidden md:block">
+          <div className="absolute -top-[20%] -right-[10%] w-[800px] h-[800px] bg-indigo-200/20 rounded-full blur-[100px]" />
+          <div className="absolute top-[40%] -left-[10%] w-[600px] h-[600px] bg-blue-200/20 rounded-full blur-[100px]" />
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 relative z-10">
@@ -228,7 +230,7 @@ const ViewTeachers = () => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -50 }}
                 className={`
-                  fixed inset-0 z-50 bg-white/50 backdrop-blur-xl lg:backdrop-blur-none lg:bg-transparent lg:static lg:w-80 lg:block p-6 lg:p-0
+                  fixed inset-0 z-50 bg-white/50 backdrop-blur-md lg:backdrop-blur-none lg:bg-transparent lg:static lg:w-80 lg:block p-6 lg:p-0
                   ${isMobileFilterOpen ? 'flex flex-col' : 'hidden'}
                 `}
               >
@@ -368,10 +370,12 @@ const ViewTeachers = () => {
                 {teachers.map(({ teacher, subjects, hourlyRate, location, rating, reviews }, index) => (
                   <motion.div
                     key={teacher._id}
-                    initial={{ opacity: 0, y: 30 }}
+                    initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.1 }}
-                    whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                    transition={{
+                      duration: 0.3,
+                      delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : index * 0.05
+                    }}
                     className="bg-white rounded-3xl p-6 md:p-8 shadow-[0_2px_20px_rgba(0,0,0,0.04)] hover:shadow-[0_10px_40px_rgba(0,0,0,0.08)] border border-slate-100 transition-all group relative overflow-hidden"
                   >
                     {/* Hover Gradient Border Effect */}

@@ -184,25 +184,27 @@ export default function TeacherDashboardInner() {
 
   return (
     <div className="relative min-h-screen bg-slate-50 overflow-hidden isolate">
-      {/* Legendary Background */}
+      {/* Legendary Background - Optimized for mobile */}
       <div className="fixed inset-0 -z-10 pointer-events-none">
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            rotate: [0, 45, 0],
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-indigo-200/30 blur-[120px] rounded-full"
-        />
-        <motion.div
-          animate={{
-            scale: [1.2, 1, 1.2],
-            rotate: [45, 0, 45],
-          }}
-          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-purple-200/30 blur-[120px] rounded-full"
-        />
-        <div className="absolute inset-0 bg-white/40 backdrop-blur-[100px]" />
+        <div className="hidden md:block">
+          <motion.div
+            animate={{
+              scale: [1, 1.2, 1],
+              rotate: [0, 45, 0],
+            }}
+            transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+            className="absolute top-[-20%] left-[-10%] w-[70%] h-[70%] bg-indigo-200/30 blur-[120px] rounded-full"
+          />
+          <motion.div
+            animate={{
+              scale: [1.2, 1, 1.2],
+              rotate: [45, 0, 45],
+            }}
+            transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
+            className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-purple-200/30 blur-[120px] rounded-full"
+          />
+        </div>
+        <div className="absolute inset-0 bg-white/40 backdrop-blur-md md:backdrop-blur-[100px]" />
         <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
       </div>
 
@@ -254,7 +256,7 @@ export default function TeacherDashboardInner() {
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12"
           >
             {/* Earnings Card */}
-            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-white/60 backdrop-blur-2xl p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 border border-white relative overflow-hidden group hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500">
+            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 border border-white relative overflow-hidden group hover:shadow-2xl hover:shadow-indigo-100/50 transition-all duration-500">
               <div className="absolute -top-4 -right-4 p-8 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all">
                 <CreditCard size={120} className="text-indigo-600" />
               </div>
@@ -270,7 +272,7 @@ export default function TeacherDashboardInner() {
             </motion.div>
 
             {/* Sessions Card */}
-            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-white/60 backdrop-blur-2xl p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 border border-white relative overflow-hidden group hover:shadow-2xl hover:shadow-blue-100/50 transition-all duration-500">
+            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 border border-white relative overflow-hidden group hover:shadow-2xl hover:shadow-blue-100/50 transition-all duration-500">
               <div className="absolute -top-4 -right-4 p-8 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all">
                 <Clock size={120} className="text-blue-600" />
               </div>
@@ -286,7 +288,7 @@ export default function TeacherDashboardInner() {
             </motion.div>
 
             {/* Students Card */}
-            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-white/60 backdrop-blur-2xl p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 border border-white relative overflow-hidden group hover:shadow-2xl hover:shadow-purple-100/50 transition-all duration-500">
+            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 border border-white relative overflow-hidden group hover:shadow-2xl hover:shadow-purple-100/50 transition-all duration-500">
               <div className="absolute -top-4 -right-4 p-8 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all">
                 <Users size={120} className="text-purple-600" />
               </div>
@@ -302,7 +304,7 @@ export default function TeacherDashboardInner() {
             </motion.div>
 
             {/* Rating Card */}
-            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-white/60 backdrop-blur-2xl p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 border border-white relative overflow-hidden group hover:shadow-2xl hover:shadow-amber-100/50 transition-all duration-500">
+            <motion.div variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }} className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 border border-white relative overflow-hidden group hover:shadow-2xl hover:shadow-amber-100/50 transition-all duration-500">
               <div className="absolute -top-4 -right-4 p-8 opacity-5 group-hover:opacity-10 group-hover:scale-110 transition-all">
                 <Star size={120} className="text-amber-500" />
               </div>
@@ -322,7 +324,7 @@ export default function TeacherDashboardInner() {
 
             {/* Left Column: Profile & quick info */}
             <div className="lg:col-span-1 space-y-6">
-              <section className="bg-white/60 backdrop-blur-2xl rounded-[3rem] p-10 border border-white shadow-xl shadow-slate-200/50 relative overflow-hidden group">
+              <section className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl rounded-[3rem] p-10 border border-white shadow-xl shadow-slate-200/50 relative overflow-hidden group">
                 <div className="flex flex-col items-center text-center">
                   <div className="relative group/avatar mb-8">
                     <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-2xl shadow-indigo-200/50 group-hover/avatar:scale-105 transition-transform duration-500">
@@ -412,7 +414,7 @@ export default function TeacherDashboardInner() {
             <div className="lg:col-span-2 space-y-6">
 
               {/* Recent Activity */}
-              <section className="bg-white/60 backdrop-blur-2xl rounded-[3rem] border border-white shadow-xl shadow-slate-200/50 overflow-hidden group">
+              <section className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl rounded-[3rem] border border-white shadow-xl shadow-slate-200/50 overflow-hidden group">
                 <div className="p-8 border-b border-white flex justify-between items-center bg-slate-50/30">
                   <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3">
                     <BookOpen size={16} className="text-indigo-600" /> Recent History
@@ -428,7 +430,7 @@ export default function TeacherDashboardInner() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Upcoming Sessions */}
-                <section className="bg-white/60 backdrop-blur-2xl rounded-[3rem] border border-white shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col min-h-[400px]">
+                <section className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl rounded-[3rem] border border-white shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col min-h-[400px]">
                   <div className="p-8 border-b border-white bg-slate-50/30">
                     <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3">
                       <Clock size={16} className="text-blue-600" /> Scheduled
@@ -463,7 +465,7 @@ export default function TeacherDashboardInner() {
                 </section>
 
                 {/* Requests */}
-                <section className="bg-white/60 backdrop-blur-2xl rounded-[3rem] border border-white shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col min-h-[400px]">
+                <section className="bg-white/60 backdrop-blur-md md:backdrop-blur-2xl rounded-[3rem] border border-white shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col min-h-[400px]">
                   <div className="p-8 border-b border-white bg-slate-50/30">
                     <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 flex items-center gap-3">
                       <MailCheck size={16} className="text-purple-600" /> Requests
