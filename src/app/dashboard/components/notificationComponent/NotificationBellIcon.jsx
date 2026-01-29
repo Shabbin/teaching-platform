@@ -229,9 +229,8 @@ export default function NotificationBell() {
                   {notifications.map((n) => (
                     <li
                       key={n._id || n.id}
-                      className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 ${
-                        !n.read ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-gray-50'
-                      }`}
+                      className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 ${!n.read ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-gray-50'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <img
@@ -260,16 +259,20 @@ export default function NotificationBell() {
 
             {/* mobile full-screen modal */}
             <motion.div
-              className="md:hidden fixed inset-0 z-40 flex flex-col bg-white overflow-y-auto"
+              className="md:hidden fixed inset-0 z-[60] flex flex-col bg-white overflow-y-auto"
               initial={{ y: '-100%' }}
               animate={{ y: 0 }}
               exit={{ y: '-100%' }}
               transition={{ duration: 0.3 }}
             >
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 font-semibold text-gray-700">
+              <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100 font-bold text-lg text-gray-800">
                 Notifications
-                <button onClick={() => setOpen(false)} aria-label="Close" className="p-1 text-gray-500 hover:text-indigo-600">
-                  <X className="w-5 h-5" />
+                <button
+                  onClick={() => setOpen(false)}
+                  aria-label="Close"
+                  className="p-2 -mr-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
                 </button>
               </div>
 
@@ -280,9 +283,8 @@ export default function NotificationBell() {
                   {notifications.map((n) => (
                     <li
                       key={n._id || n.id}
-                      className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 ${
-                        !n.read ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-gray-50'
-                      }`}
+                      className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-all duration-200 ${!n.read ? 'bg-indigo-50 hover:bg-indigo-100' : 'hover:bg-gray-50'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <img

@@ -127,12 +127,14 @@ function DashboardLayoutInner({ children }) {
 
   return (
     <div className="w-screen h-screen flex flex-col relative overflow-hidden">
-      {/* Animated Background Gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 -z-10">
+      {/* Animated Background Gradient - Hidden on mobile for performance */}
+      <div className="hidden md:block fixed inset-0 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 -z-10">
         <div className="absolute top-0 -left-4 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob"></div>
         <div className="absolute top-0 -right-4 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
         <div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
       </div>
+      {/* Static Background for Mobile */}
+      <div className="md:hidden fixed inset-0 bg-indigo-50 -z-10"></div>
 
       {/* Header Container */}
       <header
@@ -162,7 +164,7 @@ function DashboardLayoutInner({ children }) {
               <img
                 src="/logo.png"
                 alt="Logo"
-                className="h-32 md:h-44 w-auto relative z-10 cursor-pointer object-contain"
+                className="h-20 md:h-44 w-auto relative z-10 cursor-pointer object-contain"
               />
             </div>
           </Link>
@@ -226,7 +228,7 @@ function DashboardLayoutInner({ children }) {
                     <img
                       src={profileSrc}
                       alt="Profile"
-                      className="relative w-11 h-11 rounded-full object-cover border-2 border-white shadow-lg cursor-pointer ring-2 ring-transparent group-hover:ring-indigo-400 transition-all duration-300 transform group-hover:scale-105"
+                      className="relative w-11 h-11 rounded-full object-cover border-2 border-white shadow-lg cursor-pointer ring-2 ring-transparent group-hover:ring-indigo-400 transition-all duration-300 transform group-hover:scale-105 flex-shrink-0 aspect-square"
                     />
                     <div className={`absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full transition-transform ${dropdownOpen ? 'scale-0' : 'scale-100'}`}></div>
                   </button>
