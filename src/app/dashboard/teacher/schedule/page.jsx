@@ -93,7 +93,7 @@ const Sidebar = ({ onOpen, teacherName, teacherImage, mobileOpen, onClose }) => 
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="w-[280px] bg-white/40 backdrop-blur-md md:backdrop-blur-3xl border-r border-white/50 p-6 flex flex-col flex-shrink-0 hidden md:flex relative z-20">
+      <aside className="w-[280px] bg-white/40 backdrop-blur-md md:backdrop-blur-xl border-r border-white/50 p-6 flex flex-col flex-shrink-0 hidden md:flex sticky top-0 h-screen overflow-y-auto overflow-x-hidden z-20 custom-scrollbar-slim">
         <SidebarContent
           onOpen={onOpen}
           teacherName={teacherName}
@@ -109,11 +109,13 @@ const Sidebar = ({ onOpen, teacherName, teacherImage, mobileOpen, onClose }) => 
         {mobileOpen && (
           <motion.aside
             ref={sidebarRef}
-            initial={{ x: '-100%' }}
+            initial={{ x: -260 }}
             animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
-            className="fixed inset-0 z-50 w-[260px] bg-white/95 backdrop-blur-md p-6 flex flex-col border-r border-slate-200 md:hidden shadow-lg"
+            exit={{ x: -260 }}
+            transition={{ type: 'tween', duration: 0.3 }}
+            className="fixed top-0 left-0 bottom-0 z-50 w-[260px] bg-white/95 backdrop-blur-md p-6 flex flex-col border-r border-slate-200 md:hidden shadow-lg overflow-x-hidden"
           >
+
             <SidebarContent
               onOpen={onOpen}
               teacherName={teacherName}
@@ -200,7 +202,7 @@ const ClassOverview = ({ subjects }) => (
           initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.1 }}
-          className="group relative bg-white/60 backdrop-blur-md md:backdrop-blur-xl p-6 rounded-[2rem] border border-white shadow-xl shadow-indigo-100/20 hover:shadow-2xl hover:shadow-indigo-200/40 hover:-translate-y-1 transition-all duration-500"
+          className="group relative bg-white/60 backdrop-blur-md p-6 rounded-[2rem] border border-white shadow-xl shadow-indigo-100/20 hover:shadow-2xl hover:shadow-indigo-200/40 hover:-translate-y-1 transition-all duration-500"
         >
           <div className="absolute top-4 right-4 p-2 rounded-xl bg-indigo-50 text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
             <Sparkles size={14} />
@@ -225,58 +227,77 @@ const ClassOverview = ({ subjects }) => (
 );
 
 /* ---------------- Student List ---------------- */
-const StudentList = ({ students, loading }) => (
-  <section className="mt-16">
-    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10 px-2">
-      <div>
-        <h2 className="text-3xl font-black text-slate-900 tracking-tighter mb-2">Connected Learners</h2>
-        <div className="flex items-center gap-2 text-indigo-500 bg-indigo-50/50 w-fit px-3 py-1 rounded-full border border-indigo-100/50">
-          <Users size={14} />
-          <p className="text-[10px] font-black uppercase tracking-widest">{students.length} Total Students</p>
-        </div>
-      </div>
-    </div>
+const StudentList = ({ students, loading }) => {
+  const [visibleCount, setVisibleCount] = useState(24);
+  const visibleStudents = students.slice(0, visibleCount);
+  const hasMore = students.length > visibleCount;
 
-    {loading ? (
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6 md:gap-8">
-        {[1, 2, 3, 4, 5, 6].map(i => (
-          <div key={i} className="animate-pulse space-y-3">
-            <div className="aspect-square bg-slate-100 rounded-[1.5rem]" />
-            <div className="h-2 w-1/2 bg-slate-100 mx-auto rounded" />
+  return (
+    <section className="mt-8 flex-1 flex flex-col">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10 px-2">
+        <div>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tighter mb-2">Connected Learners</h2>
+          <div className="flex items-center gap-2 text-indigo-500 bg-indigo-50/50 w-fit px-3 py-1 rounded-full border border-indigo-100/50">
+            <Users size={14} />
+            <p className="text-[10px] font-black uppercase tracking-widest">{students.length} Total Students</p>
           </div>
-        ))}
-      </div>
-    ) : students.length === 0 ? (
-      <div className="bg-white/40 backdrop-blur-md md:backdrop-blur-xl rounded-[3rem] p-16 border border-white text-center shadow-2xl shadow-slate-200/50">
-        <div className="w-16 h-16 rounded-full bg-slate-50 grid place-items-center mx-auto mb-6">
-          <Users size={24} className="text-slate-200" />
         </div>
-        <p className="text-sm font-black text-slate-400 uppercase tracking-tighter">No active students found in your schedule</p>
       </div>
-    ) : (
-      <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-6 md:gap-8 pb-32">
-        {students.map(({ id, name, img }, idx) => (
-          <motion.div
-            key={id}
-            initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.03 }}
-            className="flex flex-col items-center group"
-          >
-            <div className="relative mb-4">
-              <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-              <StudentAvatar src={getImageUrl(img)} name={name} />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-0 group-hover:scale-100" />
+
+      {loading ? (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-6 md:gap-8">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="animate-pulse space-y-3">
+              <div className="aspect-square bg-slate-100 rounded-[1.5rem]" />
+              <div className="h-2 w-1/2 bg-slate-100 mx-auto rounded" />
             </div>
-            <p className="text-[10px] font-black text-slate-500 group-hover:text-indigo-600 transition-all text-center uppercase tracking-tight truncate w-full px-2">
-              {name || 'Student'}
-            </p>
-          </motion.div>
-        ))}
-      </div>
-    )}
-  </section>
-);
+          ))}
+        </div>
+      ) : students.length === 0 ? (
+        <div className="flex-grow flex flex-col items-center justify-center bg-white/40 backdrop-blur-md rounded-[3rem] p-8 border border-white text-center shadow-xl shadow-slate-200/50 min-h-[400px]">
+          <div className="w-20 h-20 rounded-full bg-slate-50 grid place-items-center mx-auto mb-6 shadow-sm">
+            <Users size={32} className="text-slate-300" />
+          </div>
+          <p className="text-sm font-black text-slate-400 uppercase tracking-tighter">No active students found in your schedule</p>
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-6 md:gap-8 pb-12">
+            {visibleStudents.map(({ id, name, img }, idx) => (
+              <motion.div
+                key={id}
+                initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.03 }}
+                className="flex flex-col items-center group"
+              >
+                <div className="relative mb-4">
+                  <div className="absolute inset-0 bg-indigo-500/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <StudentAvatar src={getImageUrl(img)} name={name} />
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-0 group-hover:scale-100" />
+                </div>
+                <p className="text-[10px] font-black text-slate-500 group-hover:text-indigo-600 transition-all text-center uppercase tracking-tight truncate w-full px-2">
+                  {name || 'Student'}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center pb-8">
+              <button
+                onClick={() => setVisibleCount(prev => prev + 24)}
+                className="px-8 py-3 rounded-2xl bg-white border border-slate-200 text-slate-600 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm hover:shadow-md active:scale-95"
+              >
+                Show More Students
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+};
 
 /* ---------------- Right Sidebar (Dynamic) ---------------- */
 function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
@@ -325,7 +346,7 @@ function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
               initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, x: 0 } : { opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : i * 0.1 }}
-              className="p-5 rounded-[1.5rem] bg-white/60 backdrop-blur-md md:backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-purple-100 transition-all cursor-default"
+              className="p-5 rounded-[1.5rem] bg-white/60 backdrop-blur-md border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-purple-100 transition-all cursor-default"
             >
               <div className="flex gap-3 mb-2">
                 <div className="w-1 h-8 bg-purple-500 rounded-full"></div>
@@ -365,7 +386,7 @@ function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
                 initial={typeof window !== 'undefined' && window.innerWidth < 768 ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: typeof window !== 'undefined' && window.innerWidth < 768 ? 0 : idx * 0.05 }}
-                className="group p-4 rounded-2xl bg-white/60 backdrop-blur-md md:backdrop-blur-xl border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-indigo-100 transition-all cursor-default"
+                className="group p-4 rounded-2xl bg-white/60 backdrop-blur-md border border-white shadow-lg shadow-slate-200/20 hover:shadow-xl hover:shadow-indigo-100 transition-all cursor-default"
               >
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
@@ -403,8 +424,10 @@ function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
   return (
     <>
       {/* Desktop */}
-      <aside className="w-[320px] bg-white/40 backdrop-blur-md md:backdrop-blur-3xl p-8 border-l border-white/50 flex-shrink-0 min-h-screen hidden md:block relative z-20 overflow-y-auto">
-        <RightSidebarContent />
+      <aside className="w-[320px] bg-white/40 backdrop-blur-md p-8 border-l border-white/50 flex-shrink-0 hidden md:block relative z-20">
+        <div className="sticky top-8">
+          <RightSidebarContent />
+        </div>
       </aside>
 
       {/* Mobile Bottom Drawer */}
@@ -414,8 +437,11 @@ function RightSidebarDynamic({ announcements, mobileOpen, onClose }) {
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md p-6 border-t border-slate-200 md:hidden max-h-[80%] overflow-y-auto"
+            transition={{ type: 'tween', duration: 0.3 }}
+            style={{ maxWidth: '100vw' }}
+            className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md p-6 border-t border-slate-200 md:hidden max-h-[80%] overflow-y-auto overflow-x-hidden"
           >
+
             <button onClick={onClose} className="self-end mb-4 text-slate-700 font-bold focus:outline-none">
               ✕
             </button>
@@ -458,7 +484,7 @@ function MainArea() {
   }, [schedulesQ.data]);
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto">
+    <div className="p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-h-[calc(100vh-2rem)]">
       <ClassOverview subjects={SUBJECTS} />
       <StudentList students={studentsFromSchedules} loading={schedulesQ.isLoading} />
     </div>
@@ -512,9 +538,10 @@ export default function TeacherClassroom() {
   }, [client]);
 
   return (
-    <div className="flex w-full h-[100dvh] bg-slate-50 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-900">
+    <div className="flex w-full min-h-screen bg-slate-50 relative font-sans selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
       {/* Legendary Background (Light Edition) - Optimized for mobile */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+
         <div className="hidden md:block">
           <div className="absolute top-0 right-0 w-[1200px] h-[1200px] bg-indigo-500/5 blur-[180px] rounded-full animate-blob"></div>
           <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-purple-500/5 blur-[150px] rounded-full animate-blob animation-delay-2000"></div>
@@ -548,15 +575,8 @@ export default function TeacherClassroom() {
         onClose={() => setMobileSidebarOpen(false)}
       />
 
-      <main
-        className="flex-1 overflow-y-auto relative z-10 custom-scrollbar overscroll-contain touch-pan-y"
-        style={{
-          WebkitOverflowScrolling: 'touch',
-          willChange: 'transform',
-          transform: 'translateZ(0)'
-        }}
-      >
-        <div className="w-full transform-gpu">
+      <main className="flex-1 relative z-10 p-0">
+        <div className="w-full">
           <MainArea />
         </div>
       </main>
@@ -570,27 +590,54 @@ export default function TeacherClassroom() {
       <FixScheduleModal open={open} onClose={() => setOpen(false)} />
 
       <style jsx global>{`
-        @keyframes blob {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-        }
-        .animate-blob { animation: blob 15s infinite; }
-        .animation-delay-2000 { animation-delay: 2s; }
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(0, 0, 0, 0.05);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(0, 0, 0, 0.1);
-        }
-      `}</style>
+  /* Prevent horizontal scroll flashes & layout overflow */
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: clip; /* better than hidden, prevents reflow */
+  }
+
+  /* Background blob animation */
+  @keyframes blob {
+    0%, 100% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    33% {
+      transform: translate3d(30px, -50px, 0) scale(1.1);
+    }
+    66% {
+      transform: translate3d(-20px, 20px, 0) scale(0.9);
+    }
+  }
+
+  .animate-blob {
+    animation: blob 15s infinite;
+    will-change: transform;
+  }
+
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+
+  /* Slim scrollbar for sidebar */
+  .custom-scrollbar-slim::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .custom-scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar-slim::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+  }
+`}</style>
+
     </div>
   );
 }

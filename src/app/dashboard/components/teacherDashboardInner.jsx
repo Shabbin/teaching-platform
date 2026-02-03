@@ -2,7 +2,7 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDispatch, useSelector } from 'react-redux';
-import { uploadProfilePicture, getTeacherDashboard } from './../../redux/userSlice';
+import { uploadProfilePicture, getTeacherDashboard,hideCreatePostTooltip } from './../../redux/userSlice';
 import API from '../../../api/axios';
 
 import ViewedPostsTimeline from './ViewedPostsTimeline';
@@ -44,6 +44,8 @@ export default function TeacherDashboardInner() {
   const { userInfo } = useSelector((state) => state.user);
 
   const [fallbackPayments, setFallbackPayments] = useState(null);
+// Tooltip for "Create Post"
+
 
   useEffect(() => {
     if (userInfo && userInfo._id) {
@@ -62,6 +64,8 @@ export default function TeacherDashboardInner() {
       dispatch(getTeacherDashboard());
     }
   }, [dispatch, isAuthenticated, teacherDashboard, dashboardLoading, dashboardError]);
+// Show tooltip if Redux says to
+
 
   useEffect(() => {
     const hasAnyPayments =
@@ -86,6 +90,9 @@ export default function TeacherDashboardInner() {
   };
 
   const teacher = teacherDashboard?.teacher || {};
+const showCreatePostTooltip =
+  teacherDashboard?.teacher?.onboarding?.showCreatePostTooltip === true;
+  console.log('ONBOARDING STATE 👉', teacher?.onboarding);
   const upcomingSessions = teacherDashboard?.upcomingSessions || [];
   const sessionRequests = teacherDashboard?.sessionRequests || [];
 
@@ -235,14 +242,40 @@ export default function TeacherDashboardInner() {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <button className="px-8 py-4 bg-white border border-slate-100 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95 shadow-lg shadow-slate-100">
-                Edit Schedule
-              </button>
-              <button className="px-10 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-2xl shadow-slate-200">
-                Create Post
-              </button>
-            </div>
+       <div className="flex items-center gap-4 relative">
+  <button className="px-8 py-4 bg-white border border-slate-100 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all active:scale-95 shadow-lg shadow-slate-100">
+    Edit Schedule
+  </button>
+
+  <div className="relative">
+    <button className="px-10 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all active:scale-95 shadow-2xl shadow-slate-200">
+      Create Post
+    </button>
+
+    {/* Tooltip */}
+{showCreatePostTooltip && (
+  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-white shadow-lg border border-slate-200 rounded-xl p-3 w-64 z-50">
+    <div className="flex justify-between items-start gap-2">
+      <p className="text-xs text-slate-700">
+        {!teacher.isEligible
+          ? 'Verify your account to unlock full posting features!'
+          : 'Now you can post freely! Click "Create Post" to start.'}
+      </p>
+
+      <button
+        onClick={() => {
+          dispatch(hideCreatePostTooltip());
+        }}
+        className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+      >
+        ×
+      </button>
+    </div>
+  </div>
+)}
+  </div>
+</div>
+
           </div>
         </motion.div>
 

@@ -151,6 +151,11 @@ const userSlice = createSlice({
           ? img || '/default-avatar.png'
           : `${process.env.NEXT_PUBLIC_API_BASE_URL}/${img}`;
     },
+     hideCreatePostTooltip: (state) => {
+    if (state.teacherDashboard?.teacher?.onboarding) {
+      state.teacherDashboard.teacher.onboarding.showCreatePostTooltip = false;
+    }
+  }
   },
   extraReducers: (builder) => {
     builder
@@ -210,5 +215,5 @@ const userSlice = createSlice({
   },
 });
 
-export const { logout, updateProfileImage, setUserInfo, setTeacherData, clearError } = userSlice.actions;
+export const { logout, updateProfileImage, setUserInfo, setTeacherData, clearError,hideCreatePostTooltip } = userSlice.actions;
 export default userSlice.reducer;

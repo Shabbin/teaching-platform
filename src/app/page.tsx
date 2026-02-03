@@ -193,7 +193,7 @@ export default function HomePage() {
           transition={{ delay: 1.5, duration: 1 }}
           className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50"
         >
-          <span className="text-xs uppercase tracking-widest">Scroll</span>
+         
           <div className="w-[1px] h-12 bg-gradient-to-b from-white/0 via-white/50 to-white/0" />
         </motion.div>
       </section>

@@ -68,7 +68,7 @@ export async function settleSolve({ questionId, studentId, teacherId }) {
 }
 
 export async function getTeacherSummary() {
-  const url = absUrl('/pay/teacher/summary'); // ✅ use the same builder as other calls
+  const url = absUrl('/payments/teacher/summary'); // ✅ use the same builder as other calls
   const res = await axios.get(url, { withCredentials: true });
   return res.data; // { payments: [...], summary: {...} }
 }
